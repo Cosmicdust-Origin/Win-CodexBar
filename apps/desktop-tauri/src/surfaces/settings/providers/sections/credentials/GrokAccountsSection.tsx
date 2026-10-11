@@ -10,7 +10,6 @@ import {
 } from "../../../../../lib/tauri";
 import { useGrokAccounts } from "../../../../../hooks/useGrokAccounts";
 import GrokAccountUsageDetails from "../../../../../components/GrokAccountUsageDetails";
-import { maskEmail } from "../../../../../components/MenuCard";
 
 export function GrokAccountsSection({
   t,
@@ -50,11 +49,14 @@ export function GrokAccountsSection({
       {loggingIn && <p role="status">{t("GrokAccountsSigningIn")}</p>}
       {accounts.length === 0 && <p>{t("GrokAccountsEmpty")}</p>}
       <ul className="credential-list">
-        {accounts.map((account) => (
+        {accounts.map((account, index) => (
           <li className="credential-card" key={account.id}>
             <div className="credential-card__header">
               <div className="credential-card__info">
-                <strong>{hidePersonalInfo ? maskEmail(account.email) : account.email}</strong>
+                <strong>
+                  {/* Mac `PersonalInfoRedactor.AccountOrdinal`: no part of the email. */}
+                  {hidePersonalInfo ? `${t("Account")} ${index + 1}` : account.email}
+                </strong>
                 <span className="credential-card__meta">
                   {usage[account.id]?.plan || account.plan}
                 </span>

@@ -44,8 +44,8 @@ describe("IdentitySection OpenAI project privacy", () => {
 });
 
 describe("IdentitySection account privacy for every provider", () => {
-  it("masks the account email of non-OpenAI providers when privacy is enabled", () => {
-    render(
+  it("drops the account email of non-OpenAI providers when privacy is enabled", () => {
+    const { container } = render(
       <IdentitySection
         provider={detail({ id: "codex", displayName: "Codex", email: "person@example.com", organization: null, plan: "Pro" })}
         subtitle=""
@@ -54,13 +54,14 @@ describe("IdentitySection account privacy for every provider", () => {
       />,
     );
 
-    expect(screen.getByText("p•••••@example.com")).toBeInTheDocument();
-    expect(screen.queryByText("person@example.com")).toBeNull();
+    expect(container.innerHTML).not.toContain("@");
+    expect(container.innerHTML).not.toContain("example.com");
+    expect(screen.queryByText("Account")).toBeNull();
     expect(screen.getByText("Pro")).toBeInTheDocument();
   });
 
-  it("masks an email embedded in the organization label", () => {
-    render(
+  it("drops an organization label that embeds the email", () => {
+    const { container } = render(
       <IdentitySection
         provider={detail({ id: "claude", displayName: "Claude", email: null, organization: "person@example.com's Organization", plan: null })}
         subtitle=""
@@ -69,7 +70,9 @@ describe("IdentitySection account privacy for every provider", () => {
       />,
     );
 
-    expect(screen.getByText("p•••••@example.com's Organization")).toBeInTheDocument();
+    expect(container.innerHTML).not.toContain("@");
+    expect(container.innerHTML).not.toContain("example.com");
+    expect(screen.queryByText("Account")).toBeNull();
   });
 
   it("shows the account email when privacy is disabled", () => {

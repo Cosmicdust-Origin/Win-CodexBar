@@ -261,6 +261,15 @@ fn codex_account_menu_label(
     )
 }
 
+/// "Account N" for the account at `index`: Hide Personal Info shows no part
+/// of an email (Mac `PersonalInfoRedactor.AccountOrdinal`).
+fn hidden_account_label(lang: Language, index: usize) -> String {
+    let word = locale::get_text(lang, LocaleKey::Account);
+    let word = word.trim();
+    let word = if word.is_empty() { "Account" } else { word };
+    format!("{word} {}", index + 1)
+}
+
 fn claude_accounts_menu(
     accounts: &[codexbar::providers::claude::accounts::ClaudeAccount],
     lang: Language,
@@ -269,12 +278,10 @@ fn claude_accounts_menu(
     let text = |key| locale::get_text(lang, key);
     let mut children: Vec<_> = accounts
         .iter()
-        .map(|account| {
+        .enumerate()
+        .map(|(index, account)| {
             let label = if hide_personal_info {
-                codexbar::core::PersonalInfoRedactor::partial_redact_email(
-                    Some(&account.email),
-                    true,
-                )
+                hidden_account_label(lang, index)
             } else {
                 account.organization.as_ref().map_or_else(
                     || account.email.clone(),
@@ -324,12 +331,10 @@ fn grok_accounts_menu(
     let text = |key| locale::get_text(lang, key);
     let mut children: Vec<_> = accounts
         .iter()
-        .map(|account| {
+        .enumerate()
+        .map(|(index, account)| {
             let label = if hide_personal_info {
-                codexbar::core::PersonalInfoRedactor::partial_redact_email(
-                    Some(&account.email),
-                    true,
-                )
+                hidden_account_label(lang, index)
             } else {
                 account.email.clone()
             };
@@ -604,5 +609,45 @@ mod tests {
             &grok_accounts_menu(&[], Language::English, false).children,
             "add_grok_account"
         ));
+    }
+
+    #[test]
+    fn hidden_claude_and_grok_tray_labels_show_no_email() {
+        use codexbar::providers::claude::accounts::ClaudeAccount;
+        use codexbar::providers::grok::accounts::GrokAccount;
+        let claude = ClaudeAccount {
+            id: "a:org".into(),
+            email: "proof@example.com".into(),
+            organization: Some("proof@example.com's Organization".into()),
+            plan: None,
+            is_active: true,
+            is_saved: true,
+        };
+        let claude_other = ClaudeAccount {
+            id: "b:org".into(),
+            email: "second@example.com".into(),
+            is_active: false,
+            ..claude.clone()
+        };
+        let grok = GrokAccount {
+            id: "user-a".into(),
+            email: "proof@example.com".into(),
+            organization: None,
+            plan: None,
+            is_active: true,
+            is_saved: true,
+        };
+        let claude_menu = claude_accounts_menu(&[claude, claude_other], Language::English, true);
+        let grok_menu = grok_accounts_menu(&[grok], Language::English, true);
+        let labels: Vec<&str> = claude_menu.children[..2]
+            .iter()
+            .chain(&grok_menu.children[..1])
+            .map(|entry| entry.label.as_str())
+            .collect();
+        assert_eq!(labels, ["Account 1", "Account 2", "Account 1"]);
+        for entry in claude_menu.children.iter().chain(&grok_menu.children) {
+            assert!(!entry.label.contains('@'), "{}", entry.label);
+            assert!(!entry.label.contains("example.com"), "{}", entry.label);
+        }
     }
 }

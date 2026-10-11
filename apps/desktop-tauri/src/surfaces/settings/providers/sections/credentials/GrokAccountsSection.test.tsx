@@ -96,11 +96,11 @@ describe("GrokAccountsSection", () => {
     expect((screen.getByText("CodexAccountsAddButton") as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("masks account emails under Hide Personal Info", async () => {
+  it("labels accounts Account N under Hide Personal Info, with no email", async () => {
     const { container } = render(<GrokAccountsSection t={t} hidePersonalInfo />);
-    await screen.findByText("o••@example.com");
-    expect(screen.getByText("t••@example.com")).toBeInTheDocument();
-    expect(container.innerHTML).not.toContain("one@example.com");
-    expect(container.innerHTML).not.toContain("two@example.com");
+    await screen.findByText("Account 1");
+    expect(screen.getByText("Account 2")).toBeInTheDocument();
+    expect(container.innerHTML).not.toContain("@");
+    expect(container.innerHTML).not.toContain("example.com");
   });
 });

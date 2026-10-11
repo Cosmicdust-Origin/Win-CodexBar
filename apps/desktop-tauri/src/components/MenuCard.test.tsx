@@ -129,15 +129,17 @@ function renderCard(
 }
 
 describe("MenuCard", () => {
-  it("masks the header email under Hide Personal Info", async () => {
-    const snapshot = { ...provider(null, 20), accountEmail: "parity.user@example.com" };
+  it("shows no email under Hide Personal Info, in the header or the error line", async () => {
+    const snapshot = {
+      ...provider(null, 20),
+      accountEmail: "parity.user@example.com",
+      error: "parity.user@example.com: session expired",
+    };
     const { container, unmount } = renderCard(snapshot, { hideEmail: true });
-    await waitFor(() =>
-      expect(container.querySelector(".card-header__email")).toHaveTextContent(
-        "p••••••••••@example.com",
-      ),
-    );
-    expect(container.textContent).not.toContain("parity.user@");
+    await waitFor(() => expect(container.textContent).toContain("session expired"));
+    expect(container.querySelector(".card-header__email")).toBeNull();
+    expect(container.innerHTML).not.toContain("@");
+    expect(container.innerHTML).not.toContain("example.com");
     unmount();
 
     const shown = renderCard(snapshot);

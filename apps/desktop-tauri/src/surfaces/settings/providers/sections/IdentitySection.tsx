@@ -3,7 +3,7 @@ import type { LocaleKey } from "../../../../i18n/keys";
 import { ProviderIcon } from "../../../../components/providers/ProviderIcon";
 import { Toggle } from "../../../../components/FormControls";
 import { hideOpenAiApiProjectId } from "../../../../lib/openAiApiIdentity";
-import { maskEmail } from "../../../../components/MenuCard";
+import { containsEmail } from "../../../../lib/personalInfo";
 import { providerSourceHintShort } from "../providerDetailFormat";
 
 interface Props {
@@ -40,14 +40,13 @@ export function IdentitySection({
   busy = false,
 }: Props) {
   const hideProjectId = provider.id === "openaiapi" && hidePersonalInfo;
-  // Same masking as the tray card (MenuCard), for every provider.
-  const account = provider.email
-    ? hidePersonalInfo
-      ? maskEmail(provider.email)
-      : provider.email
-    : hidePersonalInfo
-      ? maskEmailsInText(provider.organization)
-      : provider.organization;
+  // Hide Personal Info drops the account row when it would show an email, as
+  // the tray card (MenuCard) does, for every provider.
+  const account = hidePersonalInfo
+    ? provider.email || containsEmail(provider.organization)
+      ? null
+      : provider.organization
+    : provider.email || provider.organization;
   const rows: { key: string; label: string; value: string | null }[] = [
     {
       key: "source",
@@ -119,12 +118,6 @@ export function IdentitySection({
       </div>
     </section>
   );
-}
-
-/** Organization labels can embed the account email (e.g. "me@x.com's Organization"). */
-export function maskEmailsInText(value: string | null): string | null {
-  if (!value) return value;
-  return value.replace(/[^\s@'"]+@[^\s@'"]+/g, (email) => maskEmail(email));
 }
 
 function displayIdentityValue(
