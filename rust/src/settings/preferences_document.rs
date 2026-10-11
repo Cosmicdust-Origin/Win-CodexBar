@@ -21,7 +21,7 @@ use std::path::Path;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
-use super::{MetricPreference, Settings};
+use super::{MetricPreference, ProviderQuotaWarnings, Settings};
 use crate::core::ProviderId;
 use crate::cost_reporting_period::CostReportingPeriod;
 
@@ -55,6 +55,18 @@ const IMPORT_ONLY_PREFERENCES: &[(&str, Validator)] = &[
     // Migration #5: folded into `provider_configs.<id>.quota_warnings`.
     ("provider_usage_thresholds", provider_usage_thresholds),
 ];
+
+/// Portable per-provider preferences that live inside `provider_configs`.
+/// That field is excluded as a whole because it holds secrets, so only these
+/// sub-fields travel, each under its own document key.
+const PROVIDER_PREFERENCES: &[(&str, Validator)] = &[
+    // `provider_configs.<id>.quota_warnings`, as `{ "<id>": { "session": {..},
+    // "weekly": {..} } }`. Windows extension (#827): the Mac document has no
+    // per-provider quota warnings.
+    (PROVIDER_QUOTA_WARNINGS, provider_quota_warnings),
+];
+
+const PROVIDER_QUOTA_WARNINGS: &str = "provider_quota_warnings";
 
 /// Portable keys, named after the `Settings` fields, with their validators.
 const ALLOWED_PREFERENCES: &[(&str, Validator)] = &[
@@ -291,6 +303,70 @@ fn provider_usage_thresholds(value: &Value) -> bool {
     })
 }
 
+/// `{ "<provider>": { "session"?: window, "weekly"?: window } }`, where a
+/// window is `{ "enabled"?: bool, "high"?: percent, "critical"?: percent }`
+/// (each may be `null`). Unknown providers, windows and fields are rejected.
+fn provider_quota_warnings(value: &Value) -> bool {
+    let known = known_provider_ids();
+    let window_ok = |window: &Value| {
+        window.as_object().is_some_and(|fields| {
+            fields.iter().all(|(field, value)| match field.as_str() {
+                "enabled" => value.is_null() || value.is_boolean(),
+                "high" | "critical" => value.is_null() || percent(value),
+                _ => false,
+            })
+        })
+    };
+    value.as_object().is_some_and(|map| {
+        map.iter().all(|(provider, windows)| {
+            known.contains(provider.as_str())
+                && windows.as_object().is_some_and(|windows| {
+                    windows.iter().all(|(name, window)| {
+                        matches!(name.as_str(), "session" | "weekly") && window_ok(window)
+                    })
+                })
+        })
+    })
+}
+
+/// Every provider's non-global quota warnings, keyed by provider id.
+fn export_provider_quota_warnings(settings: &Settings) -> Result<Value, PreferencesError> {
+    let mut map = Map::new();
+    for id in ProviderId::all() {
+        let warnings = settings.quota_warnings(*id).normalized();
+        if !warnings.is_empty() {
+            let value = serde_json::to_value(warnings)
+                .map_err(|error| PreferencesError::Apply(error.to_string()))?;
+            map.insert(id.cli_name().to_string(), value);
+        }
+    }
+    Ok(Value::Object(map))
+}
+
+/// Replace every provider's quota warnings with the document's. Providers the
+/// document does not list go back to the global settings; `null` resets all.
+fn apply_provider_quota_warnings(
+    settings: &mut Settings,
+    value: &Value,
+) -> Result<(), PreferencesError> {
+    for config in settings.provider_configs.values_mut() {
+        config.quota_warnings = ProviderQuotaWarnings::default();
+    }
+    let Some(map) = value.as_object() else {
+        return Ok(());
+    };
+    for (provider, warnings) in map {
+        let id =
+            ProviderId::from_cli_name(provider).ok_or_else(|| invalid(PROVIDER_QUOTA_WARNINGS))?;
+        let warnings: ProviderQuotaWarnings = serde_json::from_value(warnings.clone())
+            .map_err(|_| invalid(PROVIDER_QUOTA_WARNINGS))?;
+        if !warnings.is_empty() {
+            settings.set_quota_warnings(id, warnings);
+        }
+    }
+    Ok(())
+}
+
 fn invalid(key: &str) -> PreferencesError {
     PreferencesError::InvalidPreference(key.to_string())
 }
@@ -329,6 +405,7 @@ impl PreferencesDocument {
             let Some((_, valid)) = ALLOWED_PREFERENCES
                 .iter()
                 .chain(IMPORT_ONLY_PREFERENCES)
+                .chain(PROVIDER_PREFERENCES)
                 .find(|(name, _)| name == key)
             else {
                 return Err(invalid(key));
@@ -371,6 +448,10 @@ impl PreferencesDocument {
             // `enabled_providers` is a set; keep exports deterministic.
             ids.sort_by(|a, b| a.as_str().cmp(&b.as_str()));
         }
+        preferences.insert(
+            PROVIDER_QUOTA_WARNINGS.to_string(),
+            export_provider_quota_warnings(settings)?,
+        );
         Self::validated(preferences)
     }
 
@@ -413,6 +494,10 @@ impl PreferencesDocument {
             ));
         };
         for (key, value) in &self.preferences {
+            if PROVIDER_PREFERENCES.iter().any(|(name, _)| name == key) {
+                // Applied below, into `provider_configs`.
+                continue;
+            }
             if !value.is_null() {
                 current.insert(key.clone(), value.clone());
             } else if let Some(default) = defaults.get(key) {
@@ -425,7 +510,14 @@ impl PreferencesDocument {
         }
         // Re-read through the normal settings loader so clamping and
         // normalization match what `settings.json` gets on load.
-        *settings = serde_json::from_value(Value::Object(current)).map_err(apply_error)?;
+        let mut next: Settings =
+            serde_json::from_value(Value::Object(current)).map_err(apply_error)?;
+        // After the legacy `provider_usage_thresholds` migration above, so the
+        // current key wins when a document carries both.
+        if let Some(value) = self.preferences.get(PROVIDER_QUOTA_WARNINGS) {
+            apply_provider_quota_warnings(&mut next, value)?;
+        }
+        *settings = next;
         Ok(self.preferences.len())
     }
 
