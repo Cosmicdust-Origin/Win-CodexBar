@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  HooksConfigSave,
+  HooksConfigSnapshot,
   ClaudeAccount,
   ClaudeReconciliationSnapshot,
   GrokAccount,
@@ -96,6 +98,14 @@ export function getCurrencyRates(preferredCurrencyCode: string): Promise<Currenc
 
 export function getStayAwakeStatus(): Promise<boolean> {
   return invoke<boolean>("get_stay_awake_status");
+}
+
+export function getHooksConfig(): Promise<HooksConfigSnapshot> {
+  return invoke<HooksConfigSnapshot>("get_hooks_config");
+}
+
+export function saveHooksConfig(request: HooksConfigSave): Promise<HooksConfigSnapshot> {
+  return invoke<HooksConfigSnapshot>("save_hooks_config", { request });
 }
 
 export function updateSettings(

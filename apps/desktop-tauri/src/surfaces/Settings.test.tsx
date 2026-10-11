@@ -51,6 +51,9 @@ vi.mock("./settings/tabs/MenuTab", () => ({
 vi.mock("./settings/tabs/AdvancedTab", () => ({
   default: () => <div data-testid="tab">advanced</div>,
 }));
+vi.mock("./settings/tabs/HooksTab", () => ({
+  default: () => <div data-testid="tab">hooks</div>,
+}));
 vi.mock("./settings/tabs/AboutTab", () => ({
   default: () => <div data-testid="tab">about</div>,
 }));

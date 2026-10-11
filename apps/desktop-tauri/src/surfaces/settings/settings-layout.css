@@ -1280,3 +1280,115 @@
   font-size: 12px;
   color: var(--provider-status-error);
 }
+
+/* ── Hooks pane (macOS PreferencesHooksPane) ─────────────────────────── */
+.hooks-pane__caption {
+  margin: 0;
+  gap: 6px;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.hooks-pane__warning-icon {
+  flex: none;
+  margin-top: 1px;
+}
+
+.hooks-rule {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+.hooks-rule__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hooks-rule__header .select {
+  min-width: 0;
+  max-width: 40%;
+}
+
+.hooks-rule__spacer {
+  flex: 1;
+}
+
+.hooks-rule__threshold {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.hooks-rule__threshold .hooks-rule__threshold-input {
+  width: 60px;
+}
+
+.hooks-rule__mono {
+  width: 100%;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+}
+
+.hooks-rule__arguments {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hooks-rule__arguments-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.hooks-rule__argument {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hooks-pane__link-button,
+.hooks-pane__icon-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--accent, #0a84ff);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.hooks-pane__icon-button {
+  color: var(--text-secondary);
+}
+
+.hooks-pane__icon-button--destructive {
+  color: var(--provider-status-error, #ff453a);
+}
+
+.hooks-pane__link-button:disabled,
+.hooks-pane__icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.hooks-pane__link-button:focus-visible,
+.hooks-pane__icon-button:focus-visible {
+  outline: 2px solid var(--accent, #0a84ff);
+  outline-offset: 1px;
+}
