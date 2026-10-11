@@ -132,6 +132,19 @@ describe("HooksTab", () => {
     expect(screen.getByText("HooksPartlyOn")).toBeInTheDocument();
   });
 
+  it("reads as off with a caption when only the file flag is on, and the switch turns both on", async () => {
+    const start = snapshot({ settingsEnabled: false, fileEnabled: true, enabled: false });
+    await renderTab(start);
+    expect(screen.getByRole("checkbox", { name: "HooksEnableLabel" })).not.toBeChecked();
+    expect(screen.getByText("HooksPartlyOn")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "HooksEnableLabel" }));
+    await waitFor(() => expect(tauriMocks.saveHooksConfig).toHaveBeenCalledTimes(1));
+    expect(lastSave()).toEqual({ enabled: true, rules: [] });
+    await waitFor(() => expect(screen.queryByText("HooksPartlyOn")).toBeNull());
+    expect(screen.getByRole("checkbox", { name: "HooksEnableLabel" })).toBeChecked();
+  });
+
   it("adds a rule, sets it up and saves each edit without touching the master flags", async () => {
     await renderTab(snapshot({ enabled: true, settingsEnabled: true, fileEnabled: true }));
     fireEvent.click(screen.getByRole("button", { name: "+ HooksAddRule" }));
