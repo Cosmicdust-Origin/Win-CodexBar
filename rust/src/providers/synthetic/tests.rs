@@ -79,6 +79,8 @@ fn pack_result_matches_the_mac_card() {
         Some("76% after next regen · Full in ~3 regens")
     );
     assert!(usage.primary.description_is_detail);
+    // The card says "Regenerates in 45m", not "Resets in 45m".
+    assert!(usage.primary.reset_regenerates);
     // No window length, so the card shows no pace line on the regen lane.
     assert_eq!(usage.primary.window_minutes, None);
 
@@ -88,6 +90,7 @@ fn pack_result_matches_the_mac_card() {
     assert_eq!(weekly.window_minutes, Some(10_080));
     assert_eq!(weekly.resets_at, at(NOW + 388_800));
     assert!(!weekly.description_is_detail);
+    assert!(!weekly.reset_regenerates);
 
     // "Search hourly 76% left", "Resets in 25m".
     assert_eq!(usage.extra_rate_windows.len(), 1);
@@ -96,6 +99,7 @@ fn pack_result_matches_the_mac_card() {
     assert_eq!(search.title, "Search hourly");
     assert_eq!(search.window.remaining_percent().round(), 76.0);
     assert_eq!(search.window.resets_at, at(NOW + 1500));
+    assert!(!search.window.reset_regenerates);
     assert!(usage.tertiary.is_none());
 
     assert_eq!(usage.login_method.as_deref(), Some("Synthetic Standard"));
@@ -243,6 +247,7 @@ fn weekly_cost_with_next_regen_amount_drives_the_weekly_regen_line() {
         Some("65% after next regen · Full in ~8 regens")
     );
     assert!(weekly.description_is_detail);
+    assert!(weekly.reset_regenerates);
     assert_eq!(weekly.window_minutes, None);
     assert_eq!(result.usage.login_method.as_deref(), Some("Pro"));
     // The Mac card hides Synthetic's cost block, so the credits never reach
