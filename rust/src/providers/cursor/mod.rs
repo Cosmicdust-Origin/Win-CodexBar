@@ -23,6 +23,13 @@ pub use api::CursorApi;
 use cost_cooldown::{CostCooldown, credential_fingerprint};
 use token_cost::TokenCostError;
 
+/// Reset-window pace (upstream `CursorProviderDescriptor.pace`, v0.70.0): any
+/// window with a billing-cycle length.
+pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
+    crate::core::ProviderPaceCapability::reset_window(
+        crate::core::PaceWindowRule::WindowDurationPresent,
+    );
+
 /// Cursor provider for fetching AI usage limits
 pub struct CursorProvider {
     metadata: ProviderMetadata,

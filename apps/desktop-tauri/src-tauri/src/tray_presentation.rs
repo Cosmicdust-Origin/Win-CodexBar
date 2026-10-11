@@ -219,7 +219,9 @@ fn resolve_single_provider_icon_plan(
 /// Pace tint for the provider that drives a single-provider tray icon.
 ///
 /// Opt-in through `menu_bar_color_pace`; on-track and unknown stages keep the
-/// normal usage-level colour.
+/// normal usage-level colour. A pace scored from a window without its own
+/// length gets no tint, as upstream `UsageStore.weeklyPace` gives the menu
+/// bar no pace for it (Copilot's reset-date-only windows, for example).
 fn tray_pace_color(
     settings: &Settings,
     selected: Option<&ProviderUsageSnapshot>,
@@ -229,6 +231,7 @@ fn tray_pace_color(
     }
     selected
         .and_then(|snapshot| snapshot.pace.as_ref())
+        .filter(|pace| pace.window_has_length)
         .and_then(|pace| TrayPaceColor::from_stage(&pace.stage))
 }
 

@@ -173,6 +173,11 @@ struct StepFunTokenPair {
     raw: String,
 }
 
+/// Reset-window pace (upstream `StepFunProviderDescriptor.pace`, v0.70.0):
+/// `.calendarMonthResetWindow`.
+pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
+    crate::core::ProviderPaceCapability::CALENDAR_MONTH_RESET_WINDOW;
+
 pub struct StepFunProvider {
     metadata: ProviderMetadata,
     client: Client,

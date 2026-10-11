@@ -5,7 +5,7 @@
 //! only requires editing `ProviderId`, the matching `providers/` module, and
 //! this one match arm.
 
-use super::{Provider, ProviderId};
+use super::{Provider, ProviderId, ProviderPaceCapability};
 use crate::providers::AtlasCloudProvider;
 use crate::providers::ClawRouterProvider;
 use crate::providers::IBMBobProvider;
@@ -136,6 +136,112 @@ pub fn instantiate(id: ProviderId) -> Box<dyn Provider> {
         ProviderId::XKiro => Box::new(XKiroProvider::new()),
         ProviderId::Raycast => Box::new(RaycastProvider::new()),
         ProviderId::Vercel => Box::new(VercelProvider::new()),
+    }
+}
+
+/// Reset-window pace rule declared by each provider's module (upstream
+/// `ProviderDescriptor.pace`, v0.70.0). Exhaustive over [`ProviderId`]: a new
+/// variant is a compile error until it is listed here, and providers that
+/// upstream does not opt in map to [`ProviderPaceCapability::UNSUPPORTED`].
+pub fn pace_capability(id: ProviderId) -> ProviderPaceCapability {
+    use crate::providers as p;
+    match id {
+        ProviderId::Copilot => p::copilot::PACE_CAPABILITY,
+        ProviderId::Cursor => p::cursor::PACE_CAPABILITY,
+        ProviderId::Grok => p::grok::PACE_CAPABILITY,
+        ProviderId::Kimi => p::kimi::PACE_CAPABILITY,
+        ProviderId::Zai => p::zai::PACE_CAPABILITY,
+        ProviderId::Amp => p::amp::PACE_CAPABILITY,
+        ProviderId::Alibaba => p::alibaba::PACE_CAPABILITY,
+        ProviderId::AlibabaTokenPlan => p::alibabatokenplan::PACE_CAPABILITY,
+        ProviderId::CommandCode => p::commandcode::PACE_CAPABILITY,
+        ProviderId::Doubao => p::doubao::PACE_CAPABILITY,
+        ProviderId::MiMo => p::mimo::PACE_CAPABILITY,
+        ProviderId::StepFun => p::stepfun::PACE_CAPABILITY,
+        ProviderId::Notion => p::notion::PACE_CAPABILITY,
+        ProviderId::Ollama => p::ollama::PACE_CAPABILITY,
+        ProviderId::OpenCodeGo => p::opencodego::PACE_CAPABILITY,
+        ProviderId::Claude
+        | ProviderId::Codex
+        | ProviderId::Pi
+        | ProviderId::Gemini
+        | ProviderId::Antigravity
+        | ProviderId::AtlasCloud
+        | ProviderId::Synthetic
+        | ProviderId::ClawRouter
+        | ProviderId::IBMBob
+        | ProviderId::Langdock
+        | ProviderId::LithosAI
+        | ProviderId::MuseAI
+        | ProviderId::WorkBuddy
+        | ProviderId::Factory
+        | ProviderId::Kiro
+        | ProviderId::VertexAI
+        | ProviderId::Augment
+        | ProviderId::MiniMax
+        | ProviderId::OpenCode
+        | ProviderId::KimiK2
+        | ProviderId::Warp
+        | ProviderId::AzureOpenAI
+        | ProviderId::T3Chat
+        | ProviderId::OpenRouter
+        | ProviderId::JetBrains
+        | ProviderId::NanoGPT
+        | ProviderId::Infini
+        | ProviderId::Perplexity
+        | ProviderId::Abacus
+        | ProviderId::Mistral
+        | ProviderId::Kilo
+        | ProviderId::Bedrock
+        | ProviderId::Codebuff
+        | ProviderId::CodeRabbit
+        | ProviderId::DeepSeek
+        | ProviderId::DeepInfra
+        | ProviderId::AiAnd
+        | ProviderId::Windsurf
+        | ProviderId::Manus
+        | ProviderId::Venice
+        | ProviderId::OpenAIApi
+        | ProviderId::ElevenLabs
+        | ProviderId::Deepgram
+        | ProviderId::Groq
+        | ProviderId::HuggingFace
+        | ProviderId::Helmcode
+        | ProviderId::V0
+        | ProviderId::TypeSafe
+        | ProviderId::LLMProxy
+        | ProviderId::Chutes
+        | ProviderId::LiteLLM
+        | ProviderId::Poe
+        | ProviderId::Devin
+        | ProviderId::Zed
+        | ProviderId::CrossModel
+        | ProviderId::Qoder
+        | ProviderId::CodeBuddy
+        | ProviderId::Sakana
+        | ProviderId::Sub2Api
+        | ProviderId::Wayfinder
+        | ProviderId::ZenMux
+        | ProviderId::ClinePass
+        | ProviderId::LongCat
+        | ProviderId::Neuralwatt
+        | ProviderId::ZoomMate
+        | ProviderId::QwenCloud
+        | ProviderId::Replicate
+        | ProviderId::Xai
+        | ProviderId::Fireworks
+        | ProviderId::Meta
+        | ProviderId::Muse
+        | ProviderId::Nous
+        | ProviderId::Hyper
+        | ProviderId::GitKraken
+        | ProviderId::Bifrost
+        | ProviderId::Aixy
+        | ProviderId::LLMMan
+        | ProviderId::DevPass
+        | ProviderId::XKiro
+        | ProviderId::Raycast
+        | ProviderId::Vercel => ProviderPaceCapability::UNSUPPORTED,
     }
 }
 

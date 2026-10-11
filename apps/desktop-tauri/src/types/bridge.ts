@@ -1,4 +1,5 @@
 import type { LocaleKey } from "../i18n/keys";
+
 export type SurfaceMode = "hidden" | "trayPanel" | "popOut" | "settings";
 export type VisibleSurfaceMode = Exclude<SurfaceMode, "hidden">;
 export type SettingsTabId =
@@ -833,6 +834,8 @@ export interface ProviderUsageSnapshot {
   primaryLabel?: string;
   secondary: RateWindowSnapshot | null;
   secondaryLabel?: string;
+  /** Provider-chosen locale key that names the secondary lane (wins over `secondaryLabel`). */
+  secondaryLabelKey?: LocaleKey | null;
   modelSpecific: RateWindowSnapshot | null;
   tertiary: RateWindowSnapshot | null;
   /** F5: duration-cadence label for tertiary ("monthly", "weekly" etc.) */

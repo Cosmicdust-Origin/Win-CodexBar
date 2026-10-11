@@ -25,6 +25,14 @@ pub(crate) fn reset_window_pace_matches(window: &RateWindow, _now: chrono::DateT
     display::window_allows_pace(window)
 }
 
+/// Reset-window pace (upstream `AmpProviderDescriptor.pace`, v0.70.0):
+/// renewing subscription windows, see [`reset_window_pace_matches`]. There is
+/// no inferred monthly duration: the window already carries its length.
+pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
+    crate::core::ProviderPaceCapability::reset_window(crate::core::PaceWindowRule::Custom(
+        reset_window_pace_matches,
+    ));
+
 /// Amp provider (Sourcegraph)
 pub struct AmpProvider {
     metadata: ProviderMetadata,
@@ -376,6 +384,60 @@ Subscription Megawatt: 42% other usage and 88% orb usage remaining - resets upon
         // Upstream primaryLabel: "Other usage" when there is an orb lane.
         assert_eq!(snapshot.primary_label.as_deref(), Some("Other usage"));
         assert_eq!(snapshot.secondary_label.as_deref(), Some("Orb usage"));
+    }
+
+    /// Upstream v0.70.0 `AmpUsageSnapshot.swift:121-131` sizes a renewing
+    /// window by its billing period, falling back to
+    /// `calendarMonthResetWindow.resolvedResetWindowForPace` ("Preserve legacy
+    /// calendar-month pacing"). It is the real month length, not a flat 30
+    /// days, so a 28-day and a 31-day cycle stay distinct.
+    #[test]
+    fn legacy_renewal_window_uses_the_real_calendar_month_length() {
+        let cases = [
+            // Renews 2026-03-01 12:00: cycle 2026-02-01..03-01 = 28 days.
+            (
+                Utc.with_ymd_and_hms(2026, 2, 20, 12, 0, 0).unwrap(),
+                9,
+                40_320,
+            ),
+            // Renews 2026-08-01 12:00: cycle 2026-07-01..08-01 = 31 days.
+            (
+                Utc.with_ymd_and_hms(2026, 7, 25, 12, 0, 0).unwrap(),
+                7,
+                44_640,
+            ),
+        ];
+        for (now, days, expected) in cases {
+            let text = format!(
+                "Subscription Megawatt: 42% other usage and 88% orb usage remaining - resets upon renewal in {days} days"
+            );
+            let snapshot = usage_snapshot_from_amp_display_text(&text, now).expect("snapshot");
+            assert_eq!(snapshot.primary.window_minutes, Some(expected));
+            assert_eq!(
+                snapshot.secondary.as_ref().and_then(|w| w.window_minutes),
+                Some(expected)
+            );
+            assert!(PACE_CAPABILITY.supports_reset_window_pace(&snapshot.primary, now));
+            assert_eq!(
+                PACE_CAPABILITY
+                    .resolved_reset_window_for_pace(&snapshot.primary)
+                    .window_minutes,
+                Some(expected)
+            );
+            // A calendar-month provider's 30-day sentinel resolves to the
+            // same real length for the same reset.
+            assert_eq!(
+                crate::core::ProviderPaceCapability::CALENDAR_MONTH_RESET_WINDOW
+                    .resolved_reset_window_for_pace(&RateWindow::with_details(
+                        10.0,
+                        Some(crate::core::MONTHLY_WINDOW_SENTINEL_MINUTES),
+                        snapshot.primary.resets_at,
+                        None,
+                    ))
+                    .window_minutes,
+                Some(expected)
+            );
+        }
     }
 
     #[test]

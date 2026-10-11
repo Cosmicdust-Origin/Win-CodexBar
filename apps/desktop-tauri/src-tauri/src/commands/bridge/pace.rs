@@ -391,6 +391,48 @@ mod tests {
         assert!(snap.pace.is_none());
     }
 
+    /// Within the 7-day fallback, a length-less Copilot window still yields
+    /// a provider-level pace (the Settings detail shows it), but upstream
+    /// `UsageStore.weeklyPace` gives the menu bar none for a window without
+    /// `windowMinutes`, so it is marked as having no length for the tray.
+    /// The card lane keeps its reset-window pace.
+    #[test]
+    fn copilot_provider_pace_is_marked_lengthless_for_the_tray() {
+        let now = february_now();
+        let usage = UsageSnapshot::new(RateWindow::with_details(
+            60.0,
+            None,
+            Some(now + Duration::days(3)),
+            None,
+        ));
+
+        let snap = snapshot_at(ProviderId::Copilot, usage);
+
+        let pace = snap.pace.as_ref().expect("provider-level pace");
+        assert!(!pace.window_has_length);
+        assert!(lane_pace(&snap.primary).reset_window);
+        let json = serde_json::to_value(pace).unwrap();
+        assert!(json.get("windowHasLength").is_none());
+    }
+
+    #[test]
+    fn provider_pace_from_a_window_with_a_length_keeps_the_tray_tint() {
+        let now = february_now();
+        let usage = UsageSnapshot::new(RateWindow::with_details(
+            60.0,
+            Some(10_080),
+            Some(now + Duration::days(3)),
+            None,
+        ));
+
+        let snap = snapshot_at(ProviderId::Claude, usage);
+
+        assert!(snap.pace.as_ref().expect("pace").window_has_length);
+        let cached: PaceSnapshot =
+            serde_json::from_str(r#"{"stage":"behind","deltaPercent":-8.0}"#).unwrap();
+        assert!(cached.window_has_length);
+    }
+
     /// Cursor's plan bars carry the billing-cycle length; the API bar is the
     /// model-specific lane, which the card renders on the tertiary lane.
     #[test]

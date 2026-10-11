@@ -194,6 +194,14 @@ fn unavailable_quota_detail(has_token_limits: bool) -> Option<ProviderDisplayDet
     ProviderDisplayDetail::new(id, title, "Unavailable")?.with_secondary_value(ZAI_UNAVAILABLE_HINT)
 }
 
+/// Reset-window pace (upstream `ZaiProviderDescriptor.pace`, v0.70.0): the
+/// monthly MCP window, resolved to the calendar month ending at its reset.
+pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
+    crate::core::ProviderPaceCapability {
+        reset_window_pace: crate::core::PaceWindowRule::Custom(reset_window_pace_matches),
+        inferred_monthly_duration: crate::core::PaceDurationRule::Custom(is_monthly_mcp_window),
+    };
+
 /// z.ai provider
 pub struct ZaiProvider {
     metadata: ProviderMetadata,

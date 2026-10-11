@@ -419,6 +419,30 @@ describe("MenuCard", () => {
     expect(screen.getByText("58% left")).toBeInTheDocument();
   });
 
+  it("names Notion's billing lane Monthly while other monthly lanes keep 30-Day", async () => {
+    // Upstream NotionProviderDescriptor.swift:32 (`weeklyLabel: "Monthly"`).
+    tauriMocks.getLocaleStrings.mockResolvedValue(
+      buildBundle({ ProviderLabelMonthly: "Monthly", ProviderMonthly: "30-Day" }),
+    );
+    const notion = provider(null, 20);
+    notion.providerId = "notion";
+    notion.displayName = "Notion";
+    notion.secondary = rateWindow(25, { windowMinutes: 43_200 });
+    notion.secondaryLabel = "Monthly";
+    notion.secondaryLabelKey = "ProviderLabelMonthly";
+    const { unmount } = renderCard(notion);
+    expect(await metricTitle("Monthly")).toBeInTheDocument();
+    unmount();
+
+    const other = provider(null, 20);
+    other.providerId = "augment";
+    other.displayName = "Augment";
+    other.secondary = rateWindow(25, { windowMinutes: 43_200 });
+    other.secondaryLabel = "Monthly";
+    renderCard(other);
+    expect(await metricTitle("30-Day")).toBeInTheDocument();
+  });
+
   it("shows every quota row in compact Overview (upstream 0.62.0 #2616)", async () => {
     const snapshot = provider(null, 20, { resetDescription: "Resets in 2h" });
     snapshot.secondary = rateWindow(42, { windowMinutes: 7 * 24 * 60 });

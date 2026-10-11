@@ -8,9 +8,10 @@
 //! sentinel (or a missing length, for Copilot) is replaced by the calendar
 //! month that ends at the reset, so a February cycle is scored as 28 days.
 //!
-//! Each provider declares its rule in [`super::ProviderId::pace_capability`];
-//! rules that need provider knowledge are function pointers owned by that
-//! provider's module.
+//! Each opted-in provider declares its rule as `PACE_CAPABILITY` in its own
+//! module (`providers/<name>/`), as upstream descriptors do. The exhaustive
+//! dispatch is `provider_factory::pace_capability`, reached through
+//! [`super::ProviderId::pace_capability`].
 
 use chrono::{DateTime, Utc};
 
