@@ -65,7 +65,7 @@ See the full history in [CHANGELOG.md](CHANGELOG.md).
 ## Supported Providers
 
 <details>
-<summary>Provider matrix</summary>
+<summary>Provider matrix (selected providers; the app supports more)</summary>
 
 | Provider | Auth | Tracks |
 |---|---|---|
