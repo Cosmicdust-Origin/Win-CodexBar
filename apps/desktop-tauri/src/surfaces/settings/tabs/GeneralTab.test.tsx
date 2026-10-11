@@ -615,7 +615,7 @@ describe("GeneralTab notifications pane", () => {
     ).not.toBeChecked();
   });
 
-  it("locks credential and pace alerts and hides thresholds while usage warnings are off", () => {
+  it("locks credential and pace alerts but keeps the thresholds while usage warnings are off (#816)", () => {
     render(
       <GeneralTab
         mode="notifications"
@@ -636,7 +636,11 @@ describe("GeneralTab notifications pane", () => {
     expect(credential).toBeDisabled();
     expect(credential).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "SessionQuotaNotifications" })).toBeEnabled();
-    expect(screen.queryByText("WarningAtPercentUsed")).toBeNull();
+    // The thresholds also colour the usage bars and the float bar, so they stay editable.
+    expect(screen.getByText("WarningAtPercentUsed")).toBeInTheDocument();
+    expect(screen.getByText("CriticalAtPercentUsed")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("70")).toBeEnabled();
+    expect(screen.getByDisplayValue("90")).toBeEnabled();
     expect(screen.queryByText("ThresholdOverridesTitle")).toBeNull();
     expect(screen.getByRole("checkbox", { name: "SoundEnabled" })).toBeInTheDocument();
   });

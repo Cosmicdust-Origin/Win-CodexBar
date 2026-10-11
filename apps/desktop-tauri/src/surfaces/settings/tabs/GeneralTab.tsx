@@ -502,30 +502,30 @@ function NotificationsPane({
         </Field>
       </SettingsGroup>
 
-      {settings.showNotifications && (
-        <SettingsGroup footer={<p>{t("ThresholdsCaption")}</p>}>
-          <Field label={t("WarningAtPercentUsed")}>
-            <NumberInput
-              value={settings.highUsageThreshold}
-              min={0}
-              max={100}
-              step={5}
-              disabled={saving}
-              onChange={(v) => set({ highUsageThreshold: v })}
-            />
-          </Field>
-          <Field label={t("CriticalAtPercentUsed")}>
-            <NumberInput
-              value={settings.criticalUsageThreshold}
-              min={0}
-              max={100}
-              step={5}
-              disabled={saving}
-              onChange={(v) => set({ criticalUsageThreshold: v })}
-            />
-          </Field>
-        </SettingsGroup>
-      )}
+      {/* The thresholds stay visible while threshold warnings are off: they also set
+          the usage-bar and float-bar colours (#816). The Mac hides them. */}
+      <SettingsGroup footer={<p>{t("ThresholdsCaption")}</p>}>
+        <Field label={t("WarningAtPercentUsed")}>
+          <NumberInput
+            value={settings.highUsageThreshold}
+            min={0}
+            max={100}
+            step={5}
+            disabled={saving}
+            onChange={(v) => set({ highUsageThreshold: v })}
+          />
+        </Field>
+        <Field label={t("CriticalAtPercentUsed")}>
+          <NumberInput
+            value={settings.criticalUsageThreshold}
+            min={0}
+            max={100}
+            step={5}
+            disabled={saving}
+            onChange={(v) => set({ criticalUsageThreshold: v })}
+          />
+        </Field>
+      </SettingsGroup>
 
       <SettingsGroup>
         <Field label={t("SoundEnabled")} description={t("SoundEnabledHelper")}>
