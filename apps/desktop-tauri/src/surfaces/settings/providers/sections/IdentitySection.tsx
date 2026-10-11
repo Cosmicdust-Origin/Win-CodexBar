@@ -3,7 +3,6 @@ import type { LocaleKey } from "../../../../i18n/keys";
 import { ProviderIcon } from "../../../../components/providers/ProviderIcon";
 import { Toggle } from "../../../../components/FormControls";
 import { hideOpenAiApiProjectId } from "../../../../lib/openAiApiIdentity";
-import { containsEmail } from "../../../../lib/personalInfo";
 import { providerSourceHintShort } from "../providerDetailFormat";
 
 interface Props {
@@ -40,13 +39,9 @@ export function IdentitySection({
   busy = false,
 }: Props) {
   const hideProjectId = provider.id === "openaiapi" && hidePersonalInfo;
-  // Hide Personal Info drops the account row when it would show an email, as
-  // the tray card (MenuCard) does, for every provider.
-  const account = hidePersonalInfo
-    ? provider.email || containsEmail(provider.organization)
-      ? null
-      : provider.organization
-    : provider.email || provider.organization;
+  // Hide Personal Info drops the account row for every provider, as the tray
+  // card (MenuCard `headerAccount`) and the Mac Account row do.
+  const account = hidePersonalInfo ? null : provider.email || provider.organization;
   const rows: { key: string; label: string; value: string | null }[] = [
     {
       key: "source",

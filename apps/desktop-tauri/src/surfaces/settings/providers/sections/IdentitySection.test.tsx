@@ -21,8 +21,8 @@ function detail(overrides: Partial<IdentityDetails> = {}): IdentityDetails {
 const t = (key: LocaleKey) => key;
 
 describe("IdentitySection OpenAI project privacy", () => {
-  it("masks project ids in account and plan rows when privacy is enabled", () => {
-    render(
+  it("drops the project account row and masks the plan's project id when privacy is enabled", () => {
+    const { container } = render(
       <IdentitySection
         provider={detail()}
         subtitle=""
@@ -31,9 +31,9 @@ describe("IdentitySection OpenAI project privacy", () => {
       />,
     );
 
-    expect(screen.getByText("Project: ••••")).toBeInTheDocument();
+    expect(screen.queryByText("Account")).toBeNull();
     expect(screen.getByText("Admin API: ••••")).toBeInTheDocument();
-    expect(screen.queryByText("proj-private")).toBeNull();
+    expect(container.innerHTML).not.toContain("proj-private");
   });
 
   it("keeps project ids visible when privacy is disabled", () => {
@@ -73,6 +73,21 @@ describe("IdentitySection account privacy for every provider", () => {
     expect(container.innerHTML).not.toContain("@");
     expect(container.innerHTML).not.toContain("example.com");
     expect(screen.queryByText("Account")).toBeNull();
+  });
+
+  it("drops an organization label without an email too", () => {
+    render(
+      <IdentitySection
+        provider={detail({ id: "claude", displayName: "Claude", email: null, organization: "Acme Research", plan: "Max" })}
+        subtitle=""
+        t={t}
+        hidePersonalInfo
+      />,
+    );
+
+    expect(screen.queryByText("Account")).toBeNull();
+    expect(screen.queryByText("Acme Research")).toBeNull();
+    expect(screen.getByText("Max")).toBeInTheDocument();
   });
 
   it("shows the account email when privacy is disabled", () => {
