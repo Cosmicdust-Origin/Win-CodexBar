@@ -415,7 +415,8 @@ impl HooksConfig {
             std::fs::create_dir_all(parent).map_err(|e| format!("create hooks dir: {e}"))?;
         }
         let body = serde_json::to_string_pretty(self).map_err(|e| e.to_string())?;
-        std::fs::write(path, body).map_err(|e| format!("write hooks.json: {e}"))
+        crate::atomic_file::write_atomic(path, body.as_bytes())
+            .map_err(|e| format!("write hooks.json: {e}"))
     }
 
     pub fn matching_rules(&self, event: &HookEvent) -> Vec<&HookRule> {

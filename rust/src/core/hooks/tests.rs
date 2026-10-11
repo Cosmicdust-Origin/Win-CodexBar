@@ -317,3 +317,22 @@ fn load_existing_tells_missing_from_unreadable() {
     assert_eq!(loaded.events[0].timeout_secs, 10);
 }
 
+#[test]
+fn save_to_replaces_an_existing_file_and_leaves_no_staging_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("nested").join("hooks.json");
+    let mut config = HooksConfig {
+        enabled: true,
+        ..HooksConfig::default()
+    };
+    config.save_to(&path).unwrap();
+    config.enabled = false;
+    config.save_to(&path).unwrap();
+
+    assert!(!HooksConfig::load_from(&path).enabled);
+    let names: Vec<_> = std::fs::read_dir(path.parent().unwrap())
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect();
+    assert_eq!(names, vec!["hooks.json".to_string()]);
+}
