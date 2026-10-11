@@ -1369,7 +1369,7 @@ describe("MenuCard", () => {
     expect(container.querySelector(".card-extra")).toBeNull();
   });
 
-  describe("LithosAI shows its balance once", () => {
+  describe("LithosAI shows its balance twice, as on the Mac", () => {
     function lithos(balance: number | null, shown: string): ProviderUsageSnapshot {
       const snapshot = provider(null, 0, { resetDescription: `Balance: ${shown}` });
       snapshot.providerId = "lithosai";
@@ -1390,7 +1390,6 @@ describe("MenuCard", () => {
               balance,
               formattedBalance: shown,
               titleKey: "CreditsTitle",
-              replacedDetailIds: ["balance"],
             };
       snapshot.displayDetails = [
         { id: "balance", sectionTitle: "Billing", title: "Balance", value: shown, secondaryValue: null, progress: null },
@@ -1405,50 +1404,59 @@ describe("MenuCard", () => {
       );
     });
 
-    it("in the Credits block, without the headline bar or the Billing row", async () => {
+    // Upstream: the Billing "Balance" row (lithosai.ts:63), then the cost block
+    // (lithosai.ts:72-73, StatusItemController+Menu.swift:1307-1336,1377-1391),
+    // titled "Credits" and reading "Balance: $X" (MenuCardView+Costs.swift:511-518).
+    it("in the Billing row, then in the Credits block", async () => {
       const { container } = renderCard(lithos(42.37, "$42.37"));
 
       expect(await screen.findByText("Credits")).toHaveClass("card-extra__title");
-      expect(screen.getAllByText(/42\.37/)).toHaveLength(1);
+      const shown = screen.getAllByText(/42\.37/);
+      expect(shown).toHaveLength(2);
+      expect(shown[0]).toHaveTextContent(/^\$42\.37$/);
+      expect(shown[0]).toHaveClass("card-kv__value");
+      expect(shown[1]).toHaveTextContent(/^Balance: \$42\.37$/);
+      expect(shown[1]).toHaveClass("card-extra__inline-value");
+      expect(
+        shown[0].compareDocumentPosition(shown[1]) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(screen.getByText("Payment card")).toBeInTheDocument();
       // The headline balance stays off the card (tray and float bar only).
       expect(container.querySelector(".menu-metric")).toBeNull();
-      expect(container.querySelector(".card-extra__inline-value")).toHaveTextContent(
-        "Balance: $42.37",
-      );
-      expect(screen.getByText("Payment card")).toBeInTheDocument();
       expect(screen.queryByText("Extra usage")).not.toBeInTheDocument();
     });
 
-    it("on the compact Overview line, which drops the Credits block and Billing rows", async () => {
-      tauriMocks.getLocaleStrings.mockResolvedValue(
-        buildBundle({ ProviderSessionLabel: "Session", ProviderTextBalanceColonPrefix: "Balance: {}" }),
-      );
+    // Upstream compact Overview rows draw the provider details when a card has no
+    // metrics (MenuCardView+ModelHelpers.swift:378-380) and never the cost block.
+    it("once on the compact Overview, in the Billing rows", async () => {
       const { container } = renderCard(lithos(42.37, "$42.37"), { compactOverview: true });
 
-      expect(await screen.findByText("Balance: $42.37")).toHaveClass("menu-metric__pct");
-      expect(screen.getAllByText(/42\.37/)).toHaveLength(1);
-      expect(container.querySelectorAll(".menu-metric")).toHaveLength(1);
+      expect(await screen.findByText("Payment card")).toBeInTheDocument();
+      const shown = screen.getAllByText(/42\.37/);
+      expect(shown).toHaveLength(1);
+      expect(shown[0]).toHaveTextContent(/^\$42\.37$/);
+      expect(shown[0]).toHaveClass("card-kv__value");
+      expect(container.querySelector(".menu-metric")).toBeNull();
       expect(container.querySelector(".card-extra")).toBeNull();
-      expect(screen.queryByText("Payment card")).not.toBeInTheDocument();
       expect(container.querySelector(".menu-card--header-only")).toBeNull();
     });
 
-    it("in the Billing row when the cost summary is hidden", async () => {
+    // Windows deviation: the Mac `.prepaidCredits` block ignores the summary style.
+    it("once, in the Billing row, when the cost summary is hidden", async () => {
       const { container } = renderCard(lithos(42.37, "$42.37"), { costSummaryDisplayStyle: "hidden" });
 
       expect(await screen.findByText("$42.37")).toBeInTheDocument();
       expect(screen.getAllByText(/42\.37/)).toHaveLength(1);
-      // The headline balance stays off the card (tray and float bar only).
       expect(container.querySelector(".menu-metric")).toBeNull();
       expect(container.querySelector(".card-extra")).toBeNull();
     });
 
-    it("in the Billing row for a debt, which has no cost block", async () => {
+    // Windows deviation: the shared cost block has no negative balance, so a debt has no block.
+    it("once, in the Billing row, for a debt", async () => {
       const { container } = renderCard(lithos(null, "-$1.00"));
 
       expect(await screen.findByText("-$1.00")).toBeInTheDocument();
       expect(screen.getAllByText(/1\.00/)).toHaveLength(1);
-      // The headline balance stays off the card (tray and float bar only).
       expect(container.querySelector(".menu-metric")).toBeNull();
       expect(container.querySelector(".card-extra")).toBeNull();
     });

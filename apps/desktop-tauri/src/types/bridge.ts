@@ -718,8 +718,6 @@ export interface CostSnapshotBridge {
   alwaysVisible?: boolean;
   /** Provider-owned cost-block title (upstream `ProviderCostMenuCardStyle`); absent keeps the shared title. */
   titleKey?: LocaleKey;
-  /** Detail row ids the cost block replaces on the card while it is shown (upstream `replacedDetailRows`). */
-  replacedDetailIds?: string[];
 }
 
 export type PaceStage =

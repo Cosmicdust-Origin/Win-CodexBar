@@ -63,7 +63,6 @@ fn fake_snapshot_with(
             daily: Vec::new(),
             always_visible: false,
             title_key: None,
-            replaced_detail_ids: Vec::new(),
         }),
         plan_name: None,
         account_email: None,

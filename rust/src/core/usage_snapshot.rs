@@ -537,12 +537,6 @@ pub struct CostSnapshot {
     /// `None` keeps the shared title. Presentation only; not serialized.
     #[serde(skip)]
     pub card_title_key: Option<crate::locale::LocaleKey>,
-
-    /// Ids of provider detail rows that the card's cost block replaces while
-    /// it is shown (upstream `ProviderCostPresentation.replacedDetailRows`).
-    /// Presentation only; not serialized.
-    #[serde(skip)]
-    pub replaced_detail_ids: Vec<&'static str>,
 }
 
 impl CostSnapshot {
@@ -564,20 +558,12 @@ impl CostSnapshot {
             history_tokens: None,
             provenance: None,
             card_title_key: None,
-            replaced_detail_ids: Vec::new(),
         }
     }
 
     /// Builder pattern: the provider's own title for the card's cost block.
     pub fn with_card_title(mut self, key: crate::locale::LocaleKey) -> Self {
         self.card_title_key = Some(key);
-        self
-    }
-
-    /// Builder pattern: provider detail rows (by id) that the card's cost
-    /// block stands in for while it is shown.
-    pub fn replacing_detail_rows(mut self, ids: &[&'static str]) -> Self {
-        self.replaced_detail_ids = ids.to_vec();
         self
     }
 

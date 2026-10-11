@@ -5,7 +5,6 @@ use std::thread::JoinHandle;
 use chrono::{TimeZone, Utc};
 use reqwest::redirect::Policy;
 
-use super::model::BALANCE_ROW_ID;
 use super::*;
 use crate::locale::LocaleKey;
 
@@ -131,11 +130,11 @@ async fn console_balance_and_sparse_spend_match_the_upstream_fixture() {
     assert_eq!(cost.limit, None);
     assert_eq!(cost.currency_code, "USD");
     assert_eq!(cost.period, "Prepaid credits");
-    // Upstream `.prepaidCredits` titles the block "Credits", and the card shows
-    // the balance once: in that block, not again as the Billing row or a bar.
+    // Upstream `.prepaidCredits` titles the block "Credits". The Billing
+    // "Balance" row stays too, so the card shows the balance twice, as on the
+    // Mac; only the headline bar stays off the card.
     assert_eq!(cost.card_title_key, Some(LocaleKey::CreditsTitle));
-    assert_eq!(cost.replaced_detail_ids, [BALANCE_ROW_ID]);
-    assert_eq!(result.display_details[0].id(), BALANCE_ROW_ID);
+    assert_eq!(result.display_details[0].id(), "balance");
     let usage = &result.usage;
     assert!(usage.primary.is_informational);
     assert!(usage.primary.hidden_on_card);
@@ -219,13 +218,11 @@ async fn zero_debt_and_subcent_balances_are_not_invented_quotas() {
             result.usage.primary.reset_description.as_deref(),
             Some(format!("Balance: {shown}").as_str())
         );
-        // A debt has no cost block, so the Billing row is where the card shows it.
+        // Every balance with a cost block gets the Credits title; a debt has
+        // no block, so the Billing row alone shows it.
         assert_eq!(
-            result
-                .cost
-                .as_ref()
-                .map(|cost| cost.replaced_detail_ids.clone()),
-            cost_balance.map(|_| vec![BALANCE_ROW_ID]),
+            result.cost.as_ref().and_then(|cost| cost.card_title_key),
+            cost_balance.map(|_| LocaleKey::CreditsTitle),
             "{balance}"
         );
         let rows = rows(&result);

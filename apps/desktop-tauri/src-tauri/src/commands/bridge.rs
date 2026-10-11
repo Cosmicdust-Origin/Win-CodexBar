@@ -142,9 +142,6 @@ pub struct CostSnapshotBridge {
     /// Provider-owned cost-block title as a locale key name; absent keeps the shared title.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title_key: Option<String>,
-    /// Detail row ids the cost block replaces on the card while it is shown.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub replaced_detail_ids: Vec<String>,
 }
 
 fn default_currency() -> String {
@@ -671,11 +668,6 @@ impl ProviderUsageSnapshot {
                     .collect(),
                 always_visible: c.always_visible,
                 title_key: c.card_title_key.map(|key| key.name().to_string()),
-                replaced_detail_ids: c
-                    .replaced_detail_ids
-                    .iter()
-                    .map(|id| (*id).to_string())
-                    .collect(),
             }),
             plan_name: usage.login_method.clone(),
             account_email: usage.account_email.clone(),
@@ -1476,7 +1468,7 @@ mod tests {
     }
 
     /// Provider-declared card wording (Synthetic's regen countdown, LithosAI's
-    /// card-hidden headline, cost titles and replaced rows) reaches the card.
+    /// card-hidden headline and cost titles) reaches the card.
     #[test]
     fn provider_card_wording_crosses_the_bridge() {
         let regen =
@@ -1496,8 +1488,7 @@ mod tests {
             .clone();
         let cost = codexbar::core::CostSnapshot::new(0.0, "USD", "Prepaid credits")
             .with_balance(4.0)
-            .with_card_title(codexbar::locale::LocaleKey::CreditsTitle)
-            .replacing_detail_rows(&["balance"]);
+            .with_card_title(codexbar::locale::LocaleKey::CreditsTitle);
         let result = codexbar::core::ProviderFetchResult::new(
             codexbar::core::UsageSnapshot::new(RateWindow::new(0.0)),
             "web",
@@ -1512,10 +1503,6 @@ mod tests {
         );
         let json = serde_json::to_value(&snapshot).unwrap();
         assert_eq!(json["cost"]["titleKey"], "CreditsTitle");
-        assert_eq!(
-            json["cost"]["replacedDetailIds"],
-            serde_json::json!(["balance"])
-        );
 
         let plain = codexbar::core::ProviderFetchResult::new(
             codexbar::core::UsageSnapshot::new(RateWindow::new(0.0)),
@@ -1531,6 +1518,5 @@ mod tests {
         ))
         .unwrap();
         assert!(json["cost"].get("titleKey").is_none());
-        assert!(json["cost"].get("replacedDetailIds").is_none());
     }
 }

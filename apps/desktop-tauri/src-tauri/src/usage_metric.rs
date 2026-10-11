@@ -872,7 +872,6 @@ mod tests {
             daily: Vec::new(),
             always_visible: false,
             title_key: None,
-            replaced_detail_ids: Vec::new(),
         });
         let settings = metric_settings(ProviderId::Mistral, MetricPreference::MonthlyPlan);
 
