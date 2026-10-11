@@ -1211,6 +1211,8 @@ export const ALL_LOCALE_KEYS = [
   "ResetsAtLabel",
   "ResetsInHoursOnly",
   "ResetsInDaysOnly",
+  "RegeneratesCountdown",
+  "CostTitleClawRouterSpend",
   "ResetsAtTime",
   "ProviderTextRequests",
   "ProviderTextTokens",

@@ -126,7 +126,11 @@ function cardMetrics(
       resetFormatMode: extra.id === "reset-credits" ? "expires" : "reset",
     });
   }
-  return metrics.filter((metric) => isUsageItemVisible(provider.hiddenUsageItemIds, metric.id));
+  // A window the provider keeps for the tray and float bar only (upstream LithosAI has no card bar).
+  return metrics.filter(
+    (metric) =>
+      !metric.snap.hiddenOnCard && isUsageItemVisible(provider.hiddenUsageItemIds, metric.id),
+  );
 }
 
 /**
@@ -281,7 +285,7 @@ export default function MenuCard({
           )}
           {showDetailSections && (
             <DetailSections
-              details={provider.displayDetails ?? []}
+              details={presence.details}
               inventory={provider.inventory ?? []}
               hiddenUsageItemIds={provider.hiddenUsageItemIds}
               resetTimeRelative={resetTimeRelative}

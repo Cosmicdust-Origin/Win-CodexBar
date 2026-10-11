@@ -1691,6 +1691,8 @@ mod reset_backfill_tests {
             reserve_eta_seconds: None,
             pace: None,
             description_is_detail: false,
+            reset_regenerates: false,
+            hidden_on_card: false,
             monthly_limit_block: None,
         }
     }

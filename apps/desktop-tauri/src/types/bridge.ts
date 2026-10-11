@@ -1,3 +1,4 @@
+import type { LocaleKey } from "../i18n/keys";
 export type SurfaceMode = "hidden" | "trayPanel" | "popOut" | "settings";
 export type VisibleSurfaceMode = Exclude<SurfaceMode, "hidden">;
 export type SettingsTabId =
@@ -675,6 +676,10 @@ export interface RateWindowSnapshot {
   isInformational?: boolean;
   /** `resetDescription` is a detail line (for example spend amounts), not reset wording. */
   descriptionIsDetail?: boolean;
+  /** The reset is the next quota regeneration: the card says "Regenerates in" (Synthetic). */
+  resetRegenerates?: boolean;
+  /** The window feeds the tray and float bar only; the card draws no row for it. */
+  hiddenOnCard?: boolean;
   reservePercent: number | null;
   reserveDescription: string | null;
   reserveWillLastToReset?: boolean;
@@ -710,6 +715,10 @@ export interface CostSnapshotBridge {
   daily?: CostDailyPoint[];
   /** Provider-metered spend that is itself a primary usage signal. */
   alwaysVisible?: boolean;
+  /** Provider-owned cost-block title (upstream `ProviderCostMenuCardStyle`); absent keeps the shared title. */
+  titleKey?: LocaleKey;
+  /** Detail row ids the cost block replaces on the card while it is shown (upstream `replacedDetailRows`). */
+  replacedDetailIds?: string[];
 }
 
 export type PaceStage =

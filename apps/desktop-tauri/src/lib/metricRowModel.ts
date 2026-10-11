@@ -181,6 +181,23 @@ function absoluteResetDescription(target: Date, now: Date, t: Translate): string
   }).format(target);
 }
 
+/**
+ * Upstream `UsageFormatter.resetCountdownDescription`: the unlocalized "in 2d 3h"
+ * countdown that `syntheticRegenDetail` puts inside "Regenerates %@", always relative.
+ */
+function regenCountdown(seconds: number): string {
+  const parts = countdownParts(seconds);
+  if (!parts) return "now";
+  const { days, hours, minutes } = parts;
+  if (days > 0) {
+    if (hours > 0) return `in ${days}d ${hours}h`;
+    if (minutes > 0) return `in ${days}d ${minutes}m`;
+    return `in ${days}d`;
+  }
+  if (hours > 0) return minutes > 0 ? `in ${hours}h ${minutes}m` : `in ${hours}h`;
+  return `in ${minutes}m`;
+}
+
 export function metricResetText(
   snap: RateWindowSnapshot,
   relative: boolean,
@@ -190,6 +207,9 @@ export function metricResetText(
   const target = snap.resetsAt ? Date.parse(snap.resetsAt) : Number.NaN;
   if (!Number.isFinite(target)) {
     return normalizeResetDescription(resetDescriptionFallback(snap), t);
+  }
+  if (snap.resetRegenerates) {
+    return fill(t("RegeneratesCountdown"), regenCountdown((target - now) / 1000));
   }
   if (!relative) {
     return fill(t("ResetsAtLabel"), absoluteResetDescription(new Date(target), new Date(now), t));

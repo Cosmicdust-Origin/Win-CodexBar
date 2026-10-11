@@ -33,6 +33,12 @@ pub struct RateWindowSnapshot {
     /// `reset_description` is a detail line (for example spend amounts), not reset wording.
     #[serde(default)]
     pub description_is_detail: bool,
+    /// The reset is the next quota regeneration; the card says "Regenerates in".
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reset_regenerates: bool,
+    /// The window feeds the tray and float bar only; the card draws no row for it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hidden_on_card: bool,
     #[serde(default)]
     pub reserve_percent: Option<f64>,
     #[serde(default)]
@@ -72,6 +78,8 @@ impl RateWindowSnapshot {
             pace: None,
             monthly_limit_block: None,
             description_is_detail: rw.description_is_detail,
+            reset_regenerates: rw.reset_regenerates,
+            hidden_on_card: rw.hidden_on_card,
         }
     }
 
@@ -131,6 +139,12 @@ pub struct CostSnapshotBridge {
     pub daily: Vec<CostDailyPointBridge>,
     #[serde(default)]
     pub always_visible: bool,
+    /// Provider-owned cost-block title as a locale key name; absent keeps the shared title.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title_key: Option<String>,
+    /// Detail row ids the cost block replaces on the card while it is shown.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub replaced_detail_ids: Vec<String>,
 }
 
 fn default_currency() -> String {
@@ -633,6 +647,12 @@ impl ProviderUsageSnapshot {
                     })
                     .collect(),
                 always_visible: c.always_visible,
+                title_key: c.card_title_key.map(|key| key.name().to_string()),
+                replaced_detail_ids: c
+                    .replaced_detail_ids
+                    .iter()
+                    .map(|id| (*id).to_string())
+                    .collect(),
             }),
             plan_name: usage.login_method.clone(),
             account_email: usage.account_email.clone(),
@@ -685,6 +705,8 @@ impl ProviderUsageSnapshot {
                 pace: None,
                 monthly_limit_block: None,
                 description_is_detail: false,
+                reset_regenerates: false,
+                hidden_on_card: false,
             },
             primary_label: Some(metadata.session_label.to_string()),
             secondary: None,
@@ -1286,6 +1308,8 @@ mod tests {
             pace: None,
             monthly_limit_block: None,
             description_is_detail: false,
+            reset_regenerates: false,
+            hidden_on_card: false,
         }
     }
 
@@ -1385,5 +1409,64 @@ mod tests {
             !japanese.to_ascii_lowercase().contains("resets in"),
             "{japanese}"
         );
+    }
+
+    /// Provider-declared card wording (Synthetic's regen countdown, LithosAI's
+    /// card-hidden headline, cost titles and replaced rows) reaches the card.
+    #[test]
+    fn provider_card_wording_crosses_the_bridge() {
+        let regen =
+            RateWindowSnapshot::from_rate_window(&RateWindow::new(10.0).with_regenerating_reset());
+        let hidden = RateWindowSnapshot::from_rate_window(
+            &RateWindow::informational("Balance: $1.00").hidden_on_card(),
+        );
+        let regen_json = serde_json::to_value(&regen).unwrap();
+        let hidden_json = serde_json::to_value(&hidden).unwrap();
+        assert_eq!(regen_json["resetRegenerates"], true);
+        assert!(regen_json.get("hiddenOnCard").is_none());
+        assert_eq!(hidden_json["hiddenOnCard"], true);
+        assert!(hidden_json.get("resetRegenerates").is_none());
+
+        let metadata = codexbar::core::instantiate_provider(ProviderId::LithosAI)
+            .metadata()
+            .clone();
+        let cost = codexbar::core::CostSnapshot::new(0.0, "USD", "Prepaid credits")
+            .with_balance(4.0)
+            .with_card_title(codexbar::locale::LocaleKey::CreditsTitle)
+            .replacing_detail_rows(&["balance"]);
+        let result = codexbar::core::ProviderFetchResult::new(
+            codexbar::core::UsageSnapshot::new(RateWindow::new(0.0)),
+            "web",
+        )
+        .with_cost(cost);
+        let snapshot = ProviderUsageSnapshot::from_fetch_result(
+            ProviderId::LithosAI,
+            &metadata,
+            &result,
+            None,
+            None,
+        );
+        let json = serde_json::to_value(&snapshot).unwrap();
+        assert_eq!(json["cost"]["titleKey"], "CreditsTitle");
+        assert_eq!(
+            json["cost"]["replacedDetailIds"],
+            serde_json::json!(["balance"])
+        );
+
+        let plain = codexbar::core::ProviderFetchResult::new(
+            codexbar::core::UsageSnapshot::new(RateWindow::new(0.0)),
+            "web",
+        )
+        .with_cost(codexbar::core::CostSnapshot::new(1.0, "USD", "This month"));
+        let json = serde_json::to_value(ProviderUsageSnapshot::from_fetch_result(
+            ProviderId::LithosAI,
+            &metadata,
+            &plain,
+            None,
+            None,
+        ))
+        .unwrap();
+        assert!(json["cost"].get("titleKey").is_none());
+        assert!(json["cost"].get("replacedDetailIds").is_none());
     }
 }

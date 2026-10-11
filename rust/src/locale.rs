@@ -1498,6 +1498,8 @@ locale_keys! {
     ResetsAtLabel,
     ResetsInHoursOnly,
     ResetsInDaysOnly,
+    RegeneratesCountdown,
+    CostTitleClawRouterSpend,
     ResetsAtTime,
     // Provider detail text localized at render time
     ProviderTextRequests,
