@@ -205,6 +205,28 @@ describe("UsageSpendTab", () => {
     expect(set).toHaveBeenCalledWith({ costUsageEnabled: true });
   });
 
+  it("hides the OpenCodex switches and the Sources filter while Track costs is off (#825)", async () => {
+    tauriMocks.getUsageSpendSummary.mockImplementation(async (options?: { period?: string }) =>
+      summary(options?.period ?? "rolling:30", false),
+    );
+    renderTab({ costUsageEnabled: false, openCodexUsageLogsEnabled: true });
+    expect(await screen.findByText("Cost tracking is off")).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: "Track costs" })).not.toBeChecked();
+    expect(screen.queryByText("UsageSpendOpenCodexImport")).toBeNull();
+    expect(screen.queryByText("UsageSpendHideNativeCodex")).toBeNull();
+    expect(screen.queryByRole("group", { name: "Sources" })).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: "Codex" })).toBeNull();
+  });
+
+  it("shows the OpenCodex switches and the Sources filter while Track costs is on", async () => {
+    renderTab({ costUsageEnabled: true, openCodexUsageLogsEnabled: true });
+    await screen.findByText("USD");
+    expect(screen.getByText("UsageSpendOpenCodexImport")).toBeInTheDocument();
+    expect(screen.getByText("UsageSpendHideNativeCodex")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Sources" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Codex" })).toBeChecked();
+  });
+
   it("leaves the History window and Cost summary pickers to Settings > Menu", async () => {
     renderTab();
     await waitFor(() => expect(tauriMocks.getUsageSpendSummary).toHaveBeenCalledTimes(1));
