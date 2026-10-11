@@ -38,6 +38,23 @@ impl HookEventType {
         }
     }
 
+    /// Every event, in the order the Settings picker lists them (macOS
+    /// `HookEventType.allCases`).
+    pub const ALL: [Self; 7] = [
+        Self::QuotaLow,
+        Self::QuotaReached,
+        Self::QuotaReset,
+        Self::UsageUpdated,
+        Self::ProviderUnavailable,
+        Self::ProviderRecovered,
+        Self::RefreshFailed,
+    ];
+
+    /// The event with this config name, or `None` for an unknown name.
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|event| event.as_str() == value)
+    }
+
     /// Events that can repeat every refresh while a condition persists.
     pub fn is_rate_limited(self) -> bool {
         matches!(
@@ -253,6 +270,9 @@ fn default_timeout_secs() -> u64 {
 }
 
 impl HookRule {
+    /// Most arguments one rule may pass (macOS `HookRule.maximumArgumentCount`).
+    pub const MAX_ARGUMENTS: usize = 32;
+
     fn matched_events(&self) -> Vec<HookEventType> {
         let mut out = self.events.clone();
         if let Some(event) = self.event
@@ -276,6 +296,9 @@ impl HookRule {
         if self.timeout_secs == 0 || self.timeout_secs > 300 {
             return false;
         }
+        if self.arguments.len() > Self::MAX_ARGUMENTS {
+            return false;
+        }
         if let Some(provider) = &self.provider
             && provider != &event.provider
         {
@@ -292,6 +315,25 @@ impl HookRule {
         }
         true
     }
+}
+
+/// Why a hooks config can't be saved from Settings.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum HooksConfigError {
+    #[error("hooks support at most {max} rules (got {count})")]
+    TooManyRules { count: usize, max: usize },
+    #[error("hook rule {n} has {count} arguments; the limit is {max}", n = .rule + 1)]
+    TooManyArguments {
+        rule: usize,
+        count: usize,
+        max: usize,
+    },
+    #[error("hook rule {n} has an unknown event \"{event}\"", n = .rule + 1)]
+    UnknownEvent { rule: usize, event: String },
+    #[error("hooks.json can't be read: {0}")]
+    Unreadable(String),
+    #[error("hooks.json can't be saved: {0}")]
+    Unwritable(String),
 }
 
 /// Top-level hooks config file contents.
@@ -324,6 +366,41 @@ impl HooksConfig {
             return Self::default();
         };
         serde_json::from_str(content.trim_start_matches('\u{feff}')).unwrap_or_default()
+    }
+
+    /// Like [`Self::load_from`], but tells a missing file (`Ok(None)`) apart
+    /// from one that exists and doesn't parse (`Err`), so an editor never
+    /// saves an empty rule list over rules it couldn't read.
+    pub fn load_existing(path: &Path) -> Result<Option<Self>, HooksConfigError> {
+        let content = match std::fs::read_to_string(path) {
+            Ok(content) => content,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(err) => return Err(HooksConfigError::Unreadable(err.to_string())),
+        };
+        serde_json::from_str(content.trim_start_matches('\u{feff}'))
+            .map(Some)
+            .map_err(|err| HooksConfigError::Unreadable(err.to_string()))
+    }
+
+    /// The limits Settings enforces before it writes `hooks.json`: at most
+    /// [`Self::MAX_RULES`] rules and [`HookRule::MAX_ARGUMENTS`] arguments per rule.
+    pub fn validate(&self) -> Result<(), HooksConfigError> {
+        if self.events.len() > Self::MAX_RULES {
+            return Err(HooksConfigError::TooManyRules {
+                count: self.events.len(),
+                max: Self::MAX_RULES,
+            });
+        }
+        for (index, rule) in self.events.iter().enumerate() {
+            if rule.arguments.len() > HookRule::MAX_ARGUMENTS {
+                return Err(HooksConfigError::TooManyArguments {
+                    rule: index,
+                    count: rule.arguments.len(),
+                    max: HookRule::MAX_ARGUMENTS,
+                });
+            }
+        }
+        Ok(())
     }
 
     /// Persist config to the standard hooks.json path (creates parent dirs).
@@ -941,5 +1018,118 @@ mod tests {
             .with_account("a");
         assert_eq!(rate_limit_key(&a, None), rate_limit_key(&b, None));
         let _ = Arc::new(a);
+    }
+
+    fn rule_with(arguments: usize) -> HookRule {
+        HookRule {
+            enabled: true,
+            event: Some(HookEventType::QuotaReached),
+            events: Vec::new(),
+            provider: None,
+            threshold: None,
+            executable: PathBuf::from(r"C:\Tools\notify.exe"),
+            arguments: (0..arguments).map(|i| format!("--arg{i}")).collect(),
+            timeout_secs: 10,
+        }
+    }
+
+    #[test]
+    fn event_names_parse_back_and_unknown_names_do_not() {
+        let names: Vec<&str> = HookEventType::ALL.iter().map(|e| e.as_str()).collect();
+        assert_eq!(
+            names,
+            [
+                "quota_low",
+                "quota_reached",
+                "quota_reset",
+                "usage_updated",
+                "provider_unavailable",
+                "provider_recovered",
+                "refresh_failed",
+            ]
+        );
+        assert_eq!(
+            HookEventType::parse("quota_low"),
+            Some(HookEventType::QuotaLow)
+        );
+        assert_eq!(
+            HookEventType::parse("refresh_failed"),
+            Some(HookEventType::RefreshFailed)
+        );
+        assert_eq!(HookEventType::parse("quota_exhausted"), None);
+        assert_eq!(HookEventType::parse("QuotaLow"), None);
+    }
+
+    #[test]
+    fn validate_accepts_32_rules_and_32_arguments() {
+        let config = HooksConfig {
+            enabled: true,
+            events: (0..32).map(|_| rule_with(32)).collect(),
+        };
+        assert_eq!(config.validate(), Ok(()));
+    }
+
+    #[test]
+    fn validate_rejects_a_33rd_rule() {
+        let config = HooksConfig {
+            enabled: true,
+            events: (0..33).map(|_| rule_with(0)).collect(),
+        };
+        assert_eq!(
+            config.validate(),
+            Err(HooksConfigError::TooManyRules { count: 33, max: 32 })
+        );
+    }
+
+    #[test]
+    fn validate_rejects_a_33rd_argument() {
+        let config = HooksConfig {
+            enabled: false,
+            events: vec![rule_with(1), rule_with(33)],
+        };
+        assert_eq!(
+            config.validate(),
+            Err(HooksConfigError::TooManyArguments {
+                rule: 1,
+                count: 33,
+                max: 32
+            })
+        );
+    }
+
+    #[test]
+    fn a_rule_over_the_argument_cap_never_matches() {
+        let event = HookEvent::new(HookEventType::QuotaReached, "codex");
+        assert!(rule_with(32).matches(&event));
+        assert!(!rule_with(33).matches(&event));
+    }
+
+    #[test]
+    fn load_existing_tells_missing_from_unreadable() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("hooks.json");
+        assert_eq!(HooksConfig::load_existing(&path), Ok(None));
+
+        std::fs::write(&path, "{ \"enabled\": true, \"events\": [ ").unwrap();
+        assert!(matches!(
+            HooksConfig::load_existing(&path),
+            Err(HooksConfigError::Unreadable(_))
+        ));
+
+        std::fs::write(
+            &path,
+            "\u{feff}{\"enabled\":true,\"events\":[{\"event\":\"quota_low\",\"threshold\":0.9,\"executable\":\"C:\\\\Tools\\\\a.exe\",\"arguments\":[\"x\"]}]}",
+        )
+        .unwrap();
+        let loaded = HooksConfig::load_existing(&path).unwrap().unwrap();
+        assert!(loaded.enabled);
+        assert_eq!(loaded.events.len(), 1);
+        assert_eq!(loaded.events[0].event, Some(HookEventType::QuotaLow));
+        assert_eq!(loaded.events[0].threshold, Some(0.9));
+        assert_eq!(
+            loaded.events[0].executable,
+            PathBuf::from(r"C:\Tools\a.exe")
+        );
+        assert_eq!(loaded.events[0].timeout_secs, 10);
     }
 }
