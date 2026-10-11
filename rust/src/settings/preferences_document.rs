@@ -509,6 +509,16 @@ impl PreferencesDocument {
                 current.remove(key);
             }
         }
+        // A document exported before "System" existed names a language
+        // without the follow flag: keep the language it chose.
+        if self
+            .preferences
+            .get("ui_language")
+            .is_some_and(|value| !value.is_null())
+            && !self.preferences.contains_key("ui_language_follows_system")
+        {
+            current.insert("ui_language_follows_system".to_string(), Value::Bool(false));
+        }
         // Re-read through the normal settings loader so clamping and
         // normalization match what `settings.json` gets on load.
         let mut next: Settings =

@@ -871,3 +871,28 @@ fn tray_scale_document_bounds_match_the_settings_clamp() {
         );
     }
 }
+
+#[test]
+fn a_document_without_the_follow_flag_keeps_its_chosen_language() {
+    // Exported before "System" existed: a language but no follow flag.
+    let document = parse(json!({ "ui_language": "japanese" })).expect("parse");
+    let mut target = Settings::default();
+    assert!(target.ui_language_follows_system);
+    document.apply_to(&mut target).expect("apply");
+    assert!(!target.ui_language_follows_system);
+    assert_eq!(target.ui_language, Language::Japanese);
+    assert!(!target.resolve_system_language_with(Language::Korean));
+    assert_eq!(target.ui_language, Language::Japanese);
+
+    // A document that carries the flag keeps following the system.
+    let document = parse(json!({
+        "ui_language": "japanese",
+        "ui_language_follows_system": true,
+    }))
+    .expect("parse");
+    let mut target = Settings::default();
+    document.apply_to(&mut target).expect("apply");
+    assert!(target.ui_language_follows_system);
+    assert!(target.resolve_system_language_with(Language::Korean));
+    assert_eq!(target.ui_language, Language::Korean);
+}
