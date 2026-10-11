@@ -469,6 +469,7 @@ mod tests {
             primary_label: None,
             secondary: Some(window(60.0)),
             secondary_label: None,
+            secondary_label_key: None,
             model_specific: None,
             tertiary: None,
             tertiary_label: None,

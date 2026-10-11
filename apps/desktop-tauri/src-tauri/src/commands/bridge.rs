@@ -197,6 +197,18 @@ pub struct PaceSnapshot {
     /// Block of the window this pace comes from (upstream hides its pace).
     #[serde(default)]
     pub monthly_limit_block: Option<MonthlyLimitBlockSnapshot>,
+    /// Whether the window this pace comes from carries its own length.
+    /// Upstream `UsageStore.weeklyPace` (UsageStore+HistoricalPace.swift)
+    /// gives the menu bar no pace for a generic window without
+    /// `windowMinutes`, rather than scoring it against the 7-day fallback,
+    /// so the tray pace tint skips it. Card lanes keep their own pace.
+    /// Tray-only; not sent to the frontend.
+    #[serde(default = "default_window_has_length", skip_serializing)]
+    pub window_has_length: bool,
+}
+
+fn default_window_has_length() -> bool {
+    true
 }
 
 /// One burndown chart point (RFC 3339 capture time + remaining percent).
@@ -291,6 +303,10 @@ pub struct ProviderUsageSnapshot {
     pub secondary: Option<RateWindowSnapshot>,
     #[serde(default)]
     pub secondary_label: Option<String>,
+    /// Locale key that names the secondary lane instead of `secondary_label`
+    /// (provider-owned, see `UsageSnapshot::secondary_label_key`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secondary_label_key: Option<String>,
     #[serde(default)]
     pub model_specific: Option<RateWindowSnapshot>,
     #[serde(default)]
@@ -448,6 +464,8 @@ impl ProviderUsageSnapshot {
             expected_used_percent: p.expected_used_percent,
             actual_used_percent: p.actual_used_percent,
             monthly_limit_block: MonthlyLimitBlockSnapshot::for_pace(usage, &blocked),
+            window_has_length: primary_pace_window
+                .is_some_and(|window| window.window_minutes.is_some()),
         });
 
         // Pace of the secondary lane, which also derives the row's reserve.
@@ -539,6 +557,11 @@ impl ProviderUsageSnapshot {
                     .clone()
                     .unwrap_or_else(|| metadata.weekly_label.to_string())
             }),
+            secondary_label_key: usage
+                .secondary
+                .as_ref()
+                .and(usage.secondary_label_key)
+                .map(|key| key.name().to_string()),
             model_specific: usage.model_specific.as_ref().map(|w| {
                 lane(
                     w,
@@ -689,6 +712,7 @@ impl ProviderUsageSnapshot {
             primary_label: Some(metadata.session_label.to_string()),
             secondary: None,
             secondary_label: None,
+            secondary_label_key: None,
             model_specific: None,
             tertiary: None,
             tertiary_label: None,
@@ -1289,6 +1313,46 @@ mod tests {
             monthly_limit_block: None,
             description_is_detail: false,
         }
+    }
+
+    /// Notion names its billing lane with the "Monthly" app string
+    /// (upstream `NotionProviderDescriptor.swift:32`); a provider that only
+    /// sets the raw "Monthly" label sends no key.
+    #[test]
+    fn secondary_label_key_crosses_the_bridge_only_when_the_provider_sets_it() {
+        let now = chrono::Utc::now();
+        let monthly = || {
+            RateWindow::with_details(
+                25.0,
+                Some(43_200),
+                Some(now + chrono::Duration::days(9)),
+                None,
+            )
+        };
+        let bridge = |id: ProviderId, usage: codexbar::core::UsageSnapshot| {
+            let metadata = codexbar::core::instantiate_provider(id).metadata().clone();
+            let result = ProviderFetchResult::new(usage, "web");
+            serde_json::to_value(ProviderUsageSnapshot::from_fetch_result(
+                id, &metadata, &result, None, None,
+            ))
+            .unwrap()
+        };
+
+        let notion = bridge(
+            ProviderId::Notion,
+            codexbar::core::UsageSnapshot::new(monthly())
+                .with_secondary(monthly())
+                .with_secondary_label_key(codexbar::locale::LocaleKey::ProviderLabelMonthly),
+        );
+        assert_eq!(notion["secondaryLabelKey"], "ProviderLabelMonthly");
+        assert_eq!(notion["secondaryLabel"], "Monthly");
+
+        let augment = bridge(
+            ProviderId::Augment,
+            codexbar::core::UsageSnapshot::new(monthly()).with_secondary(monthly()),
+        );
+        assert!(augment.get("secondaryLabelKey").is_none());
+        assert_eq!(augment["secondaryLabel"], "Monthly");
     }
 
     #[test]

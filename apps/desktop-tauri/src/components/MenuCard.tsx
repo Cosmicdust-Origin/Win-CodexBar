@@ -87,7 +87,9 @@ function cardMetrics(
   if (provider.secondary) {
     metrics.push({
       id: "secondary",
-      label: localizeWindowLabel(provider.secondaryLabel, t) || t("DetailWindowSecondary"),
+      label: provider.secondaryLabelKey
+        ? t(provider.secondaryLabelKey)
+        : localizeWindowLabel(provider.secondaryLabel, t) || t("DetailWindowSecondary"),
       snap: provider.secondary,
       lane: "secondary",
     });

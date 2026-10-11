@@ -37,6 +37,7 @@ fn fake_snapshot_with(
         primary_label: None,
         secondary: secondary_percent.map(window),
         secondary_label: None,
+        secondary_label_key: None,
         model_specific: None,
         tertiary: tertiary_percent.map(window),
         tertiary_label: None,
@@ -724,6 +725,7 @@ fn tray_pace_color_is_opt_in_and_follows_canonical_stage() {
         expected_used_percent: 40.0,
         actual_used_percent: 32.0,
         monthly_limit_block: None,
+        window_has_length: true,
     };
     let with_pace = |pace: Option<crate::commands::PaceSnapshot>| {
         let mut snapshot = fake_snapshot("codex", "Codex", 50.0);
@@ -771,6 +773,47 @@ fn tray_pace_color_is_opt_in_and_follows_canonical_stage() {
     assert_ne!(percent_normal, percent_behind);
 }
 
+/// Upstream `UsageStore.weeklyPace`: no menu-bar pace for a window without
+/// its own length (Copilot's reset-date-only windows). The rendered RGBA with
+/// the tint enabled must equal the untinted icon.
+#[test]
+fn tray_pace_tint_skips_pace_from_a_window_without_a_length() {
+    let pace = |window_has_length: bool| crate::commands::PaceSnapshot {
+        stage: "far_ahead".to_string(),
+        delta_percent: 20.0,
+        will_last_to_reset: false,
+        eta_seconds: None,
+        expected_used_percent: 30.0,
+        actual_used_percent: 50.0,
+        monthly_limit_block: None,
+        window_has_length,
+    };
+    let with_pace = |pace: Option<crate::commands::PaceSnapshot>| {
+        let mut snapshot = fake_snapshot("copilot", "Copilot", 50.0);
+        snapshot.pace = pace;
+        vec![snapshot]
+    };
+    for style in [
+        codexbar::settings::MenuBarIconStyle::default(),
+        codexbar::settings::MenuBarIconStyle::Percent,
+    ] {
+        let colored = Settings {
+            menu_bar_color_pace: true,
+            menu_bar_icon_style: style,
+            ..Settings::default()
+        };
+        let render = |snapshots: &[ProviderUsageSnapshot]| {
+            TrayPresentationPlan::resolve(&colored, snapshots, None).render_icon()
+        };
+        let unpaced = render(&with_pace(None));
+        let lengthless = render(&with_pace(Some(pace(false))));
+        let with_length = render(&with_pace(Some(pace(true))));
+
+        assert_eq!(unpaced, lengthless);
+        assert_ne!(unpaced, with_length);
+    }
+}
+
 #[test]
 fn stacked_tray_icon_keeps_usage_colours_when_pace_tint_is_enabled() {
     let mut codex = fake_snapshot("codex", "Codex", 50.0);
@@ -782,6 +825,7 @@ fn stacked_tray_icon_keeps_usage_colours_when_pace_tint_is_enabled() {
         expected_used_percent: 30.0,
         actual_used_percent: 50.0,
         monthly_limit_block: None,
+        window_has_length: true,
     });
     let claude = fake_snapshot("claude", "Claude", 20.0);
     let snapshots = vec![codex.clone(), claude.clone()];

@@ -38,6 +38,11 @@ const ZEN_BALANCE_START_DELAY: Duration = Duration::from_millis(25);
 /// `optionalZenBalanceJoinGrace`: join bound for background/UI reads.
 const ZEN_BALANCE_JOIN_GRACE: Duration = Duration::from_millis(250);
 
+/// Reset-window pace (upstream `OpenCodeGoProviderDescriptor.pace`, v0.70.0):
+/// `.calendarMonthResetWindow`.
+pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
+    crate::core::ProviderPaceCapability::CALENDAR_MONTH_RESET_WINDOW;
+
 pub struct OpenCodeGoProvider {
     metadata: ProviderMetadata,
     client: Client,

@@ -37,6 +37,13 @@ const CLI_SETTINGS_ENDPOINT: &str = "https://cli-chat-proxy.grok.com/v1/settings
 const RESET_CREDITS_TIMEOUT: Duration = Duration::from_secs(2);
 const RESET_CREDITS_JOIN_GRACE: Duration = Duration::from_millis(250);
 
+/// Reset-window pace (upstream `GrokProviderDescriptor.pace`, v0.70.0): weekly
+/// windows inside their length, see [`reset_window_pace_matches`].
+pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
+    crate::core::ProviderPaceCapability::reset_window(crate::core::PaceWindowRule::Custom(
+        reset_window_pace_matches,
+    ));
+
 pub struct GrokProvider {
     metadata: ProviderMetadata,
     client: Client,

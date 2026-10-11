@@ -540,46 +540,10 @@ impl ProviderId {
     }
 
     /// Reset-window pace rule (upstream `ProviderDescriptor.pace`, v0.70.0).
-    /// Only the providers upstream opts in get reset-window pace; rules that
-    /// need provider knowledge live in that provider's module.
+    /// Each provider declares its rule in its own module; the dispatch lives
+    /// in `provider_factory::pace_capability`.
     pub fn pace_capability(&self) -> super::ProviderPaceCapability {
-        use super::{PaceDurationRule, PaceWindowRule, ProviderPaceCapability};
-        match self {
-            ProviderId::Copilot => ProviderPaceCapability {
-                reset_window_pace: PaceWindowRule::ResetDatePresent,
-                inferred_monthly_duration: PaceDurationRule::WindowDurationMissing,
-            },
-            ProviderId::Cursor => {
-                ProviderPaceCapability::reset_window(PaceWindowRule::WindowDurationPresent)
-            }
-            ProviderId::Grok => ProviderPaceCapability::reset_window(PaceWindowRule::Custom(
-                crate::providers::grok::reset_window_pace_matches,
-            )),
-            ProviderId::Kimi => {
-                ProviderPaceCapability::reset_window(PaceWindowRule::WindowDuration(7 * 24 * 60))
-            }
-            ProviderId::Zai => ProviderPaceCapability {
-                reset_window_pace: PaceWindowRule::Custom(
-                    crate::providers::zai::reset_window_pace_matches,
-                ),
-                inferred_monthly_duration: PaceDurationRule::Custom(
-                    crate::providers::zai::is_monthly_mcp_window,
-                ),
-            },
-            ProviderId::Amp => ProviderPaceCapability::reset_window(PaceWindowRule::Custom(
-                crate::providers::amp::reset_window_pace_matches,
-            )),
-            ProviderId::Alibaba
-            | ProviderId::AlibabaTokenPlan
-            | ProviderId::CommandCode
-            | ProviderId::Doubao
-            | ProviderId::MiMo
-            | ProviderId::StepFun
-            | ProviderId::Notion
-            | ProviderId::Ollama
-            | ProviderId::OpenCodeGo => ProviderPaceCapability::CALENDAR_MONTH_RESET_WINDOW,
-            _ => ProviderPaceCapability::UNSUPPORTED,
-        }
+        super::provider_factory::pace_capability(*self)
     }
 
     /// Parse from CLI name string

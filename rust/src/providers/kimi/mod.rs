@@ -242,6 +242,13 @@ struct KimiWindow {
     time_unit: String,
 }
 
+/// Reset-window pace (upstream `KimiProviderDescriptor.pace`, v0.70.0): the
+/// weekly window only.
+pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
+    crate::core::ProviderPaceCapability::reset_window(crate::core::PaceWindowRule::WindowDuration(
+        7 * 24 * 60,
+    ));
+
 /// Kimi AI provider
 pub struct KimiProvider {
     metadata: ProviderMetadata,

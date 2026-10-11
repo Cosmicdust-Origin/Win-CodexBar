@@ -722,6 +722,7 @@ mod tests {
                 description_is_detail: false,
             }),
             secondary_label: None,
+            secondary_label_key: None,
             model_specific: None,
             tertiary: tertiary_percent.map(|pct| crate::commands::RateWindowSnapshot {
                 used_percent: pct,

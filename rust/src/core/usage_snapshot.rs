@@ -248,6 +248,12 @@ pub struct UsageSnapshot {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secondary_label: Option<String>,
 
+    /// Locale key for the secondary label, when the provider names its lane
+    /// with an app string rather than a raw window label. Surfaces that
+    /// localize at render time show this key instead of `secondary_label`.
+    #[serde(skip)]
+    pub secondary_label_key: Option<crate::locale::LocaleKey>,
+
     /// Model-specific rate window (e.g., Opus quota for Claude)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_specific: Option<RateWindow>,
@@ -294,6 +300,7 @@ impl UsageSnapshot {
             primary_label: None,
             secondary: None,
             secondary_label: None,
+            secondary_label_key: None,
             model_specific: None,
             model_specific_is_code_review: false,
             tertiary: None,
@@ -321,6 +328,12 @@ impl UsageSnapshot {
     /// Builder pattern: override the secondary window label for this snapshot.
     pub fn with_secondary_label(mut self, label: impl Into<String>) -> Self {
         self.secondary_label = Some(label.into());
+        self
+    }
+
+    /// Builder pattern: name the secondary window with a locale key.
+    pub fn with_secondary_label_key(mut self, key: crate::locale::LocaleKey) -> Self {
+        self.secondary_label_key = Some(key);
         self
     }
 
