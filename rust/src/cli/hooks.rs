@@ -558,7 +558,7 @@ fn run_test(args: HooksTestArgs) -> anyhow::Result<()> {
     let settings = Settings::load();
     if !settings.hooks_enabled {
         anyhow::bail!(
-            "Hooks are disabled in Settings (hooks_enabled=false). Enable them in Advanced."
+            "Hooks are disabled in Settings (hooks_enabled=false). Enable them in Settings > Hooks."
         );
     }
 
