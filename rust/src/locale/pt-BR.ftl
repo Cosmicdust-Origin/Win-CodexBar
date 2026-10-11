@@ -7,6 +7,7 @@ TabApiKeys = Chaves de API
 TabCookies = Cookies
 TabUsageSpend = Uso e gastos
 TabAdvanced = Avançado
+TabHooks = Hooks
 TabAbout = Sobre
 TabShortcuts = Atalhos
 InterfaceLanguage = Idioma da interface

@@ -198,6 +198,7 @@ locale_keys! {
     TabCookies,
     TabUsageSpend,
     TabAdvanced,
+    TabHooks,
     TabAbout,
     TabShortcuts,
 

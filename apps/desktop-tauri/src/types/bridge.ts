@@ -8,6 +8,7 @@ export type SettingsTabId =
   | "menu"
   | "usageSpend"
   | "advanced"
+  | "hooks"
   | "about";
 
 // ── Narrowed string-literal unions (persisted settings enums) ─────────

@@ -14,6 +14,7 @@ export const ALL_LOCALE_KEYS = [
   "TabCookies",
   "TabUsageSpend",
   "TabAdvanced",
+  "TabHooks",
   "TabAbout",
   "TabShortcuts",
   "InterfaceLanguage",

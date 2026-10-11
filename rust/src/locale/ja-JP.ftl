@@ -7,6 +7,7 @@ TabApiKeys = API キー
 TabCookies = Cookie
 TabUsageSpend = 使用量とコスト
 TabAdvanced = 詳細
+TabHooks = フック
 TabAbout = 情報
 TabShortcuts = ショートカット
 InterfaceLanguage = 表示言語

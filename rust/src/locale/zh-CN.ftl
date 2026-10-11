@@ -7,6 +7,7 @@ TabApiKeys = API 密钥
 TabCookies = Cookie
 TabUsageSpend = 用量与费用
 TabAdvanced = 高级
+TabHooks = 钩子
 TabAbout = 关于
 TabShortcuts = 快捷键
 InterfaceLanguage = 界面语言

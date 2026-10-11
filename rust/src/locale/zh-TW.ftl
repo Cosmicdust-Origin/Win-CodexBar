@@ -7,6 +7,7 @@ TabApiKeys = API 金鑰
 TabCookies = Cookie
 TabUsageSpend = 用量與費用
 TabAdvanced = 高階
+TabHooks = 掛鉤
 TabAbout = 關於
 TabShortcuts = 快捷鍵
 InterfaceLanguage = 介面語言

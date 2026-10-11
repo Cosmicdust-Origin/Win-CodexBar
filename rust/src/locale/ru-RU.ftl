@@ -7,6 +7,7 @@ TabApiKeys = API-ключи
 TabCookies = Куки
 TabUsageSpend = Использование и расходы
 TabAdvanced = Дополнительно
+TabHooks = Хуки
 TabAbout = О программе
 TabShortcuts = Горячие клавиши
 InterfaceLanguage = Язык интерфейса

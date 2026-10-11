@@ -7,6 +7,7 @@ TabApiKeys = API Anahtarları
 TabCookies = Çerezler
 TabUsageSpend = Kullanım ve Harcama
 TabAdvanced = Gelişmiş
+TabHooks = Kancalar
 TabAbout = Hakkında
 TabShortcuts = Kısayollar
 InterfaceLanguage = Arayüz Dili

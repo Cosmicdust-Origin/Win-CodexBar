@@ -114,9 +114,10 @@ describe("Settings sidebar", () => {
       "menuBar",
       "menu",
       "advanced",
+      "hooks",
       "about",
     ]);
-    expect(container.querySelectorAll(".settings-sidebar__chip")).toHaveLength(6);
+    expect(container.querySelectorAll(".settings-sidebar__chip")).toHaveLength(7);
     expect(container.querySelector(".settings-sidebar__app-icon")).not.toBeNull();
     expect(providerNames()).toEqual(["codex", "zai", "claude", "cline", "grok"]);
     expect(screen.getByText("SettingsSidebarProvidersOnCount")).toBeInTheDocument();

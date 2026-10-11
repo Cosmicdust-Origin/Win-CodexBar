@@ -7,6 +7,7 @@ TabApiKeys = API-ключі
 TabCookies = Файли cookie
 TabUsageSpend = Використання та витрати
 TabAdvanced = Додатково
+TabHooks = Хуки
 TabAbout = Про програму
 TabShortcuts = Комбінації клавіш
 InterfaceLanguage = Мова інтерфейсу
