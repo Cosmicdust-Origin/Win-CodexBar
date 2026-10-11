@@ -7,6 +7,7 @@ use serde_json::{Value, json};
 
 use super::model::{build_result, monthly_reset, parse_usage};
 use super::*;
+use crate::locale::LocaleKey;
 
 /// The parity pack payload (`scenarios/providers/ClawRouter/routes.json`)
 /// with `{{month:+0}}` resolved to `window_key`.
@@ -106,6 +107,11 @@ fn pack_result_matches_the_mac_card() {
     assert_eq!(cost.currency_code, "USD");
     assert_eq!(cost.period, "This month");
     assert_eq!(cost.resets_at, Some(reset));
+    // Upstream `.clawRouter` with a positive limit titles the block "Monthly budget".
+    assert_eq!(
+        cost.card_title_key,
+        Some(LocaleKey::ProviderTextMonthlyBudget)
+    );
 
     assert_eq!(
         rows(&result),
@@ -232,6 +238,10 @@ fn unmetered_policy_reports_actual_cost_without_a_limit() {
     assert!((cost.used - 18.42).abs() < 1e-9);
     assert_eq!(cost.limit, None);
     assert_eq!(
+        cost.card_title_key,
+        Some(LocaleKey::CostTitleClawRouterSpend)
+    );
+    assert_eq!(
         cost.resets_at,
         Utc.with_ymd_and_hms(2026, 11, 1, 0, 0, 0).single()
     );
@@ -263,6 +273,11 @@ fn zero_limit_keeps_the_cost_but_drops_the_meter() {
         Some("No monthly limit reported")
     );
     assert_eq!(result.cost.as_ref().and_then(|cost| cost.limit), Some(0.0));
+    // Upstream `.clawRouter` with `limit <= 0` is "ClawRouter spend".
+    assert_eq!(
+        result.cost.as_ref().and_then(|cost| cost.card_title_key),
+        Some(LocaleKey::CostTitleClawRouterSpend)
+    );
     assert!(rows(&result).contains(&row("Usage", "Monthly budget", "$18.420000 / $0.00", None)));
 }
 
