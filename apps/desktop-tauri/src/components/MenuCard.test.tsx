@@ -1395,6 +1395,20 @@ describe("MenuCard", () => {
       expect(screen.queryByText("Extra usage")).not.toBeInTheDocument();
     });
 
+    it("on the compact Overview line, which drops the Credits block and Billing rows", async () => {
+      tauriMocks.getLocaleStrings.mockResolvedValue(
+        buildBundle({ ProviderSessionLabel: "Session", ProviderTextBalanceColonPrefix: "Balance: {}" }),
+      );
+      const { container } = renderCard(lithos(42.37, "$42.37"), { compactOverview: true });
+
+      expect(await screen.findByText("Balance: $42.37")).toHaveClass("menu-metric__pct");
+      expect(screen.getAllByText(/42\.37/)).toHaveLength(1);
+      expect(container.querySelectorAll(".menu-metric")).toHaveLength(1);
+      expect(container.querySelector(".card-extra")).toBeNull();
+      expect(screen.queryByText("Payment card")).not.toBeInTheDocument();
+      expect(container.querySelector(".menu-card--header-only")).toBeNull();
+    });
+
     it("in the Billing row when the cost summary is hidden", async () => {
       const { container } = renderCard(lithos(42.37, "$42.37"), { costSummaryDisplayStyle: "hidden" });
 

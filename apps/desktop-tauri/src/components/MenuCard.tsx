@@ -78,6 +78,7 @@ function cardMetrics(
   provider: ProviderUsageSnapshot,
   t: ReturnType<typeof useLocale>["t"],
   language: ReturnType<typeof useLocale>["language"],
+  compactOverview: boolean,
 ): MetricEntry[] {
   const metrics: MetricEntry[] = [];
   if (provider.providerId !== "wayfinder") {
@@ -127,9 +128,12 @@ function cardMetrics(
     });
   }
   // A window the provider keeps for the tray and float bar only (upstream LithosAI has no card bar).
+  // The compact Overview drops the detail rows and cost block that carry it on the full card, so
+  // the window stays there as the card's one line.
   return metrics.filter(
     (metric) =>
-      !metric.snap.hiddenOnCard && isUsageItemVisible(provider.hiddenUsageItemIds, metric.id),
+      (compactOverview || !metric.snap.hiddenOnCard) &&
+      isUsageItemVisible(provider.hiddenUsageItemIds, metric.id),
   );
 }
 
@@ -200,7 +204,7 @@ export default function MenuCard({
         provider.providerId === "openaiapi" && hideEmail,
       );
 
-  const metrics = cardMetrics(provider, t, language);
+  const metrics = cardMetrics(provider, t, language, compactOverview);
   // Snapshots are cached across failed refreshes, so monthly-limit blocks are
   // re-checked against the clock and lift when the pool's reset passes.
   const monthlyLimitBlockNow = useMonthlyLimitBlockNow(
