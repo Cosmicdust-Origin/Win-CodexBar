@@ -1173,6 +1173,7 @@ ResetsInHoursOnly = Resets in { "{}" }h
 ResetsInDaysOnly = Resets in { "{}" }d
 RegeneratesCountdown = Regenerates { "{}" }
 CostTitleClawRouterSpend = ClawRouter spend
+CostTitleClawRouterMonthlyBudget = Monthly budget
 ResetsAtTime = Resets at { "{}" }
 ProviderTextRequests = { "{}" } requests
 ProviderTextTokens = { "{}" } tokens

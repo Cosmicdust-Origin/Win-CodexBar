@@ -1171,6 +1171,7 @@ ResetsInHoursOnly = リセットまで { "{}" }時間
 ResetsInDaysOnly = リセットまで { "{}" }日
 RegeneratesCountdown = { "{}" } に再生成
 CostTitleClawRouterSpend = ClawRouter spend
+CostTitleClawRouterMonthlyBudget = Monthly budget
 ResetsAtTime = { "{}" } にリセット
 ProviderTextRequests = { "{}" } リクエスト
 ProviderTextTokens = { "{}" } トークン

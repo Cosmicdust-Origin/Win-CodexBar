@@ -1170,6 +1170,7 @@ ResetsInHoursOnly = 초기화까지 { "{}" }시간
 ResetsInDaysOnly = 초기화까지 { "{}" }일
 RegeneratesCountdown = { "{}" }에 재생성
 CostTitleClawRouterSpend = ClawRouter spend
+CostTitleClawRouterMonthlyBudget = Monthly budget
 ResetsAtTime = { "{}" }에 초기화
 ProviderTextRequests = 요청 { "{}" }회
 ProviderTextTokens = { "{}" } 토큰

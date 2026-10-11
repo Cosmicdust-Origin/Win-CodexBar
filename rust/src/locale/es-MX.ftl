@@ -1170,6 +1170,7 @@ ResetsInHoursOnly = Reinicia en { "{}" }h
 ResetsInDaysOnly = Reinicia en { "{}" }d
 RegeneratesCountdown = Se regenera { "{}" }
 CostTitleClawRouterSpend = ClawRouter spend
+CostTitleClawRouterMonthlyBudget = Monthly budget
 ResetsAtTime = Reinicia a las { "{}" }
 ProviderTextRequests = { "{}" } solicitudes
 ProviderTextTokens = { "{}" } tokens

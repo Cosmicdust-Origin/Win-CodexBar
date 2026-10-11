@@ -1171,6 +1171,7 @@ ResetsInHoursOnly = { "{}" } 小时后重置
 ResetsInDaysOnly = { "{}" } 天后重置
 RegeneratesCountdown = { "{}" }后恢复
 CostTitleClawRouterSpend = ClawRouter spend
+CostTitleClawRouterMonthlyBudget = Monthly budget
 ResetsAtTime = { "{}" } 重置
 ProviderTextRequests = { "{}" } 次请求
 ProviderTextTokens = { "{}" } Token

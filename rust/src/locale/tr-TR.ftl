@@ -1171,6 +1171,7 @@ ResetsInHoursOnly = Sıfırlanmaya { "{}" } sa
 ResetsInDaysOnly = Sıfırlanmaya { "{}" } g
 RegeneratesCountdown = Yenilenme: { "{}" }
 CostTitleClawRouterSpend = ClawRouter spend
+CostTitleClawRouterMonthlyBudget = Monthly budget
 ResetsAtTime = { "{}" } saatinde sıfırlanır
 ProviderTextRequests = { "{}" } istek
 ProviderTextTokens = { "{}" } token

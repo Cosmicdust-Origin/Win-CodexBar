@@ -1173,6 +1173,7 @@ ResetsInHoursOnly = Скинеться через { "{}" } год
 ResetsInDaysOnly = Скинеться через { "{}" } дн.
 RegeneratesCountdown = Регенерує { "{}" }
 CostTitleClawRouterSpend = ClawRouter spend
+CostTitleClawRouterMonthlyBudget = Monthly budget
 ResetsAtTime = Скинеться о { "{}" }
 ProviderTextRequests = Запитів: { "{}" }
 ProviderTextTokens = Токенів: { "{}" }

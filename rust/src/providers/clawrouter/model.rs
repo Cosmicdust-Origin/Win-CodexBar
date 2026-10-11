@@ -259,7 +259,7 @@ pub(super) fn build_result(usage: &ClawRouterUsage) -> ProviderFetchResult {
 /// "Monthly budget" when a positive limit is reported, else "ClawRouter spend".
 fn cost_card_title(limit: Option<f64>) -> LocaleKey {
     match limit {
-        Some(limit) if limit > 0.0 => LocaleKey::ProviderTextMonthlyBudget,
+        Some(limit) if limit > 0.0 => LocaleKey::CostTitleClawRouterMonthlyBudget,
         _ => LocaleKey::CostTitleClawRouterSpend,
     }
 }

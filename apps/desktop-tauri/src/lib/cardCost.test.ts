@@ -16,7 +16,7 @@ const STRINGS: Partial<Record<LocaleKey, string>> = {
   ProviderLabelMonthly: "Monthly",
   WindowLabelMonthlyCredits: "Monthly credits",
   CreditsTitle: "Credits",
-  ProviderTextMonthlyBudget: "Monthly budget",
+  CostTitleClawRouterMonthlyBudget: "Monthly budget",
   CostTitleClawRouterSpend: "ClawRouter spend",
 };
 const t = (key: LocaleKey) => STRINGS[key] ?? key;
@@ -179,7 +179,7 @@ describe("cardCostSection", () => {
   // Upstream `ProviderCostMenuCardStyle`: the provider names its block.
   it("uses the provider's card title for capped, inline and balance blocks", () => {
     const budget = cardCostSection(
-      cost({ used: 18.42, limit: 50, period: "This month", titleKey: "ProviderTextMonthlyBudget" }),
+      cost({ used: 18.42, limit: 50, period: "This month", titleKey: "CostTitleClawRouterMonthlyBudget" }),
       "detailed",
       t,
       "clawrouter",

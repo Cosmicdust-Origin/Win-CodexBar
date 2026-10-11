@@ -110,7 +110,7 @@ fn pack_result_matches_the_mac_card() {
     // Upstream `.clawRouter` with a positive limit titles the block "Monthly budget".
     assert_eq!(
         cost.card_title_key,
-        Some(LocaleKey::ProviderTextMonthlyBudget)
+        Some(LocaleKey::CostTitleClawRouterMonthlyBudget)
     );
 
     assert_eq!(

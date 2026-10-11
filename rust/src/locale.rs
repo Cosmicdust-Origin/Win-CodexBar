@@ -1500,6 +1500,7 @@ locale_keys! {
     ResetsInDaysOnly,
     RegeneratesCountdown,
     CostTitleClawRouterSpend,
+    CostTitleClawRouterMonthlyBudget,
     ResetsAtTime,
     // Provider detail text localized at render time
     ProviderTextRequests,

@@ -1171,6 +1171,7 @@ ResetsInHoursOnly = Сброс через { "{}" } ч
 ResetsInDaysOnly = Сброс через { "{}" } д
 RegeneratesCountdown = Пополняется { "{}" }
 CostTitleClawRouterSpend = ClawRouter spend
+CostTitleClawRouterMonthlyBudget = Monthly budget
 ResetsAtTime = Сброс в { "{}" }
 ProviderTextRequests = Запросов: { "{}" }
 ProviderTextTokens = Токенов: { "{}" }

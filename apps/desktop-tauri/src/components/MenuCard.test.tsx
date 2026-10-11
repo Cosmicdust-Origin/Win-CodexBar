@@ -1432,7 +1432,7 @@ describe("MenuCard", () => {
 
   it("titles ClawRouter's capped cost block Monthly budget", async () => {
     tauriMocks.getLocaleStrings.mockResolvedValue(
-      buildBundle({ ProviderTextMonthlyBudget: "Monthly budget", ExtraUsage: "Extra usage" }),
+      buildBundle({ CostTitleClawRouterMonthlyBudget: "Monthly budget", ExtraUsage: "Extra usage" }),
     );
     const snapshot = provider(null, 37);
     snapshot.providerId = "clawrouter";
@@ -1446,7 +1446,7 @@ describe("MenuCard", () => {
       resetsAt: null,
       formattedUsed: "$18.42",
       formattedLimit: "$50.00",
-      titleKey: "ProviderTextMonthlyBudget",
+      titleKey: "CostTitleClawRouterMonthlyBudget",
     };
 
     renderCard(snapshot);

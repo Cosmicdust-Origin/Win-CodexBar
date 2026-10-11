@@ -1175,6 +1175,7 @@ ResetsInHoursOnly = Renova em { "{}" }h
 ResetsInDaysOnly = Renova em { "{}" }d
 RegeneratesCountdown = Regenera { "{}" }
 CostTitleClawRouterSpend = ClawRouter spend
+CostTitleClawRouterMonthlyBudget = Monthly budget
 ResetsAtTime = Renova às { "{}" }
 ProviderTextRequests = { "{}" } solicitações
 ProviderTextTokens = { "{}" } tokens
