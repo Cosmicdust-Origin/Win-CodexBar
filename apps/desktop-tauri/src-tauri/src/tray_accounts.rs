@@ -6,6 +6,7 @@
 use codexbar::codex_accounts::{CodexAccount, ordinals_by_id};
 use codexbar::locale::{self, LocaleKey};
 use codexbar::settings::{Language, Settings};
+use std::collections::HashMap;
 use tauri::AppHandle;
 #[cfg(test)]
 use uuid::Uuid;
@@ -261,13 +262,26 @@ fn codex_account_menu_label(
     )
 }
 
-/// "Account N" for the account at `index`: Hide Personal Info shows no part
-/// of an email (Mac `PersonalInfoRedactor.AccountOrdinal`).
-fn hidden_account_label(lang: Language, index: usize) -> String {
+/// Number accounts 1..n by their sorted stable id, not by list order, so an
+/// account keeps its "Account N" when a switch reorders the list. Settings
+/// uses the same rule (`buildAccountOrdinals`).
+fn ordinals_by_sorted_id<'a>(ids: impl IntoIterator<Item = &'a str>) -> HashMap<&'a str, usize> {
+    let mut ids: Vec<&str> = ids.into_iter().collect();
+    ids.sort_unstable();
+    ids.dedup();
+    ids.into_iter()
+        .enumerate()
+        .map(|(index, id)| (id, index + 1))
+        .collect()
+}
+
+/// "Account N": Hide Personal Info shows no part of an email (Mac
+/// `PersonalInfoRedactor.AccountOrdinal`).
+fn hidden_account_label(lang: Language, ordinal: usize) -> String {
     let word = locale::get_text(lang, LocaleKey::Account);
     let word = word.trim();
     let word = if word.is_empty() { "Account" } else { word };
-    format!("{word} {}", index + 1)
+    format!("{word} {ordinal}")
 }
 
 fn claude_accounts_menu(
@@ -276,12 +290,12 @@ fn claude_accounts_menu(
     hide_personal_info: bool,
 ) -> TrayMenuEntry {
     let text = |key| locale::get_text(lang, key);
+    let ordinals = ordinals_by_sorted_id(accounts.iter().map(|account| account.id.as_str()));
     let mut children: Vec<_> = accounts
         .iter()
-        .enumerate()
-        .map(|(index, account)| {
+        .map(|account| {
             let label = if hide_personal_info {
-                hidden_account_label(lang, index)
+                hidden_account_label(lang, ordinals[account.id.as_str()])
             } else {
                 account.organization.as_ref().map_or_else(
                     || account.email.clone(),
@@ -329,12 +343,12 @@ fn grok_accounts_menu(
     hide_personal_info: bool,
 ) -> TrayMenuEntry {
     let text = |key| locale::get_text(lang, key);
+    let ordinals = ordinals_by_sorted_id(accounts.iter().map(|account| account.id.as_str()));
     let mut children: Vec<_> = accounts
         .iter()
-        .enumerate()
-        .map(|(index, account)| {
+        .map(|account| {
             let label = if hide_personal_info {
-                hidden_account_label(lang, index)
+                hidden_account_label(lang, ordinals[account.id.as_str()])
             } else {
                 account.email.clone()
             };
@@ -611,6 +625,17 @@ mod tests {
         ));
     }
 
+    fn claude_menu_account(id: &str) -> codexbar::providers::claude::accounts::ClaudeAccount {
+        codexbar::providers::claude::accounts::ClaudeAccount {
+            id: id.into(),
+            email: format!("{id}@example.com"),
+            organization: None,
+            plan: None,
+            is_active: false,
+            is_saved: true,
+        }
+    }
+
     #[test]
     fn hidden_claude_and_grok_tray_labels_show_no_email() {
         use codexbar::providers::claude::accounts::ClaudeAccount;
@@ -645,6 +670,62 @@ mod tests {
             .map(|entry| entry.label.as_str())
             .collect();
         assert_eq!(labels, ["Account 1", "Account 2", "Account 1"]);
+
+        // An unsaved live login is listed first; numbering still follows the
+        // sorted ids, so "b:org" stays "Account 2" whatever the list order.
+        let live = ClaudeAccount {
+            is_active: true,
+            is_saved: false,
+            ..claude_menu_account("0:org")
+        };
+        let reordered = claude_accounts_menu(
+            &[
+                live,
+                claude_menu_account("b:org"),
+                claude_menu_account("a:org"),
+            ],
+            Language::English,
+            true,
+        );
+        let by_id: Vec<(&str, &str)> = reordered.children[..3]
+            .iter()
+            .map(|entry| (entry.id.as_deref().unwrap_or(""), entry.label.as_str()))
+            .collect();
+        assert_eq!(
+            by_id,
+            [
+                ("switch_claude_account:0:org", "Account 1"),
+                ("switch_claude_account:b:org", "Account 3"),
+                ("switch_claude_account:a:org", "Account 2"),
+            ]
+        );
+        let grok_reordered = grok_accounts_menu(
+            &[
+                GrokAccount {
+                    id: "user-z".into(),
+                    email: "z@example.com".into(),
+                    organization: None,
+                    plan: None,
+                    is_active: true,
+                    is_saved: false,
+                },
+                GrokAccount {
+                    id: "user-a".into(),
+                    email: "a@example.com".into(),
+                    organization: None,
+                    plan: None,
+                    is_active: false,
+                    is_saved: true,
+                },
+            ],
+            Language::English,
+            true,
+        );
+        let grok_labels: Vec<&str> = grok_reordered.children[..2]
+            .iter()
+            .map(|entry| entry.label.as_str())
+            .collect();
+        assert_eq!(grok_labels, ["Account 2", "Account 1"]);
         for entry in claude_menu.children.iter().chain(&grok_menu.children) {
             assert!(!entry.label.contains('@'), "{}", entry.label);
             assert!(!entry.label.contains("example.com"), "{}", entry.label);

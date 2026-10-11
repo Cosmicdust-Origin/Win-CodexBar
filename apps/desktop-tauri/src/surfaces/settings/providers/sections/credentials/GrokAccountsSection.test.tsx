@@ -103,4 +103,17 @@ describe("GrokAccountsSection", () => {
     expect(container.innerHTML).not.toContain("@");
     expect(container.innerHTML).not.toContain("example.com");
   });
+
+  it("numbers hidden accounts by sorted id, not list order", async () => {
+    // The unsaved live login is listed first, but "user-a" sorts first.
+    const live: GrokAccount = { ...current, id: "user-z", email: "z@example.com" };
+    const saved: GrokAccount = { ...other, id: "user-a", email: "a@example.com" };
+    mocks.grokAccountsList.mockResolvedValue([live, saved]);
+    const { container } = render(<GrokAccountsSection t={t} hidePersonalInfo />);
+    await screen.findByText("Account 2");
+    const labels = [...container.querySelectorAll(".credential-card__info strong")].map(
+      (label) => label.textContent,
+    );
+    expect(labels).toEqual(["Account 2", "Account 1"]);
+  });
 });
