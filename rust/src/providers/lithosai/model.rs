@@ -10,6 +10,7 @@ use crate::core::{
     CostSnapshot, ProviderDisplayDetail, ProviderError, ProviderFetchResult, RateWindow,
     UsageSnapshot,
 };
+use crate::locale::LocaleKey;
 use crate::providers::format;
 
 /// `Number.MAX_SAFE_INTEGER`.
@@ -203,6 +204,9 @@ fn row(id: &str, title: &str, value: impl Into<String>) -> Option<ProviderDispla
     ProviderDisplayDetail::new(id, title, value).and_then(|row| row.with_section_title(SECTION))
 }
 
+/// The Billing row the Credits block replaces on the card.
+pub(super) const BALANCE_ROW_ID: &str = "balance";
+
 /// The prepaid balance as a cost block (omitted for a debt), plus upstream's
 /// "Billing" rows.
 /// Upstream has no quota bar; the Windows primary slot carries the balance
@@ -214,9 +218,12 @@ pub(super) fn result(
 ) -> ProviderFetchResult {
     let balance = usd(billing.balance_nanos);
     let balance_text = money(balance);
-    let mut usage = UsageSnapshot::new(RateWindow::informational(format!(
-        "Balance: {balance_text}"
-    )))
+    // Upstream's snapshot has no window (lithosai.ts:71-79). The primary
+    // carries the balance for the tray and float bar only; the card shows it
+    // in the Credits block or the Billing row.
+    let mut usage = UsageSnapshot::new(
+        RateWindow::informational(format!("Balance: {balance_text}")).hidden_on_card(),
+    )
     .with_login_method("Browser session");
     if let Some(email) = &account.email {
         usage = usage.with_email(email.clone());
@@ -226,7 +233,7 @@ pub(super) fn result(
     }
 
     let mut rows = vec![
-        row("balance", "Balance", balance_text),
+        row(BALANCE_ROW_ID, "Balance", balance_text),
         row(
             "payment-card",
             "Payment card",
@@ -263,7 +270,15 @@ pub(super) fn result(
     // as "$0.00". Upstream keeps negative balances visible, so a debt is left
     // to the primary line and the Balance row.
     let result = if billing.balance_nanos >= 0 {
-        result.with_cost(CostSnapshot::new(0.0, "USD", "Prepaid credits").with_balance(balance))
+        // Upstream `.prepaidCredits` (LithosAIProviderDescriptor.swift:16-19):
+        // a "Credits" block. While it is shown it stands in for the Billing
+        // "Balance" row, so the card shows the balance once.
+        result.with_cost(
+            CostSnapshot::new(0.0, "USD", "Prepaid credits")
+                .with_balance(balance)
+                .with_card_title(LocaleKey::CreditsTitle)
+                .replacing_detail_rows(&[BALANCE_ROW_ID]),
+        )
     } else {
         result
     };

@@ -5,7 +5,9 @@ use std::thread::JoinHandle;
 use chrono::{TimeZone, Utc};
 use reqwest::redirect::Policy;
 
+use super::model::BALANCE_ROW_ID;
 use super::*;
+use crate::locale::LocaleKey;
 
 const ME: &str = r#"{"user":{"email":"person@example.test"},"activeOrganization":{"id":"org-fixture","name":"Synthetic Organization"}}"#;
 const EMPTY_SPEND: &str = r#"{"start":"2027-01-01","end":"2027-01-21","days":[]}"#;
@@ -129,8 +131,14 @@ async fn console_balance_and_sparse_spend_match_the_upstream_fixture() {
     assert_eq!(cost.limit, None);
     assert_eq!(cost.currency_code, "USD");
     assert_eq!(cost.period, "Prepaid credits");
+    // Upstream `.prepaidCredits` titles the block "Credits", and the card shows
+    // the balance once: in that block, not again as the Billing row or a bar.
+    assert_eq!(cost.card_title_key, Some(LocaleKey::CreditsTitle));
+    assert_eq!(cost.replaced_detail_ids, [BALANCE_ROW_ID]);
+    assert_eq!(result.display_details[0].id(), BALANCE_ROW_ID);
     let usage = &result.usage;
     assert!(usage.primary.is_informational);
+    assert!(usage.primary.hidden_on_card);
     assert_eq!(
         usage.primary.reset_description.as_deref(),
         Some("Balance: $4.71")
@@ -206,9 +214,19 @@ async fn zero_debt_and_subcent_balances_are_not_invented_quotas() {
             "{balance}"
         );
         assert!(result.usage.primary.is_informational);
+        assert!(result.usage.primary.hidden_on_card, "{balance}");
         assert_eq!(
             result.usage.primary.reset_description.as_deref(),
             Some(format!("Balance: {shown}").as_str())
+        );
+        // A debt has no cost block, so the Billing row is where the card shows it.
+        assert_eq!(
+            result
+                .cost
+                .as_ref()
+                .map(|cost| cost.replaced_detail_ids.clone()),
+            cost_balance.map(|_| vec![BALANCE_ROW_ID]),
+            "{balance}"
         );
         let rows = rows(&result);
         assert_eq!(rows[0], ("Balance".to_owned(), shown.to_owned()));
