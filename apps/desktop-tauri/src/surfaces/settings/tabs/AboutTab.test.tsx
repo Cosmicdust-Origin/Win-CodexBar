@@ -87,6 +87,7 @@ const settings: SettingsSnapshot = {
   codexCustomSessionsDirs: [],
   updateChannel: "stable",
   uiLanguage: "english",
+  uiLanguageFollowsSystem: false,
   theme: "dark",
   windowScalePercent: 125,
   trayScalePercent: 100,

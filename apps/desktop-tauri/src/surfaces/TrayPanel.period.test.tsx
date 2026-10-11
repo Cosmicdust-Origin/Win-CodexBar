@@ -116,6 +116,7 @@ const settings = {
   overviewLayout: "detailed",
   hidePersonalInfo: false,
   uiLanguage: "english",
+  uiLanguageFollowsSystem: false,
   theme: "dark",
   windowScalePercent: 125,
   trayScalePercent: 100,

@@ -93,6 +93,7 @@ const settings: SettingsSnapshot = {
   codexCustomSessionsDirs: [],
   updateChannel: "stable",
   uiLanguage: "english",
+  uiLanguageFollowsSystem: false,
   theme: "dark",
   claudeAvoidKeychainPrompts: true,
   codexSparkUsageVisible: true,
@@ -126,6 +127,32 @@ describe("GeneralTab running version", () => {
 });
 
 describe("GeneralTab language picker", () => {
+  it("lists System first and shows it while following the system", () => {
+    render(
+      <GeneralTab
+        settings={{ ...settings, uiLanguage: "korean", uiLanguageFollowsSystem: true }}
+        set={vi.fn()}
+        saving={false}
+      />,
+    );
+
+    const select = screen.getByDisplayValue("System") as HTMLSelectElement;
+    expect(select.value).toBe("system");
+    expect(select.querySelectorAll("option")[0].textContent).toBe("System");
+  });
+
+  it("picking System follows the system; picking a language stops following", () => {
+    const set = vi.fn();
+    render(<GeneralTab settings={settings} set={set} saving={false} />);
+
+    const select = screen.getByDisplayValue("English");
+    fireEvent.change(select, { target: { value: "system" } });
+    expect(set).toHaveBeenLastCalledWith({ uiLanguageFollowsSystem: true });
+
+    fireEvent.change(select, { target: { value: "japanese" } });
+    expect(set).toHaveBeenLastCalledWith({ uiLanguage: "japanese" });
+  });
+
   it("renders all supported language options", () => {
     render(<GeneralTab settings={settings} set={vi.fn()} saving={false} />);
 

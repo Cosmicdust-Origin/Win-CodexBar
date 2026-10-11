@@ -111,6 +111,7 @@ const ALLOWED_PREFERENCES: &[(&str, Validator)] = &[
     ("provider_metrics", provider_metrics),
     ("theme", typed::<super::ThemePreference>),
     ("ui_language", typed::<super::Language>),
+    ("ui_language_follows_system", typed::<bool>),
     ("window_scale_percent", uint_in::<100, 250>),
     (
         "tray_scale_percent",

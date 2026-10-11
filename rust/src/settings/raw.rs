@@ -265,6 +265,10 @@ pub(super) struct RawSettings {
     auto_download_updates: bool,
     install_updates_on_quit: bool,
     ui_language: Language,
+    /// Field-level default: a file without the key predates "System" and
+    /// keeps its chosen language (new installs get true from `Settings::default`).
+    #[serde(default)]
+    ui_language_follows_system: bool,
     theme: ThemePreference,
     #[serde(default = "default_window_scale_percent")]
     window_scale_percent: u16,
@@ -418,6 +422,7 @@ impl Default for RawSettings {
             auto_download_updates: s.auto_download_updates,
             install_updates_on_quit: s.install_updates_on_quit,
             ui_language: s.ui_language,
+            ui_language_follows_system: s.ui_language_follows_system,
             theme: s.theme,
             window_scale_percent: s.window_scale_percent,
             tray_scale_percent: s.tray_scale_percent,
@@ -769,6 +774,7 @@ impl From<RawSettings> for Settings {
             auto_download_updates: raw.auto_download_updates,
             install_updates_on_quit: raw.install_updates_on_quit,
             ui_language: raw.ui_language,
+            ui_language_follows_system: raw.ui_language_follows_system,
             theme: raw.theme,
             window_scale_percent: clamp_window_scale_percent(raw.window_scale_percent),
             tray_scale_percent: clamp_tray_scale_percent(raw.tray_scale_percent),

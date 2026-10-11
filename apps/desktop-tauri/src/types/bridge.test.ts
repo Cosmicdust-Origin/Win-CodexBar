@@ -120,6 +120,7 @@ describe("Language type", () => {
       codexCustomSessionsDirs: [],
       updateChannel: "stable",
       uiLanguage: "spanish",
+      uiLanguageFollowsSystem: false,
       theme: "dark",
       claudeAvoidKeychainPrompts: true,
       codexSparkUsageVisible: true,

@@ -62,6 +62,8 @@ pub async fn import_preferences(
     let applied = document
         .apply_to(&mut settings)
         .map_err(|error| error.to_string())?;
+    // An imported "System" language resolves to this PC's display language.
+    settings.resolve_system_language();
     if settings.cost_usage_enabled && !previous_cost_tracking {
         // Turning "Track costs" on pins the bucket zone, as in Settings.
         settings.pin_cost_usage_bucket_time_zone();

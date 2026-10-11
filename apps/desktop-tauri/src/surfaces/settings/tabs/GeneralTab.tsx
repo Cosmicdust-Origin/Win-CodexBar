@@ -32,6 +32,9 @@ import type { TabProps } from "../settingsTabs";
 import PreferencesTransferSection from "./PreferencesTransferSection";
 import SwitcherShortcutsDialog from "../SwitcherShortcutsDialog";
 
+/** Select value for Language "System" (follow the Windows display language). */
+const SYSTEM_LANGUAGE = "system";
+
 const FALLBACK_LANGUAGE_OPTIONS: LanguageOption[] = [
   { value: "english", display: "English" },
   { value: "chinese", display: "中文" },
@@ -277,13 +280,24 @@ export default function GeneralTab({
         <Field label={t("InterfaceLanguage")} description={t("GeneralLanguageHelper")}>
           <Select
             variant="menu"
-            value={settings.uiLanguage}
+            value={settings.uiLanguageFollowsSystem ? SYSTEM_LANGUAGE : settings.uiLanguage}
             disabled={saving}
-            options={languageOptions.map((opt) => ({
-              value: opt.value,
-              label: opt.display,
-            }))}
-            onChange={(v) => set({ uiLanguage: v as Language })}
+            ariaLabel={t("InterfaceLanguage")}
+            options={[
+              // Mac PreferencesGeneralPane.swift:6 lists "System" first, labelled in English.
+              { value: SYSTEM_LANGUAGE, label: "System" },
+              ...languageOptions.map((opt) => ({
+                value: opt.value,
+                label: opt.display,
+              })),
+            ]}
+            onChange={(v) =>
+              set(
+                v === SYSTEM_LANGUAGE
+                  ? { uiLanguageFollowsSystem: true }
+                  : { uiLanguage: v as Language },
+              )
+            }
           />
         </Field>
         <Field label={t("PreferredCurrencyLabel")} description={t("PreferredCurrencyHelper")}>

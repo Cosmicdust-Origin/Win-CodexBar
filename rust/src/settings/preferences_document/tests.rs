@@ -62,6 +62,7 @@ fn customized_settings() -> Settings {
         ]),
         theme: ThemePreference::Dark,
         ui_language: Language::Japanese,
+        ui_language_follows_system: false,
         window_scale_percent: 150,
         tray_scale_percent: 120,
         float_bar_opacity: 60,

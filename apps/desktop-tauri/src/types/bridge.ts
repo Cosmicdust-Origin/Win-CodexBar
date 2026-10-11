@@ -247,6 +247,8 @@ export interface SettingsSnapshot {
   httpProxyUsername?: string;
   httpProxyPassword?: string;
   uiLanguage: Language;
+  /** Language "System": `uiLanguage` follows the Windows display language. */
+  uiLanguageFollowsSystem: boolean;
   theme: ThemePreference;
   /** 100..=250 — clamped server-side. */
   windowScalePercent: number;
@@ -393,6 +395,8 @@ export interface SettingsUpdate {
   httpProxyUsername?: string;
   httpProxyPassword?: string;
   uiLanguage?: Language;
+  /** `true` picks "System"; picking a `uiLanguage` turns it off. */
+  uiLanguageFollowsSystem?: boolean;
   theme?: ThemePreference;
   windowScalePercent?: number;
   trayScalePercent?: number;

@@ -111,6 +111,7 @@ function settings(overrides: Partial<SettingsSnapshot> = {}): SettingsSnapshot {
     switcherShortcuts: {},
     codexCustomSessionsDirs: [],
     uiLanguage: "english",
+    uiLanguageFollowsSystem: false,
     // "dark" (not "auto") so useTheme's effect short-circuits before ever
     // touching window.matchMedia, which jsdom doesn't implement here.
     theme: "dark",
