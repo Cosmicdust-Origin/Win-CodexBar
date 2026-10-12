@@ -83,6 +83,13 @@ const PANE_GLYPHS: Record<Exclude<SettingsTabId, "providers" | "about">, ReactEl
       <circle cx="13" cy="12" r="1.4" />
     </Glyph>
   ),
+  // macOS `bolt.horizontal.circle.fill`.
+  hooks: (
+    <Glyph>
+      <circle cx="8" cy="8" r="6.2" />
+      <path d="M3.8 8.6 7.4 5.6 7.4 7.4H12.2L8.6 10.4 8.6 8.6Z" />
+    </Glyph>
+  ),
 };
 
 function PaneChip({ pane }: { pane: SidebarPane }) {

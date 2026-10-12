@@ -10,6 +10,7 @@ export type SettingsTabId =
   | "menu"
   | "usageSpend"
   | "advanced"
+  | "hooks"
   | "about";
 
 // ── Narrowed string-literal unions (persisted settings enums) ─────────
@@ -1448,4 +1449,55 @@ export interface ClaudeSwapAccountsState {
   executableConfigured: boolean;
   accounts: ClaudeSwapAccount[];
   error: string | null;
+}
+
+// ── Hooks (Settings > Hooks; Rust `commands/hooks.rs`) ────────────────
+
+/** The seven hook events, in the macOS picker order (`HookEventType.allCases`). */
+export const HOOK_EVENT_TYPES = [
+  "quota_low",
+  "quota_reached",
+  "quota_reset",
+  "usage_updated",
+  "provider_unavailable",
+  "provider_recovered",
+  "refresh_failed",
+] as const;
+
+export type HookEventType = (typeof HOOK_EVENT_TYPES)[number];
+
+/** One rule in `hooks.json` (`HookRulePayload`). */
+export interface HookRulePayload {
+  enabled: boolean;
+  /** Event names stay strings so the backend can reject an unknown one. */
+  event: string | null;
+  /** Extra events from a hand-edited file; the pane carries them through. */
+  events: string[];
+  /** Provider id, or null for any provider. */
+  provider: string | null;
+  /** For `quota_low`: usage fraction 0..1 (edited as 1..100 %). */
+  threshold: number | null;
+  executable: string;
+  arguments: string[];
+  timeoutSecs: number;
+}
+
+/** What the Hooks pane shows (`HooksConfigSnapshot`). */
+export interface HooksConfigSnapshot {
+  /** On only when `settings.hooks_enabled` and `hooks.json` `enabled` are both on. */
+  enabled: boolean;
+  settingsEnabled: boolean;
+  fileEnabled: boolean;
+  rules: HookRulePayload[];
+  path: string;
+  /** Set when `hooks.json` exists but can't be read; saving is refused. */
+  error: string | null;
+  maxRules: number;
+  maxArguments: number;
+}
+
+/** A save from the Hooks pane (`HooksConfigSave`). `enabled` is sent only by the Enable switch. */
+export interface HooksConfigSave {
+  enabled?: boolean | null;
+  rules: HookRulePayload[];
 }

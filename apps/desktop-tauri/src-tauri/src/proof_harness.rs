@@ -11,6 +11,7 @@
 //!   - `settings`           — show settings (General tab)
 //!   - `settings:menuBar`   — show settings on the Menu Bar tab
 //!   - `settings:usageSpend` — show settings on the Usage & Spend tab
+//!   - `settings:hooks`     — show settings on the Hooks tab
 //!   - `settings:about`     — show settings on the About tab
 //!   - `settings:providers:codex` — show settings on the Codex provider pane
 //!

@@ -207,6 +207,8 @@ fn main() {
             commands::list_agent_sessions,
             commands::focus_agent_session,
             commands::update_settings,
+            commands::get_hooks_config,
+            commands::save_hooks_config,
             commands::set_surface_mode,
             commands::dismiss_tray_panel,
             commands::begin_flyout_gesture,

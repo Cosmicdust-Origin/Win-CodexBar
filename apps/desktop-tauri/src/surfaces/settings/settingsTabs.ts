@@ -9,6 +9,7 @@ export const TAB_META: { id: SettingsTabId; labelKey: LocaleKey }[] = [
   { id: "menu", labelKey: "TabMenu" },
   { id: "usageSpend", labelKey: "TabUsageSpend" },
   { id: "advanced", labelKey: "TabAdvanced" },
+  { id: "hooks", labelKey: "TabHooks" },
   { id: "about", labelKey: "TabAbout" },
 ];
 
@@ -48,7 +49,7 @@ export function providersTabRequest(providerId: string): `providers:${string}` {
 }
 
 /** macOS system colors behind the white glyph of a sidebar pane chip. */
-export type SidebarChipColor = "gray" | "green" | "red" | "blue" | "teal" | "purple";
+export type SidebarChipColor = "gray" | "green" | "red" | "blue" | "teal" | "purple" | "orange";
 
 export interface SidebarPane {
   id: Exclude<SettingsTabId, "providers">;
@@ -60,7 +61,7 @@ export interface SidebarPane {
 /**
  * App panes in the Settings sidebar, in the macOS 0.70 order
  * (`PreferencesSidebar.swift` appPanesSection). iCloud Sync, Plugins and Debug
- * have no Windows pane; Hooks arrives with its own pane later.
+ * have no Windows pane.
  */
 export const SIDEBAR_PANES: SidebarPane[] = [
   { id: "general", labelKey: "TabGeneral", chip: "gray" },
@@ -69,6 +70,7 @@ export const SIDEBAR_PANES: SidebarPane[] = [
   { id: "menuBar", labelKey: "TabMenuBar", chip: "blue" },
   { id: "menu", labelKey: "TabMenu", chip: "teal" },
   { id: "advanced", labelKey: "TabAdvanced", chip: "purple" },
+  { id: "hooks", labelKey: "TabHooks", chip: "orange" },
   { id: "about", labelKey: "TabAbout", chip: null },
 ];
 

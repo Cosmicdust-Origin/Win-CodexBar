@@ -76,7 +76,7 @@ Notes:
 
 Canonical tab ids (frontend + proof harness whitelist must match):
 
-`general`, `providers`, `notifications`, `menuBar`, `menu`, `usageSpend`, `advanced`, `about`
+`general`, `providers`, `notifications`, `menuBar`, `menu`, `usageSpend`, `advanced`, `hooks`, `about`
 
 Unknown ids fall back to General. Legacy ids `display` / `apiKeys` / `cookies` are **not** settings tabs (content lives under other tabs / provider detail).
 
