@@ -1119,6 +1119,10 @@ export const ALL_LOCALE_KEYS = [
   "LLMManBaseUrlLabel",
   "LLMManBaseUrlPlaceholder",
   "LLMManBaseUrlHelp",
+  "CosmicProjectIdTitle",
+  "CosmicProjectIdLabel",
+  "CosmicProjectIdPlaceholder",
+  "CosmicProjectIdHelp",
 
   // Tray icon visibility (Windows 11 hidden-icons overflow)
   "PromoteTrayIconLabel",
