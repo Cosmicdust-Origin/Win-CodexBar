@@ -344,6 +344,35 @@ portal in Settings → Providers → IBM Bob, as token accounts, or with
 - 401 and 403 report that the key was rejected; response bodies are never
   echoed in errors.
 
+### Aerostack
+
+Aerostack is disabled by default. In Settings → Providers → Aerostack, enter an
+**account JWT** to monitor usage and allowance. Alternatively, set `AEROSTACK_TOKEN`.
+The masked token is saved in CodexBar's local config file. This is the account
+bearer token used by the billing API, not an Agent Endpoint key (`aek_…`).
+Replace it when it expires; CodexBar does not sign in, refresh tokens, or import
+browser credentials.
+
+The provider makes one read-only request:
+
+```text
+GET https://api.aerostack.dev/api/billing/usage
+Authorization: Bearer <account JWT>
+```
+
+- The **Monthly AI tokens** meter uses `usage.ai_tokens.used` and `usage.ai_tokens.limit`.
+- Detail rows show tokens used, allowance, remaining tokens, any usage above the
+  allowance, and the reported period (for example, `2026-03`). The account tier
+  supplies the plan label.
+- The account's returned limit is authoritative; CodexBar does not hardcode
+  Free or paid quotas.
+- Missing counters remain unknown. A zero or absent allowance has no percentage
+  meter; any reported counters remain visible. Usage above the allowance is not
+  a claim that the account is blocked: Aerostack documents a grace buffer.
+- Invalid counters fail parsing without including the response body in the error.
+- 401 reports authentication failure (expired or rejected JWT); 403, 429, and
+  other errors report their status; response bodies are never echoed in errors.
+
 ### Cosmic AI
 
 Cosmic AI is disabled by default. In Settings → Providers → Cosmic AI, enter a

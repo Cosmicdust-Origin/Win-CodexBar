@@ -4,6 +4,7 @@
 
 import { contrastRatio, mixWithWhite } from "../../lib/color";
 import abacus from "./icons/ProviderIcon-abacus.svg?raw";
+import aerostack from "./icons/ProviderIcon-aerostack.svg?raw";
 import alibaba from "./icons/ProviderIcon-alibaba.svg?raw";
 import amp from "./icons/ProviderIcon-amp.svg?raw";
 import antigravity from "./icons/ProviderIcon-antigravity.svg?raw";
@@ -106,6 +107,7 @@ export interface ProviderIcon {
 
 const RAW: Record<string, string> = {
   abacus: tint(abacus),
+  aerostack: tint(aerostack),
   alibaba: tint(alibaba),
   amp: tint(amp),
   antigravity: tint(antigravity),
@@ -193,6 +195,7 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   alibabatokenplan: { id: "alibabatokenplan", brandColor: "#ff6a00", fallbackLetter: "阿", svgPath: RAW.alibaba },
   amp:         { id: "amp",         brandColor: "#f34e3f", fallbackLetter: "⚡", svgPath: RAW.amp },
   antigravity: { id: "antigravity", brandColor: "#60ba7e", fallbackLetter: "◉", svgPath: RAW.antigravity },
+  aerostack:   { id: "aerostack",   brandColor: "#6366F1", fallbackLetter: "◆", svgPath: RAW.aerostack },
   augment:     { id: "augment",     brandColor: "#1aa049", fallbackLetter: "A", svgPath: RAW.augment },
   claude:      { id: "claude",      brandColor: "#cc7c5e", fallbackLetter: "◈", svgPath: RAW.claude },
   pi:          { id: "pi",          brandColor: "#7c3aed", fallbackLetter: "P" },

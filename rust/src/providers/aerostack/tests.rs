@@ -1,196 +1,149 @@
-//! Tests for Aerostack provider
-
 use super::*;
 use serde_json::json;
 
+fn rows(result: &ProviderFetchResult) -> Vec<(String, String)> {
+    result
+        .display_details
+        .iter()
+        .map(|d| {
+            assert_eq!(d.section_title(), Some(SECTION_TITLE));
+            (d.title().to_string(), d.value().to_string())
+        })
+        .collect()
+}
+
+fn row(label: &str, value: &str) -> (String, String) {
+    (label.to_string(), value.to_string())
+}
+
+fn with_tokens(tokens: Value) -> Value {
+    json!({ "usage": { "ai_tokens": tokens } })
+}
+
+fn assert_unrecognized(result: Result<ProviderFetchResult, ProviderError>) {
+    match result {
+        Err(ProviderError::Other(message)) => assert_eq!(message, UNRECOGNIZED),
+        other => panic!("expected the unrecognized-response error, got {other:?}"),
+    }
+}
+
 #[test]
-fn test_parse_aerostack_response_complete() {
-    let response = json!({
-        "usage": {
-            "ai_tokens": {
-                "used": 1000,
-                "limit": 5000
-            }
-        },
+fn full_payload_matches_upstream_rows() {
+    let result = parse_usage(&json!({
+        "usage": { "ai_tokens": { "used": 1_200, "limit": 5_000 } },
         "period": "2026-03",
-        "tier": "Pro"
-    });
+        "tier": " Pro ",
+    }))
+    .unwrap();
 
-    let result = parse_aerostack_response(&response);
-    assert!(result.is_ok(), "Should parse valid response");
+    assert_eq!(
+        rows(&result),
+        vec![
+            row("Tokens used", "1,200"),
+            row("Allowance", "5,000"),
+            row("Remaining", "3,800"),
+            row("Period", "2026-03"),
+        ]
+    );
+    assert!((result.usage.primary.used_percent - 24.0).abs() < 1e-9);
+    assert!(!result.usage.primary.hidden_on_card);
+    assert_eq!(result.usage.login_method.as_deref(), Some("Pro"));
 }
 
 #[test]
-fn test_parse_aerostack_response_minimal() {
-    let response = json!({
-        "usage": {
-            "ai_tokens": {
-                "used": 1000,
-                "limit": 5000
-            }
-        }
-    });
-
-    let result = parse_aerostack_response(&response);
-    assert!(result.is_ok(), "Should parse minimal response");
+fn usage_above_allowance_adds_a_row_and_clamps_the_bar() {
+    let result = parse_usage(&with_tokens(json!({ "used": 6_000, "limit": 5_000 }))).unwrap();
+    assert_eq!(
+        rows(&result),
+        vec![
+            row("Tokens used", "6,000"),
+            row("Allowance", "5,000"),
+            row("Remaining", "0"),
+            row("Above allowance", "1,000"),
+        ]
+    );
+    assert!((result.usage.primary.used_percent - 100.0).abs() < 1e-9);
 }
 
 #[test]
-fn test_parse_aerostack_response_used_only() {
-    let response = json!({
-        "usage": {
-            "ai_tokens": {
-                "used": 1000
-            }
-        }
-    });
-
-    let result = parse_aerostack_response(&response);
-    assert!(result.is_ok(), "Should accept used without limit");
+fn a_single_counter_or_zero_allowance_draws_no_bar() {
+    for tokens in [
+        json!({ "used": 1_000 }),
+        json!({ "limit": 5_000, "used": null }),
+        json!({ "used": 10, "limit": 0 }),
+    ] {
+        let result = parse_usage(&with_tokens(tokens)).unwrap();
+        assert!(result.usage.primary.hidden_on_card);
+    }
+    assert_eq!(
+        rows(&parse_usage(&with_tokens(json!({ "used": 1_000 }))).unwrap()),
+        vec![row("Tokens used", "1,000")]
+    );
 }
 
 #[test]
-fn test_parse_aerostack_response_limit_only() {
-    let response = json!({
-        "usage": {
-            "ai_tokens": {
-                "limit": 5000
-            }
-        }
-    });
-
-    let result = parse_aerostack_response(&response);
-    assert!(result.is_ok(), "Should accept limit without used");
+fn rejects_shapes_upstream_rejects() {
+    assert_unrecognized(parse_usage(&json!({})));
+    assert_unrecognized(parse_usage(&json!([])));
+    assert_unrecognized(parse_usage(&json!({ "usage": { "ai_tokens": [] } })));
+    assert_unrecognized(parse_usage(&with_tokens(json!({}))));
+    assert_unrecognized(parse_usage(&with_tokens(
+        json!({ "used": null, "limit": null }),
+    )));
+    assert_unrecognized(parse_usage(&with_tokens(json!({ "used": -1, "limit": 5 }))));
+    assert_unrecognized(parse_usage(&with_tokens(
+        json!({ "used": 1.5, "limit": 5 }),
+    )));
+    assert_unrecognized(parse_usage(&with_tokens(
+        json!({ "used": "1", "limit": 5 }),
+    )));
+    assert_unrecognized(parse_usage(&with_tokens(
+        json!({ "used": 9_007_199_254_740_992_u64 }),
+    )));
 }
 
 #[test]
-fn test_parse_aerostack_response_zero_values() {
-    let response = json!({
-        "usage": {
-            "ai_tokens": {
-                "used": 0,
-                "limit": 5000
-            }
-        }
-    });
+fn integral_floats_count_as_integers() {
+    let result = parse_usage(&with_tokens(json!({ "used": 5.0, "limit": 10.0 }))).unwrap();
+    assert!((result.usage.primary.used_percent - 50.0).abs() < 1e-9);
 
-    let result = parse_aerostack_response(&response);
-    assert!(result.is_ok(), "Should parse zero values");
+    let result = parse_usage(&with_tokens(json!({ "used": -0.0, "limit": 10 }))).unwrap();
+    assert!(result.usage.primary.used_percent.abs() < 1e-9);
 }
 
 #[test]
-fn test_parse_aerostack_response_above_limit() {
-    let response = json!({
-        "usage": {
-            "ai_tokens": {
-                "used": 6000,
-                "limit": 5000
-            }
-        }
-    });
-
-    let result = parse_aerostack_response(&response);
-    assert!(result.is_ok(), "Should parse usage above limit");
+fn period_must_be_a_calendar_month_when_present() {
+    let with_period = |period: Value| {
+        parse_usage(&json!({
+            "usage": { "ai_tokens": { "used": 1, "limit": 2 } },
+            "period": period,
+        }))
+    };
+    assert!(with_period(json!(null)).is_ok());
+    assert!(with_period(json!("2026-12")).is_ok());
+    for bad in [
+        json!("2026-13"),
+        json!("2026-00"),
+        json!("2026-3"),
+        json!("2026/03"),
+        json!("26-03"),
+        json!(202603),
+    ] {
+        assert_unrecognized(with_period(bad));
+    }
 }
 
 #[test]
-fn test_parse_aerostack_response_missing_tokens() {
-    let response = json!({
-        "usage": {
-            "ai_tokens": {}
-        }
-    });
-
-    let result = parse_aerostack_response(&response);
-    assert!(result.is_err(), "Should fail with missing counters");
-}
-
-#[test]
-fn test_parse_aerostack_response_missing_usage() {
-    let response = json!({});
-
-    let result = parse_aerostack_response(&response);
-    assert!(result.is_err(), "Should fail with missing usage");
-}
-
-#[test]
-fn test_parse_aerostack_response_invalid_period() {
-    let response = json!({
-        "usage": {
-            "ai_tokens": {
-                "used": 1000,
-                "limit": 5000
-            }
-        },
-        "period": "2026/03"
-    });
-
-    let result = parse_aerostack_response(&response);
-    assert!(result.is_ok(), "Should parse despite invalid period");
-}
-
-#[test]
-fn test_parse_aerostack_response_with_invalid_tier() {
-    let response = json!({
-        "usage": {
-            "ai_tokens": {
-                "used": 1000,
-                "limit": 5000
-            }
-        },
-        "tier": "x".repeat(121)
-    });
-
-    let result = parse_aerostack_response(&response);
-    assert!(result.is_ok(), "Should parse with oversized tier (ignored)");
-}
-
-#[test]
-fn test_parse_aerostack_response_negative_values() {
-    let response = json!({
-        "usage": {
-            "ai_tokens": {
-                "used": -1000,
-                "limit": 5000
-            }
-        }
-    });
-
-    let result = parse_aerostack_response(&response);
-    assert!(result.is_err(), "Should reject negative values");
-}
-
-#[test]
-fn test_parse_aerostack_response_float_values() {
-    let response = json!({
-        "usage": {
-            "ai_tokens": {
-                "used": 1000.5,
-                "limit": 5000
-            }
-        }
-    });
-
-    let result = parse_aerostack_response(&response);
-    assert!(result.is_err(), "Should reject non-integer floats");
-}
-
-#[test]
-fn test_format_number() {
-    assert_eq!(super::format_number(1234.0), "1234");
-    assert_eq!(super::format_number(0.0), "0");
-    assert_eq!(super::format_number(1000000.0), "1000000");
-}
-
-#[test]
-fn test_is_valid_period() {
-    assert!(super::is_valid_period("2026-03"));
-    assert!(super::is_valid_period("2026-12"));
-    assert!(super::is_valid_period("2026-01"));
-    assert!(!super::is_valid_period("2026-13"));
-    assert!(!super::is_valid_period("2026-00"));
-    assert!(!super::is_valid_period("26-03"));
-    assert!(!super::is_valid_period("2026"));
-    assert!(!super::is_valid_period("2026/03"));
-    assert!(!super::is_valid_period("2026-3"));
+fn tier_must_be_a_short_string_when_present() {
+    let with_tier = |tier: Value| {
+        parse_usage(&json!({
+            "usage": { "ai_tokens": { "used": 1, "limit": 2 } },
+            "tier": tier,
+        }))
+    };
+    assert_eq!(with_tier(json!(null)).unwrap().usage.login_method, None);
+    assert_eq!(with_tier(json!("   ")).unwrap().usage.login_method, None);
+    assert!(with_tier(json!("x".repeat(120))).is_ok());
+    assert_unrecognized(with_tier(json!("x".repeat(121))));
+    assert_unrecognized(with_tier(json!(5)));
 }

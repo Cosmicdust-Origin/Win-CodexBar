@@ -1,4 +1,5 @@
 export const TEST_PROVIDER_CATALOG: Array<[string, string]> = [
+  ["aerostack", "Aerostack"],
   ["codex", "Codex"],
   ["claude", "Claude"],
   ["pi", "Pi"],

@@ -785,6 +785,17 @@ pub fn get_api_key_providers() -> Vec<ProviderConfigInfo> {
             dashboard_url: Some("https://bob.ibm.com"),
         },
         ProviderConfigInfo {
+            id: ProviderId::Aerostack,
+            name: "Aerostack",
+            requires_api_key: true,
+            api_key_env_var: Some("AEROSTACK_TOKEN"),
+            api_key_help: Some(
+                "Set an Aerostack account JWT in Settings or AEROSTACK_TOKEN. This is the account bearer token used by the billing API, not an Agent Endpoint key.",
+            ),
+            config_file_path: None,
+            dashboard_url: Some("https://app.aerostack.dev/settings/billing"),
+        },
+        ProviderConfigInfo {
             id: ProviderId::Cosmic,
             name: "Cosmic AI",
             requires_api_key: true,

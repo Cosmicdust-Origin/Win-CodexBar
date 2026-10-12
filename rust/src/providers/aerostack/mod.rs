@@ -1,16 +1,28 @@
-//! Aerostack monthly AI-token usage provider
+//! Aerostack monthly AI-token usage provider.
 //!
-//! Fetches account billing AI-token usage through the official account billing API.
-//! Requires an account JWT token for authentication.
+//! Fetches account AI-token usage from `GET https://api.aerostack.dev/api/billing/usage`
+//! with the account JWT as a bearer token.
+//!
+//! Ported from upstream CodexBar v0.74.1 (`Resources/Plugins/aerostack.js`).
 
 use async_trait::async_trait;
 use reqwest::Client;
-use serde_json::Value;
+use serde_json::{Map, Value};
 
+use super::format;
 use crate::core::{
-    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
-    SourceMode,
+    FetchContext, Provider, ProviderDisplayDetail, ProviderError, ProviderFetchResult, ProviderId,
+    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
 };
+use crate::providers::read_bounded_response;
+
+const USAGE_URL: &str = "https://api.aerostack.dev/api/billing/usage";
+const CREDENTIAL_TARGET: &str = "codexbar-aerostack";
+pub const API_KEY_ENV: &str = "AEROSTACK_TOKEN";
+const MAX_RESPONSE_BYTES: usize = 256 * 1024;
+const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+const SECTION_TITLE: &str = "Monthly AI tokens";
+const UNRECOGNIZED: &str = "Aerostack returned an unrecognized account AI-token usage response.";
 
 pub struct AerostackProvider {
     client: Client,
@@ -20,9 +32,51 @@ impl AerostackProvider {
     pub fn new() -> Self {
         Self {
             client: crate::core::credentialed_http_client_builder()
+                .redirect(reqwest::redirect::Policy::none())
+                .timeout(REQUEST_TIMEOUT)
                 .build()
                 .unwrap_or_else(|_| Client::new()),
         }
+    }
+
+    async fn fetch_usage_impl(
+        &self,
+        ctx: &FetchContext,
+    ) -> Result<ProviderFetchResult, ProviderError> {
+        let token = crate::providers::resolve_api_key(
+            ctx.api_key.as_deref(),
+            CREDENTIAL_TARGET,
+            &[API_KEY_ENV],
+        )?;
+
+        let response = self
+            .client
+            .get(USAGE_URL)
+            .bearer_auth(&token)
+            .header(reqwest::header::ACCEPT, "application/json")
+            .send()
+            .await?;
+
+        let status = response.status().as_u16();
+        match status {
+            200 => {}
+            401 => {
+                return Err(ProviderError::Other(
+                    "Aerostack account JWT expired or was rejected.".into(),
+                ));
+            }
+            _ => {
+                return Err(ProviderError::Other(format!(
+                    "Aerostack returned HTTP {status}."
+                )));
+            }
+        }
+
+        let body = read_bounded_response(response, MAX_RESPONSE_BYTES)
+            .await
+            .map_err(|_| unrecognized())?;
+        let root: Value = serde_json::from_slice(&body).map_err(|_| unrecognized())?;
+        parse_usage(&root)
     }
 }
 
@@ -43,163 +97,134 @@ impl Provider for AerostackProvider {
     }
 
     async fn fetch_usage(&self, ctx: &FetchContext) -> Result<ProviderFetchResult, ProviderError> {
-        let _api_key = ctx.api_key.as_deref().ok_or_else(|| {
-            ProviderError::Other(
-                "Set an Aerostack account JWT in Settings or AEROSTACK_TOKEN.".to_string(),
-            )
-        })?;
-
-        let response = self
-            .client
-            .get("https://api.aerostack.dev/api/billing/usage")
-            .send()
-            .await
-            .map_err(ProviderError::Network)?;
-
-        let status = response.status().as_u16();
-        let body = response.text().await.map_err(ProviderError::Network)?;
-
-        // Check HTTP status
-        match status {
-            401 => {
-                return Err(ProviderError::Other(
-                    "Aerostack account JWT expired or was rejected.".to_string(),
-                ));
-            }
-            403 => {
-                return Err(ProviderError::Other(
-                    "Aerostack returned HTTP 403 (permission denied).".to_string(),
-                ));
-            }
-            429 => {
-                return Err(ProviderError::Other(
-                    "Aerostack returned HTTP 429 (rate limited).".to_string(),
-                ));
-            }
-            500..=599 => {
-                return Err(ProviderError::Other(format!(
-                    "Aerostack returned HTTP {}.",
-                    status
-                )));
-            }
-            200 => {}
-            _ => {
-                return Err(ProviderError::Other(format!(
-                    "Aerostack returned HTTP {}.",
-                    status
-                )));
+        match ctx.source_mode {
+            SourceMode::Auto | SourceMode::OAuth => self.fetch_usage_impl(ctx).await,
+            SourceMode::Web | SourceMode::Cli => {
+                Err(ProviderError::UnsupportedSource(ctx.source_mode))
             }
         }
-
-        // Parse JSON response
-        let root: Value = serde_json::from_str(&body).map_err(|_| {
-            ProviderError::Other(
-                "Aerostack returned an unrecognized account AI-token usage response.".to_string(),
-            )
-        })?;
-
-        parse_aerostack_response(&root)
     }
 
     fn available_sources(&self) -> Vec<SourceMode> {
-        vec![SourceMode::Cli]
+        vec![SourceMode::Auto, SourceMode::OAuth]
     }
 }
 
-fn parse_aerostack_response(root: &Value) -> Result<ProviderFetchResult, ProviderError> {
-    use crate::core::{RateWindow, UsageSnapshot};
+fn unrecognized() -> ProviderError {
+    ProviderError::Other(UNRECOGNIZED.into())
+}
 
-    let fail_msg = "Aerostack returned an unrecognized account AI-token usage response.";
+/// Upstream `counter`: absent or null is `None`; anything else must be a
+/// non-negative safe integer.
+fn counter(tokens: &Map<String, Value>, key: &str) -> Result<Option<u64>, ProviderError> {
+    const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+    match tokens.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::Number(n)) => {
+            if let Some(v) = n.as_u64() {
+                return if v <= MAX_SAFE_INTEGER {
+                    Ok(Some(v))
+                } else {
+                    Err(unrecognized())
+                };
+            }
+            match n.as_f64() {
+                // JSON like `5.0` is still a safe integer to JavaScript.
+                Some(f) if f.fract() == 0.0 && (0.0..=MAX_SAFE_INTEGER as f64).contains(&f) => {
+                    // `+ 0.0` turns -0 into 0; JavaScript accepts -0 as a safe integer.
+                    format!("{:.0}", f + 0.0)
+                        .parse()
+                        .map(Some)
+                        .map_err(|_| unrecognized())
+                }
+                _ => Err(unrecognized()),
+            }
+        }
+        Some(_) => Err(unrecognized()),
+    }
+}
 
-    // Extract the nested tokens object
+fn tokens(value: u64) -> String {
+    format::number(value as f64, 0)
+}
+
+fn is_valid_period(period: &str) -> bool {
+    let bytes = period.as_bytes();
+    bytes.len() == 7
+        && bytes[..4].iter().all(u8::is_ascii_digit)
+        && bytes[4] == b'-'
+        && matches!(
+            (bytes[5], bytes[6]),
+            (b'0', b'1'..=b'9') | (b'1', b'0'..=b'2')
+        )
+}
+
+fn parse_usage(root: &Value) -> Result<ProviderFetchResult, ProviderError> {
+    let root = root.as_object().ok_or_else(unrecognized)?;
     let tokens_obj = root
         .get("usage")
-        .and_then(|u| u.get("ai_tokens"))
-        .and_then(|v| v.as_object())
-        .ok_or_else(|| ProviderError::Other(fail_msg.to_string()))?;
+        .and_then(Value::as_object)
+        .and_then(|usage| usage.get("ai_tokens"))
+        .and_then(Value::as_object)
+        .ok_or_else(unrecognized)?;
 
-    // Helper to parse counter values
-    let get_counter = |key: &str| -> Result<Option<f64>, ProviderError> {
-        match tokens_obj.get(key) {
-            None => Ok(None),
-            Some(Value::Null) => Ok(None),
-            Some(Value::Number(n)) => {
-                let f = n
-                    .as_f64()
-                    .ok_or_else(|| ProviderError::Other(fail_msg.to_string()))?;
-                if f.is_finite() && f >= 0.0 && f.fract() == 0.0 {
-                    Ok(Some(f))
-                } else {
-                    Err(ProviderError::Other(fail_msg.to_string()))
-                }
-            }
-            Some(_) => Err(ProviderError::Other(fail_msg.to_string())),
-        }
-    };
-
-    let used = get_counter("used")?;
-    let limit = get_counter("limit")?;
-
-    // At least one counter must be present
+    let used = counter(tokens_obj, "used")?;
+    let limit = counter(tokens_obj, "limit")?;
     if used.is_none() && limit.is_none() {
-        return Err(ProviderError::Other(fail_msg.to_string()));
+        return Err(unrecognized());
     }
 
-    // Calculate percentages for primary window
-    // Only show percentage if both used and limit are present, and limit > 0
-    let primary = if let (Some(u), Some(l)) = (used, limit) {
-        if l > 0.0 {
-            RateWindow::new(((u / l) * 100.0).clamp(0.0, 100.0))
-        } else {
-            RateWindow::new(0.0)
+    let mut rows: Vec<(&str, &str, String)> = Vec::new();
+    if let Some(used) = used {
+        rows.push(("tokens-used", "Tokens used", tokens(used)));
+    }
+    if let Some(limit) = limit {
+        rows.push(("allowance", "Allowance", tokens(limit)));
+    }
+    if let (Some(used), Some(limit)) = (used, limit) {
+        rows.push(("remaining", "Remaining", tokens(limit.saturating_sub(used))));
+        if used > limit {
+            rows.push(("above-allowance", "Above allowance", tokens(used - limit)));
         }
-    } else {
-        RateWindow::new(0.0)
+    }
+    match root.get("period") {
+        None | Some(Value::Null) => {}
+        Some(Value::String(period)) if is_valid_period(period) => {
+            rows.push(("period", "Period", period.clone()));
+        }
+        Some(_) => return Err(unrecognized()),
+    }
+
+    // JavaScript `tier.length` counts UTF-16 units of the untrimmed string.
+    let login_method = match root.get("tier") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(tier)) if tier.encode_utf16().count() <= 120 => {
+            Some(tier.trim().to_string()).filter(|t| !t.is_empty())
+        }
+        Some(_) => return Err(unrecognized()),
     };
 
-    let snapshot = UsageSnapshot::new(primary);
-    let result = ProviderFetchResult::new(snapshot, "api");
+    // Upstream sends no primary window unless both counters exist and the
+    // allowance is positive; the card then draws no bar.
+    let primary = match (used, limit) {
+        (Some(used), Some(limit)) if limit > 0 => {
+            RateWindow::new((used as f64 / limit as f64 * 100.0).clamp(0.0, 100.0))
+        }
+        _ => RateWindow::informational(SECTION_TITLE).hidden_on_card(),
+    };
+    let mut usage = UsageSnapshot::new(primary);
+    if let Some(login_method) = login_method {
+        usage = usage.with_login_method(login_method);
+    }
 
+    let mut result = ProviderFetchResult::new(usage, "api");
+    for (id, label, value) in rows {
+        result = result.with_display_detail(
+            ProviderDisplayDetail::new(format!("aerostack-{id}"), label, value)
+                .and_then(|d| d.with_section_title(SECTION_TITLE)),
+        );
+    }
     Ok(result)
-}
-
-/// Validate YYYY-MM format
-fn is_valid_period(period: &str) -> bool {
-    // Match YYYY-MM format
-    let parts: Vec<&str> = period.split('-').collect();
-    if parts.len() != 2 {
-        return false;
-    }
-
-    let year = parts[0];
-    let month = parts[1];
-
-    if year.len() != 4 || month.len() != 2 {
-        return false;
-    }
-
-    if !year.chars().all(|c| c.is_ascii_digit()) {
-        return false;
-    }
-
-    if !month.chars().all(|c| c.is_ascii_digit()) {
-        return false;
-    }
-
-    if let Ok(m) = month.parse::<u32>() {
-        (1..=12).contains(&m)
-    } else {
-        false
-    }
-}
-
-/// Format a number with thousands separators
-fn format_number(n: f64) -> String {
-    if n.fract() == 0.0 && n.is_finite() {
-        format!("{:.0}", n)
-    } else {
-        format!("{}", n)
-    }
 }
 
 const AEROSTACK_METADATA: ProviderMetadata = ProviderMetadata {
