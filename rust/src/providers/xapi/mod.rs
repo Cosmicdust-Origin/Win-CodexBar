@@ -306,7 +306,8 @@ fn parse_account_id(me: &Map<String, Value>) -> Result<String, ProviderError> {
     let account_id = match id {
         Value::Number(n) => match n.as_f64() {
             Some(f) if f.fract() == 0.0 && (0.0..=MAX_SAFE_INTEGER).contains(&f) => {
-                format!("{}", f as u64)
+                // `+ 0.0` turns -0 into 0, as JavaScript's String(-0) does.
+                format!("{:.0}", f + 0.0)
             }
             _ => return Err(invalid("account or dollar balance")),
         },
