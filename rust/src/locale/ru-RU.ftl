@@ -1587,3 +1587,6 @@ ProviderCodexBatterySaver = Экономия заряда для веб-OpenAI
 ProviderCodexBatterySaverHelp = Ограничивает фоновые обновления chatgpt.com, чтобы снизить расход батареи и трафика. Дополнения панели могут устаревать, пока вы не обновите их вручную.
 ProviderOptionNotUsedOnWindows = Пока не используется в Windows; выбор сохраняется на будущее.
 ClaudeSwapExecutablePathHelp = Путь к исполняемому файлу cswap (github.com/realiti4/claude-swap).
+CookieHelpXapiAuto = Автоматически импортирует файлы cookie браузера с console.x.com.
+CookieHelpXapiManual = Вставьте заголовок Cookie с console.x.com.
+CookieHelpXapiOff = Файлы cookie X API отключены.

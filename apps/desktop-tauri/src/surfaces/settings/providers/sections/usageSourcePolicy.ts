@@ -132,6 +132,14 @@ const POLICIES: Readonly<Record<string, UsageSourcePolicy>> = {
       },
     ],
   },
+  xapi: {
+    options: [
+      { value: "auto", label: "Auto", descriptionKey: "CookieHelpXapiAuto", description: "Automatic imports browser cookies from console.x.com." },
+      { value: "web", label: "Manual", descriptionKey: "CookieHelpXapiManual", description: "Paste a Cookie header from console.x.com." },
+      { value: "cli", label: "Off", descriptionKey: "CookieHelpXapiOff", description: "X API cookies are disabled." },
+    ],
+    hideCookieSourceValues: ["cli"],
+  },
 };
 
 export function usageSourcePolicy(providerId: string): UsageSourcePolicy | null {

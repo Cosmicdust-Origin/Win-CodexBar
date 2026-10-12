@@ -1587,3 +1587,6 @@ ProviderCodexBatterySaver = OpenAI 網頁省電
 ProviderCodexBatterySaverHelp = 限制 chatgpt.com 背景重新整理，以減少電池和網路用量。儀表板附加資訊可能在手動重新整理前維持舊資料。
 ProviderOptionNotUsedOnWindows = Windows 上尚未使用；此選擇會儲存，待支援後生效。
 ClaudeSwapExecutablePathHelp = cswap 執行檔的路徑 (github.com/realiti4/claude-swap)。
+CookieHelpXapiAuto = 自動從 console.x.com 匯入瀏覽器 Cookie。
+CookieHelpXapiManual = 貼上來自 console.x.com 的 Cookie 標頭。
+CookieHelpXapiOff = X API Cookie 已停用。

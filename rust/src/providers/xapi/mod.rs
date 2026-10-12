@@ -331,7 +331,7 @@ fn parse_credits(
         .get("freeCredits")
         .and_then(|v| v.get("balance"))
         .and_then(|v| v.as_f64())
-        .and_then(|n| if n.is_finite() { Some(n) } else { None })
+        .filter(|n| n.is_finite())
         .unwrap_or(0.0);
 
     let balance = paid + free;
