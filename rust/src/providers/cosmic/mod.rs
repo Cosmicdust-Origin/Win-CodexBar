@@ -482,4 +482,28 @@ mod tests {
         // "Unlimited" is not a valid numeric format, returns None
         assert!(matches!(parse_limit_string("unlimited"), Ok(None)));
     }
+
+    #[tokio::test]
+    async fn cosmic_requires_project_id() {
+        let provider = CosmicProvider::new();
+        let ctx = FetchContext {
+            api_key: Some("cos_test_token".to_string()),
+            workspace_id: None,
+            ..Default::default()
+        };
+        let result = provider.fetch_usage(&ctx).await;
+        assert!(matches!(result, Err(ProviderError::Other(msg)) if msg.contains("Project ID")));
+    }
+
+    #[tokio::test]
+    async fn cosmic_requires_api_key() {
+        let provider = CosmicProvider::new();
+        let ctx = FetchContext {
+            api_key: None,
+            workspace_id: Some("project_123".to_string()),
+            ..Default::default()
+        };
+        let result = provider.fetch_usage(&ctx).await;
+        assert!(matches!(result, Err(ProviderError::Other(msg)) if msg.contains("Token")));
+    }
 }
