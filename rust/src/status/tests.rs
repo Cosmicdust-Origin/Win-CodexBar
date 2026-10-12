@@ -188,3 +188,17 @@ fn summary_falls_back_to_cli_label() {
     status.description = Some("Elevated errors".into());
     assert_eq!(status.summary(), "Elevated errors");
 }
+
+#[test]
+fn parse_errors_never_quote_the_feed() {
+    let body = br#"{"status": {"indicator": 42, "description": "token=abc123"}}"#;
+    for source in [
+        StatusSource::Statuspage("https://status.example.invalid"),
+        StatusSource::GoogleWorkspace("product"),
+    ] {
+        assert_eq!(
+            parse_source(source, body),
+            Err("invalid status feed".to_string())
+        );
+    }
+}

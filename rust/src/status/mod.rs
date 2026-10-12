@@ -183,11 +183,16 @@ pub async fn fetch_status(source: StatusSource) -> Result<ProviderStatus, String
         .bytes()
         .await
         .map_err(|_| "body read failed".to_string())?;
+    parse_source(source, &body)
+}
+
+/// A decode error can quote feed text, so it is replaced by a fixed string.
+fn parse_source(source: StatusSource, body: &[u8]) -> Result<ProviderStatus, String> {
     match source {
-        StatusSource::Statuspage(_) => parse_statuspage_status(&body),
-        StatusSource::GoogleWorkspace(product) => parse_google_workspace_status(&body, product),
+        StatusSource::Statuspage(_) => parse_statuspage_status(body),
+        StatusSource::GoogleWorkspace(product) => parse_google_workspace_status(body, product),
     }
-    .map_err(|e| e.to_string())
+    .map_err(|_| "invalid status feed".to_string())
 }
 
 /// CLI entry point. A failed refresh never replaces the last successful
