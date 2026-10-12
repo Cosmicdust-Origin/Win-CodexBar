@@ -631,3 +631,27 @@ fn monthly_mcp_marker_gets_the_sentinel_and_reset_window_pace() {
     );
     assert_eq!(parsed.usage.primary.window_minutes, Some(300));
 }
+
+#[test]
+fn oversized_window_length_has_no_minutes() {
+    let provider = ZaiProvider::new();
+    let quota: ZaiQuotaResponse = serde_json::from_value(serde_json::json!({
+        "code": 200,
+        "data": {
+            "limits": [{
+                "type": "TIME_LIMIT",
+                "unit": 6,
+                "number": i32::MAX,
+                "usage": 100,
+                "currentValue": 20,
+                "remaining": 80,
+                "percentage": 25,
+                "nextResetTime": 123000_i64
+            }]
+        }
+    }))
+    .unwrap();
+    let usage = provider.parse_quota_response(&quota).unwrap().usage;
+    assert_eq!(usage.primary.window_minutes, None);
+    assert_eq!(usage.primary.used_percent, 20.0);
+}

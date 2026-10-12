@@ -587,7 +587,7 @@ impl ZaiProvider {
             6 => 10080, // weeks
             _ => return None,
         };
-        Some(number * minutes_per_unit)
+        number.checked_mul(minutes_per_unit)
     }
 }
 
