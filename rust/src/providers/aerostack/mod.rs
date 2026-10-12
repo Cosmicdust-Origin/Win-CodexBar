@@ -67,14 +67,14 @@ impl Provider for AerostackProvider {
                 ));
             }
             403 => {
-                return Err(ProviderError::Other(format!(
-                    "Aerostack returned HTTP 403 (permission denied)."
-                )));
+                return Err(ProviderError::Other(
+                    "Aerostack returned HTTP 403 (permission denied).".to_string(),
+                ));
             }
             429 => {
-                return Err(ProviderError::Other(format!(
-                    "Aerostack returned HTTP 429 (rate limited)."
-                )));
+                return Err(ProviderError::Other(
+                    "Aerostack returned HTTP 429 (rate limited).".to_string(),
+                ));
             }
             500..=599 => {
                 return Err(ProviderError::Other(format!(
@@ -187,7 +187,7 @@ fn is_valid_period(period: &str) -> bool {
     }
 
     if let Ok(m) = month.parse::<u32>() {
-        m >= 1 && m <= 12
+        (1..=12).contains(&m)
     } else {
         false
     }
