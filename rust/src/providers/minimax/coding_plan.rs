@@ -383,7 +383,14 @@ fn make_remains_row(
         reset_description(&window_type, &time_range, now, resets)
     };
 
-    let win_minutes = window_minutes(start_dt, end_dt);
+    // Upstream `MiniMaxUsageSnapshot.windowMinutes(for:)` gives every weekly
+    // row 7 days from its window type, even when the payload has no weekly
+    // start and end. Other rows keep their payload span.
+    let win_minutes = if window_type.eq_ignore_ascii_case("weekly") {
+        window_minutes_for_window_type(&window_type)
+    } else {
+        window_minutes(start_dt, end_dt)
+    };
 
     let percent = if is_unlimited {
         0.0
@@ -787,6 +794,35 @@ mod tests {
         // General is text-gen → weekly row generated
         assert_eq!(rows.len(), 2);
         assert!(rows[1].is_weekly);
+    }
+
+    #[test]
+    fn weekly_row_without_start_and_end_is_seven_days() {
+        let json = serde_json::json!({
+            "data": {
+                "model_remains": [{
+                    "model_name": "General",
+                    "current_interval_total_count": 100,
+                    "current_interval_usage_count": 60,
+                    "current_interval_status": 0,
+                    "current_weekly_total_count": 1000,
+                    "current_weekly_usage_count": 900,
+                    "current_weekly_status": 0,
+                    "weekly_remains_time": 172800000
+                }]
+            }
+        });
+        let snapshot = parse_coding_plan_value(&json, now()).unwrap();
+        let MiniMaxCodingPlanSnapshot::Remains { rows, .. } = snapshot else {
+            panic!("expected Remains");
+        };
+        assert_eq!(rows.len(), 2);
+        // No start/end on the interval row: no length, as before.
+        assert_eq!(rows[0].window_minutes, None);
+        // The weekly row has no weekly start/end but is still 7 days.
+        assert!(rows[1].is_weekly);
+        assert_eq!(rows[1].window_minutes, Some(10_080));
+        assert!((rows[1].percent - 10.0).abs() < 0.01);
     }
 
     #[test]
