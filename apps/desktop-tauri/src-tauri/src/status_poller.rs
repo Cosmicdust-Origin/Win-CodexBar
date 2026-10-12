@@ -2,13 +2,13 @@
 //! provider refresh while "Check provider status" is on
 //! (`UsageStore.swift:842`, `UsageStore+ProviderStatus.swift:5-38`); the
 //! shell does the same by starting a status poll from each full provider
-//! refresh and when the switch turns on, but not from the Windows-only
-//! auto-resume probe.
+//! refresh (unforced ones at most every `UNFORCED_POLL_SPACING`) and when
+//! the switch turns on, but not from the Windows-only auto-resume probe.
 
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use codexbar::core::ProviderId;
 use codexbar::locale::{LocaleKey, get_text};
@@ -25,6 +25,15 @@ use crate::state::AppState;
 /// upstream; this also bounds connect stalls the client timeout misses.
 const POLL_TIMEOUT: Duration = Duration::from_secs(15);
 
+/// Unforced refreshes run far more often on Windows than on the Mac: every
+/// surface mount and the startup timer call the stale check, and any enabled
+/// provider without a fresh snapshot makes each of those a full refresh. This
+/// floor keeps those from re-polling a page; it stays below the 60-second
+/// shortest refresh cadence minus the 15-second scheduler tick, so timed
+/// refreshes still poll every round. Forced refreshes (manual, menu-open,
+/// settings changes) poll every time, as upstream does.
+const UNFORCED_POLL_SPACING: Duration = Duration::from_secs(30);
+
 type FetchResult = Result<ProviderStatus, String>;
 
 /// Last known status per provider. Every poll takes a ticket; a result only
@@ -37,6 +46,7 @@ pub struct ProviderStatusCache {
     issued: u64,
     applied: HashMap<ProviderId, u64>,
     floor: u64,
+    started: HashMap<ProviderId, Instant>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,8 +64,9 @@ impl ProviderStatusCache {
         }
     }
 
-    /// A failed fetch keeps the last good status, as upstream does
-    /// (`UsageStore+ProviderStatus.swift:34-36`). Returns whether the
+    /// A failed fetch keeps the last good status and, as upstream does, does
+    /// not retire older polls still in flight: only a success is evidence
+    /// (`UsageStore+ProviderStatus.swift:28-36`). Returns whether the
     /// published status changed.
     fn apply(&mut self, ticket: StatusTicket, result: FetchResult) -> bool {
         let stale = ticket.seq <= self.floor
@@ -63,20 +74,21 @@ impl ProviderStatusCache {
                 .applied
                 .get(&ticket.provider)
                 .is_some_and(|seq| *seq >= ticket.seq);
+        let Ok(status) = result else {
+            return false;
+        };
         if stale {
             return false;
         }
         self.applied.insert(ticket.provider, ticket.seq);
-        match result {
-            Ok(status) => self.statuses.insert(ticket.provider, status.clone()) != Some(status),
-            Err(_) => false,
-        }
+        self.statuses.insert(ticket.provider, status.clone()) != Some(status)
     }
 
     fn clear(&mut self) {
         self.floor = self.issued;
         self.statuses.clear();
         self.applied.clear();
+        self.started.clear();
     }
 
     fn retain(&mut self, providers: &[ProviderId]) {
@@ -115,14 +127,27 @@ pub fn entries(cache: &ProviderStatusCache, settings: &Settings) -> Vec<Provider
         .collect()
 }
 
+/// Issue tickets for the targets to poll now. An unforced poll skips
+/// providers whose last poll started within `UNFORCED_POLL_SPACING`.
 fn begin(
     cache: &mut ProviderStatusCache,
     targets: Vec<(ProviderId, StatusSource)>,
+    now: Instant,
+    force: bool,
 ) -> Vec<(StatusTicket, StatusSource)> {
-    targets
-        .into_iter()
-        .map(|(id, source)| (cache.issue(id), source))
-        .collect()
+    let mut tickets = Vec::with_capacity(targets.len());
+    for (id, source) in targets {
+        let recent = cache
+            .started
+            .get(&id)
+            .is_some_and(|at| now.saturating_duration_since(*at) < UNFORCED_POLL_SPACING);
+        if recent && !force {
+            continue;
+        }
+        cache.started.insert(id, now);
+        tickets.push((cache.issue(id), source));
+    }
+    tickets
 }
 
 /// Fetch each distinct source once (Codex and OpenAI API share a page,
@@ -196,7 +221,7 @@ fn finish(
 
 /// Start a detached status poll for `providers`. Never blocks the caller;
 /// the task holds no lock across the network wait, so app exit is not held up.
-pub fn spawn_poll(app: &AppHandle, settings: &Settings, providers: &[ProviderId]) {
+pub fn spawn_poll(app: &AppHandle, settings: &Settings, providers: &[ProviderId], force: bool) {
     let targets = targets(settings, providers);
     if targets.is_empty() {
         return;
@@ -205,9 +230,12 @@ pub fn spawn_poll(app: &AppHandle, settings: &Settings, providers: &[ProviderId]
         return;
     };
     let tickets = match state.lock() {
-        Ok(mut guard) => begin(&mut guard.provider_statuses, targets),
+        Ok(mut guard) => begin(&mut guard.provider_statuses, targets, Instant::now(), force),
         Err(_) => return,
     };
+    if tickets.is_empty() {
+        return;
+    }
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let results = poll(tickets, codexbar::status::fetch_status, POLL_TIMEOUT).await;
@@ -241,7 +269,7 @@ pub fn settings_changed(app: &AppHandle, settings: &Settings, poll_now: bool) {
     }
     publish(app, settings);
     if poll_now {
-        spawn_poll(app, settings, &settings.get_enabled_provider_ids());
+        spawn_poll(app, settings, &settings.get_enabled_provider_ids(), true);
     }
 }
 
@@ -388,6 +416,8 @@ mod tests {
         let tickets = begin(
             cache,
             targets(settings, &settings.get_enabled_provider_ids()),
+            Instant::now(),
+            true,
         );
         let results = run(poll(tickets, fake_fetch(calls.clone()), POLL_TIMEOUT));
         (
@@ -461,7 +491,12 @@ mod tests {
         let mut cache = ProviderStatusCache::default();
         poll_once(&mut cache, &on);
 
-        let in_flight = begin(&mut cache, targets(&on, &[ProviderId::Claude]));
+        let in_flight = begin(
+            &mut cache,
+            targets(&on, &[ProviderId::Claude]),
+            Instant::now(),
+            true,
+        );
         cache.clear();
         let results = run(poll(in_flight, fake_fetch(Arc::default()), POLL_TIMEOUT));
         assert!(!finish(&mut cache, &on, results));
@@ -482,12 +517,46 @@ mod tests {
     }
 
     #[test]
+    fn unforced_polls_within_thirty_seconds_skip_the_page_and_forced_ones_do_not() {
+        let on = settings(true, &[ProviderId::Claude, ProviderId::Codex]);
+        let ids = on.get_enabled_provider_ids();
+        let mut cache = ProviderStatusCache::default();
+        let t0 = Instant::now();
+        assert_eq!(begin(&mut cache, targets(&on, &ids), t0, false).len(), 2);
+
+        let soon = t0 + Duration::from_secs(29);
+        assert!(begin(&mut cache, targets(&on, &ids), soon, false).is_empty());
+        assert_eq!(begin(&mut cache, targets(&on, &ids), soon, true).len(), 2);
+
+        let later = soon + Duration::from_secs(30);
+        assert_eq!(begin(&mut cache, targets(&on, &ids), later, false).len(), 2);
+
+        cache.clear();
+        assert_eq!(begin(&mut cache, targets(&on, &ids), later, false).len(), 2);
+    }
+
+    #[test]
+    fn newer_failure_does_not_retire_an_older_success_still_in_flight() {
+        let mut cache = ProviderStatusCache::default();
+        let older = cache.issue(ProviderId::Claude);
+        let newer = cache.issue(ProviderId::Claude);
+        assert!(!cache.apply(newer, Err("timeout".to_string())));
+        assert!(cache.apply(older, Ok(status(StatusIndicator::Major, "Down"))));
+        assert_eq!(
+            cache.get(ProviderId::Claude).map(|s| s.indicator),
+            Some(StatusIndicator::Major)
+        );
+    }
+
+    #[test]
     fn results_for_providers_disabled_mid_poll_are_dropped() {
         let both = settings(true, &[ProviderId::Claude, ProviderId::Codex]);
         let mut cache = ProviderStatusCache::default();
         let tickets = begin(
             &mut cache,
             targets(&both, &[ProviderId::Claude, ProviderId::Codex]),
+            Instant::now(),
+            true,
         );
         let results = run(poll(tickets, fake_fetch(Arc::default()), POLL_TIMEOUT));
         let claude_only = settings(true, &[ProviderId::Claude]);
@@ -524,7 +593,12 @@ mod tests {
     fn hung_fetch_times_out_without_blocking_other_sources() {
         let on = settings(true, &[ProviderId::Claude, ProviderId::Codex]);
         let mut cache = ProviderStatusCache::default();
-        let tickets = begin(&mut cache, targets(&on, &on.get_enabled_provider_ids()));
+        let tickets = begin(
+            &mut cache,
+            targets(&on, &on.get_enabled_provider_ids()),
+            Instant::now(),
+            true,
+        );
         let results = run(poll(
             tickets,
             |source| {

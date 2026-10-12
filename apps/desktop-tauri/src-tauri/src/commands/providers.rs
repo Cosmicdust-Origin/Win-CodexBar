@@ -642,7 +642,7 @@ async fn do_refresh_providers_with_policy(
         }
     };
     if scope.polls_status() {
-        crate::status_poller::spawn_poll(app, &inputs.settings, &refresh_ids);
+        crate::status_poller::spawn_poll(app, &inputs.settings, &refresh_ids, force);
     }
 
     // Ensure cache only contains currently enabled providers for this generation.
