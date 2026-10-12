@@ -54,8 +54,8 @@ impl TavilyProvider {
             metadata: ProviderMetadata {
                 id: ProviderId::Tavily,
                 display_name: "Tavily",
-                session_label: "Account plan",
-                weekly_label: "Account plan",
+                session_label: "Plan credits",
+                weekly_label: "API key",
                 supports_opus: false,
                 supports_credits: false,
                 default_enabled: false,
@@ -93,25 +93,9 @@ impl TavilyProvider {
         let status = response.status();
         match status {
             StatusCode::OK => {}
-            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
-                return Err(ProviderError::Other(
-                    "Tavily API key is invalid or expired. Check your settings.".into(),
-                ));
-            }
-            StatusCode::TOO_MANY_REQUESTS => {
-                return Err(ProviderError::Other(
-                    "Tavily rate limit exceeded. Keep refreshes at least one minute apart.".into(),
-                ));
-            }
-            status if status.is_server_error() => {
-                return Err(ProviderError::Other(format!(
-                    "Tavily service error: HTTP {}.",
-                    status.as_u16()
-                )));
-            }
             _ => {
                 return Err(ProviderError::Other(format!(
-                    "Tavily API error: HTTP {}.",
+                    "Tavily returned HTTP {}.",
                     status.as_u16()
                 )));
             }
@@ -263,44 +247,91 @@ fn parse_usage(payload: &Value) -> Result<ParsedUsage, ProviderError> {
     // Build display details (used for Settings panel expandable section)
     let mut details = Vec::new();
 
-    // Account plan detail
+    // Account plan section
     if let Some(detail) = ProviderDisplayDetail::new(
-        "account-plan",
-        "Account plan",
-        format!("{} / {}", plan_usage, plan_limit),
+        "account-plan-used",
+        "Used",
+        format!("{} credits", plan_usage),
     )
-    .and_then(|d| d.with_secondary_value(format!("Remaining: {}", plan_limit - plan_usage)))
+    .and_then(|d| d.with_section_title("Account plan"))
+    {
+        details.push(detail);
+    }
+    if let Some(detail) = ProviderDisplayDetail::new(
+        "account-plan-limit",
+        "Limit",
+        format!("{} credits", plan_limit),
+    )
+    .and_then(|d| d.with_section_title("Account plan"))
+    {
+        details.push(detail);
+    }
+    if let Some(detail) = ProviderDisplayDetail::new(
+        "account-plan-remaining",
+        "Remaining",
+        format!("{} credits", (plan_limit - plan_usage).max(0)),
+    )
+    .and_then(|d| d.with_section_title("Account plan"))
     {
         details.push(detail);
     }
 
-    // API key detail
+    // API key section
+    if let Some(detail) =
+        ProviderDisplayDetail::new("api-key-used", "Used", format!("{} credits", key_usage))
+            .and_then(|d| d.with_section_title("API key"))
+    {
+        details.push(detail);
+    }
     if let Some(limit) = key_limit {
-        let detail =
-            ProviderDisplayDetail::new("api-key", "API key", format!("{} / {}", key_usage, limit))
-                .and_then(|d| d.with_secondary_value(format!("Remaining: {}", limit - key_usage)));
-        if let Some(d) = detail {
-            details.push(d);
+        if let Some(detail) =
+            ProviderDisplayDetail::new("api-key-limit", "Limit", format!("{} credits", limit))
+                .and_then(|d| d.with_section_title("API key"))
+        {
+            details.push(detail);
+        }
+        if let Some(detail) = ProviderDisplayDetail::new(
+            "api-key-remaining",
+            "Remaining",
+            format!("{} credits", (limit - key_usage).max(0)),
+        )
+        .and_then(|d| d.with_section_title("API key"))
+        {
+            details.push(detail);
         }
     } else {
         // Unlimited key
         if let Some(detail) =
-            ProviderDisplayDetail::new("api-key", "API key", format!("{} / Unlimited", key_usage))
+            ProviderDisplayDetail::new("api-key-limit", "Limit", "Unlimited".to_string())
+                .and_then(|d| d.with_section_title("API key"))
         {
             details.push(detail);
         }
     }
 
-    // Pay-as-you-go detail (if present)
-    if let (Some(paygo_u), Some(paygo_l)) = (paygo_usage, paygo_limit)
-        && let Some(detail) = ProviderDisplayDetail::new(
-            "paygo",
-            "Pay as you go",
-            format!("{} / {}", paygo_u, paygo_l),
+    // Pay-as-you-go section (if present)
+    if let (Some(paygo_u), Some(paygo_l)) = (paygo_usage, paygo_limit) {
+        if let Some(detail) =
+            ProviderDisplayDetail::new("paygo-used", "Used", format!("{} credits", paygo_u))
+                .and_then(|d| d.with_section_title("Pay as you go"))
+        {
+            details.push(detail);
+        }
+        if let Some(detail) =
+            ProviderDisplayDetail::new("paygo-limit", "Limit", format!("{} credits", paygo_l))
+                .and_then(|d| d.with_section_title("Pay as you go"))
+        {
+            details.push(detail);
+        }
+        if let Some(detail) = ProviderDisplayDetail::new(
+            "paygo-remaining",
+            "Remaining",
+            format!("{} credits", (paygo_l - paygo_u).max(0)),
         )
-        .and_then(|d| d.with_secondary_value(format!("Remaining: {}", paygo_l - paygo_u)))
-    {
-        details.push(detail);
+        .and_then(|d| d.with_section_title("Pay as you go"))
+        {
+            details.push(detail);
+        }
     }
 
     Ok(ParsedUsage { usage, details })
@@ -361,8 +392,8 @@ mod tests {
         assert!(result.usage.secondary.is_none());
         assert!(result.usage.login_method.is_none());
         assert!(!result.details.is_empty());
-        // Should have account-plan and api-key details with "Unlimited" label
-        let api_key_detail = result.details.iter().find(|d| d.id() == "api-key");
+        // Should have api-key-limit detail with "Unlimited" label
+        let api_key_detail = result.details.iter().find(|d| d.id() == "api-key-limit");
         assert!(api_key_detail.is_some());
         assert!(api_key_detail.unwrap().value().contains("Unlimited"));
     }
@@ -397,9 +428,9 @@ mod tests {
         assert_eq!(result.usage.primary.used_percent, 50.0);
         assert!(result.usage.secondary.is_some());
         assert_eq!(result.usage.login_method, Some("Pro".to_string()));
-        // Should have details for account-plan, api-key, and paygo
-        assert_eq!(result.details.len(), 3);
-        let paygo_detail = result.details.iter().find(|d| d.id() == "paygo");
+        // Should have details for account-plan (3 rows), api-key (3 rows), and paygo (3 rows) = 9 total
+        assert_eq!(result.details.len(), 9);
+        let paygo_detail = result.details.iter().find(|d| d.id() == "paygo-used");
         assert!(paygo_detail.is_some());
     }
 
