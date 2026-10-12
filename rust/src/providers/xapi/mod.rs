@@ -338,10 +338,8 @@ fn parse_credits(
     let balance_text = format!("${:.2}", balance);
 
     // Build the usage snapshot with balance as informational
-    let usage = UsageSnapshot::new(
-        RateWindow::informational(balance_text.clone()),
-    )
-    .with_login_method("Browser session");
+    let usage = UsageSnapshot::new(RateWindow::informational(balance_text.clone()))
+        .with_login_method("Browser session");
 
     let mut result = ProviderFetchResult::new(usage, "web");
 
