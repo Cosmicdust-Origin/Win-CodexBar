@@ -687,7 +687,7 @@ fn parse_language(s: &str) -> Option<Language> {
 /// Serializes the load -> patch -> save of `update_settings`. Commands run
 /// concurrently, so two overlapping patches would otherwise both load the same
 /// file and the later save would drop the earlier change.
-static UPDATE_SETTINGS_LOCK: Mutex<()> = Mutex::new(());
+pub(super) static UPDATE_SETTINGS_LOCK: Mutex<()> = Mutex::new(());
 
 #[tauri::command]
 pub async fn update_settings(

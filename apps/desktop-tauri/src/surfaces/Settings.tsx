@@ -24,6 +24,7 @@ import GeneralTab from "./settings/tabs/GeneralTab";
 import MenuBarTab from "./settings/tabs/MenuBarTab";
 import MenuTab from "./settings/tabs/MenuTab";
 import AdvancedTab from "./settings/tabs/AdvancedTab";
+import HooksTab from "./settings/tabs/HooksTab";
 import AboutTab from "./settings/tabs/AboutTab";
 import ProvidersTab from "./settings/tabs/ProvidersTab";
 import UsageSpendTab from "./settings/tabs/UsageSpendTab";
@@ -242,6 +243,7 @@ export default function Settings({
             {activeTab === "advanced" && (
               <AdvancedTab settings={settings} set={set} saving={saving} />
             )}
+            {activeTab === "hooks" && <HooksTab providers={catalog} />}
             {activeTab === "about" && (
               <AboutTab settings={settings} set={set} saving={saving} />
             )}

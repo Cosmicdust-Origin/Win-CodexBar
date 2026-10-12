@@ -42,7 +42,7 @@ Cargo workspace (root `Cargo.toml`): members `rust`, `apps/desktop-tauri/src-tau
 - **Tray panel flyout** — larger dashboard window opened from the tray
   menu ("Pop Out Dashboard"); the tray panel itself is the only
   dashboard layout.
-- **Settings** — detached window; tabs: `general`, `providers`, `notifications`, `menuBar`, `menu`, `usageSpend`, `advanced`, `about`.
+- **Settings** — detached window; tabs: `general`, `providers`, `notifications`, `menuBar`, `menu`, `usageSpend`, `advanced`, `hooks`, `about`.
 - **Float bar** — optional capacity strip.
 
 ## Concurrency & platform
