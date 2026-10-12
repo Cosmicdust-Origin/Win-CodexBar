@@ -784,6 +784,15 @@ pub fn get_api_key_providers() -> Vec<ProviderConfigInfo> {
             config_file_path: None,
             dashboard_url: Some("https://bob.ibm.com"),
         },
+        ProviderConfigInfo {
+            id: ProviderId::SailResearch,
+            name: "Sail Research",
+            requires_api_key: true,
+            api_key_env_var: Some(crate::providers::sailresearch::API_KEY_ENV),
+            api_key_help: Some("Saved in CodexBar's local config file. Or set SAIL_API_KEY."),
+            config_file_path: None,
+            dashboard_url: Some("https://app.sailresearch.com"),
+        },
     ]
 }
 
