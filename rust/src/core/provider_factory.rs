@@ -13,6 +13,7 @@ use crate::providers::LangdockProvider;
 use crate::providers::LithosAIProvider;
 use crate::providers::MuseAIProvider;
 use crate::providers::SyntheticProvider;
+use crate::providers::TavilyProvider;
 use crate::providers::WorkBuddyProvider;
 use crate::providers::{
     AbacusProvider, AiAndProvider, AixyProvider, AlibabaProvider, AlibabaTokenPlanProvider,
@@ -55,6 +56,7 @@ pub fn instantiate(id: ProviderId) -> Box<dyn Provider> {
         ProviderId::LithosAI => Box::new(LithosAIProvider::new()),
         ProviderId::MuseAI => Box::new(MuseAIProvider::new()),
         ProviderId::WorkBuddy => Box::new(WorkBuddyProvider::new()),
+        ProviderId::Tavily => Box::new(TavilyProvider::new()),
         ProviderId::Factory => Box::new(FactoryProvider::new()),
         ProviderId::Zai => Box::new(ZaiProvider::new()),
         ProviderId::Kiro => Box::new(KiroProvider::new()),
@@ -174,6 +176,7 @@ pub fn pace_capability(id: ProviderId) -> ProviderPaceCapability {
         | ProviderId::LithosAI
         | ProviderId::MuseAI
         | ProviderId::WorkBuddy
+        | ProviderId::Tavily
         | ProviderId::Factory
         | ProviderId::Kiro
         | ProviderId::VertexAI
