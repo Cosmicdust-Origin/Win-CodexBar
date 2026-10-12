@@ -435,7 +435,7 @@ async fn read_team_quota(
         };
         match read_session(&mut client, identity, team_id, now).await {
             Ok(SessionOutcome::Next) => {}
-            Ok(SessionOutcome::Done(reading)) => return reading,
+            Ok(SessionOutcome::Done(reading)) => return reading.map(|reading| *reading),
             Err(Abort) => {
                 tracing::debug!("Muse browser team quota read stopped");
                 return None;
@@ -448,7 +448,7 @@ async fn read_team_quota(
 enum SessionOutcome {
     /// This session was rejected or belongs to another account.
     Next,
-    Done(Option<WebReading>),
+    Done(Option<Box<WebReading>>),
 }
 
 async fn read_session(
@@ -484,11 +484,11 @@ async fn read_session(
         .collect();
 
     let done = |teams: Vec<BrowserTeam>, note: Option<TeamNote>, quota: Option<TeamQuota>| {
-        Ok(SessionOutcome::Done(Some(WebReading {
+        Ok(SessionOutcome::Done(Some(Box::new(WebReading {
             teams,
             note,
             quota,
-        })))
+        }))))
     };
     if team_id.is_empty() {
         return done(teams, Some(TeamNote::ChooseTeam), None);

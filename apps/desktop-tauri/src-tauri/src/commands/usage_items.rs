@@ -29,7 +29,7 @@ pub(crate) fn usage_item_id(raw_id: &str) -> String {
 }
 
 fn redacted_usage_item_title(title: &str, settings: &Settings) -> String {
-    PersonalInfoRedactor::redact_emails_in_text(Some(title), settings.hide_personal_info)
+    PersonalInfoRedactor::hide_emails_in_text(Some(title), settings.hide_personal_info)
         .unwrap_or_default()
 }
 
@@ -92,7 +92,9 @@ pub(crate) fn usage_item_descriptors(
         let mut detail_titles = std::collections::HashSet::new();
         for detail in &snapshot.display_details {
             if detail_titles.insert(detail.title.clone()) {
-                let redacted = PersonalInfoRedactor::redact_emails_in_text(
+                // The ID keeps the "Hidden" marker it has always used, so
+                // sections hidden under Hide Personal Info stay hidden.
+                let id_title = PersonalInfoRedactor::redact_emails_in_text(
                     Some(&detail.title),
                     settings.hide_personal_info,
                 )
@@ -100,12 +102,12 @@ pub(crate) fn usage_item_descriptors(
                 let id = format!(
                     "{}{}",
                     codexbar::settings::USAGE_ITEM_DETAIL_SECTION_PREFIX,
-                    redacted
+                    id_title
                 );
                 if seen.insert(id.clone()) {
                     items.push(ProviderUsageItemSnapshot {
                         id,
-                        title: redacted,
+                        title: redacted_usage_item_title(&detail.title, settings),
                         available: true,
                     });
                 }

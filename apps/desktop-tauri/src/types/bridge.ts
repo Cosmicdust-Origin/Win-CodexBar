@@ -1,3 +1,5 @@
+import type { LocaleKey } from "../i18n/keys";
+
 export type SurfaceMode = "hidden" | "trayPanel" | "popOut" | "settings";
 export type VisibleSurfaceMode = Exclude<SurfaceMode, "hidden">;
 export type SettingsTabId =
@@ -248,6 +250,8 @@ export interface SettingsSnapshot {
   httpProxyUsername?: string;
   httpProxyPassword?: string;
   uiLanguage: Language;
+  /** Language "System": `uiLanguage` follows the Windows display language. */
+  uiLanguageFollowsSystem: boolean;
   theme: ThemePreference;
   /** 100..=250 — clamped server-side. */
   windowScalePercent: number;
@@ -394,6 +398,8 @@ export interface SettingsUpdate {
   httpProxyUsername?: string;
   httpProxyPassword?: string;
   uiLanguage?: Language;
+  /** `true` picks "System"; picking a `uiLanguage` turns it off. */
+  uiLanguageFollowsSystem?: boolean;
   theme?: ThemePreference;
   windowScalePercent?: number;
   trayScalePercent?: number;
@@ -676,6 +682,10 @@ export interface RateWindowSnapshot {
   isInformational?: boolean;
   /** `resetDescription` is a detail line (for example spend amounts), not reset wording. */
   descriptionIsDetail?: boolean;
+  /** The reset is the next quota regeneration: the card says "Regenerates in" (Synthetic). */
+  resetRegenerates?: boolean;
+  /** The window feeds the tray and float bar only; the card draws no row for it. */
+  hiddenOnCard?: boolean;
   reservePercent: number | null;
   reserveDescription: string | null;
   reserveWillLastToReset?: boolean;
@@ -711,6 +721,8 @@ export interface CostSnapshotBridge {
   daily?: CostDailyPoint[];
   /** Provider-metered spend that is itself a primary usage signal. */
   alwaysVisible?: boolean;
+  /** Provider-owned cost-block title (upstream `ProviderCostMenuCardStyle`); absent keeps the shared title. */
+  titleKey?: LocaleKey;
 }
 
 export type PaceStage =
@@ -825,6 +837,8 @@ export interface ProviderUsageSnapshot {
   primaryLabel?: string;
   secondary: RateWindowSnapshot | null;
   secondaryLabel?: string;
+  /** Provider-chosen locale key that names the secondary lane (wins over `secondaryLabel`). */
+  secondaryLabelKey?: LocaleKey | null;
   modelSpecific: RateWindowSnapshot | null;
   tertiary: RateWindowSnapshot | null;
   /** F5: duration-cadence label for tertiary ("monthly", "weekly" etc.) */

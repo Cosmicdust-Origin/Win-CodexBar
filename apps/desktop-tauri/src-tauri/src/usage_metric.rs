@@ -404,6 +404,8 @@ fn derived_window(used_percent: f64, resets_at: Option<String>) -> RateWindowSna
         pace: None,
         monthly_limit_block: None,
         description_is_detail: false,
+        reset_regenerates: false,
+        hidden_on_card: false,
     }
 }
 
@@ -469,6 +471,7 @@ mod tests {
             primary_label: None,
             secondary: Some(window(60.0)),
             secondary_label: None,
+            secondary_label_key: None,
             model_specific: None,
             tertiary: None,
             tertiary_label: None,
@@ -868,6 +871,7 @@ mod tests {
             formatted_balance: None,
             daily: Vec::new(),
             always_visible: false,
+            title_key: None,
         });
         let settings = metric_settings(ProviderId::Mistral, MetricPreference::MonthlyPlan);
 

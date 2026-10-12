@@ -108,6 +108,33 @@ describe("metricResetText", () => {
     ).toBeNull();
     expect(metricResetText(rateWindow({ resetsAt: "not a date" }), true, NOW, en)).toBeNull();
   });
+
+  // Upstream `syntheticRegenDetail`: "Regenerates %@" around the unlocalized
+  // `resetCountdownDescription`, relative even under the absolute reset style.
+  it.each([
+    [45 * MINUTE, true, "Regenerates in 45m"],
+    [45 * MINUTE, false, "Regenerates in 45m"],
+    [2 * HOUR + 5 * MINUTE, true, "Regenerates in 2h 5m"],
+    [DAY + 3 * HOUR, true, "Regenerates in 1d 3h"],
+    [2 * DAY, true, "Regenerates in 2d"],
+    [500, true, "Regenerates now"],
+  ])("counts a regen lane %d ms down to %j (relative %s)", (ms, relative, expected) => {
+    const snap = rateWindow({
+      resetsAt: new Date(NOW + ms).toISOString(),
+      resetDescription: "76% after next regen · Full in ~3 regens",
+      descriptionIsDetail: true,
+      resetRegenerates: true,
+    });
+    expect(metricResetText(snap, relative, NOW, en)).toBe(expected);
+  });
+
+  it("uses the Mac translation of Regenerates around the English countdown", () => {
+    const snap = rateWindow({
+      resetsAt: new Date(NOW + 45 * MINUTE).toISOString(),
+      resetRegenerates: true,
+    });
+    expect(metricResetText(snap, true, NOW, fromFtl("ja-JP.ftl"))).toBe("in 45m に再生成");
+  });
 });
 
 describe("metricRowPresentation percent and reset", () => {

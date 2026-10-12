@@ -91,11 +91,13 @@ export function cardCostSection(
   const balanceText = (value: number) =>
     `${t("DetailCostBalance")}: ${money(value, cost.formattedBalance)}`;
   const limit = cost.limit ?? 0;
+  // A provider-declared title (upstream `ProviderCostMenuCardStyle`) wins.
+  const title = (fallback: LocaleKey) => t(cost.titleKey ?? fallback);
 
   if (limit > 0) {
     const percentUsed = clampPercent((cost.used / limit) * 100);
     return {
-      title: isQuota ? t("QuotaUsageTitle") : t("ExtraUsage"),
+      title: title(isQuota ? "QuotaUsageTitle" : "ExtraUsage"),
       spendLine: `${periodLabel(cost.period, t("CostPeriodThisMonth"), t)}: ${money(cost.used, cost.formattedUsed)} / ${money(limit, cost.formattedLimit)}`,
       percentUsed,
       percentLine: t("UsedPercent").replace(/\{[^}]*\}/, percentUsed.toFixed(0)),
@@ -107,7 +109,7 @@ export function cardCostSection(
 
   if (cost.alwaysVisible === true) {
     return {
-      title: t("ApiSpendTitle"),
+      title: title("ApiSpendTitle"),
       spendLine: `${periodLabel(cost.period, t("CostPeriodLastDays").replace("{}", "30"), t)}: ${money(cost.used, cost.formattedUsed)}`,
       percentUsed: null,
       percentLine: null,
@@ -117,7 +119,7 @@ export function cardCostSection(
   }
 
   const inline = (spendLine: string): CardCostSection => ({
-    title: t("ExtraUsage"),
+    title: title("ExtraUsage"),
     spendLine,
     percentUsed: null,
     percentLine: null,

@@ -41,6 +41,11 @@ const COOKIE_DOMAINS: &[&str] = &[
 /// with the real cycle length ending at `resets_at` (upstream `ProviderPaceCapability`).
 const MONTHLY_WINDOW_SENTINEL_MINUTES: u32 = 30 * 24 * 60;
 
+/// Reset-window pace (upstream `NotionProviderDescriptor.pace`, v0.70.0):
+/// `.calendarMonthResetWindow`.
+pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
+    crate::core::ProviderPaceCapability::CALENDAR_MONTH_RESET_WINDOW;
+
 pub struct NotionProvider {
     metadata: ProviderMetadata,
 }
@@ -335,7 +340,12 @@ fn build_usage_snapshot(
 
     let mut snapshot = UsageSnapshot::new(primary);
     if let Some(secondary) = secondary {
-        snapshot = snapshot.with_secondary(secondary);
+        // Upstream `NotionProviderDescriptor.swift:32` (`weeklyLabel:
+        // "Monthly"`): the billing-period lane reads "Monthly", not the
+        // generic monthly-window wording.
+        snapshot = snapshot
+            .with_secondary(secondary)
+            .with_secondary_label_key(crate::locale::LocaleKey::ProviderLabelMonthly);
     }
     snapshot.updated_at = now;
 
@@ -748,6 +758,11 @@ mod tests {
             secondary.resets_at,
             date_from_milliseconds(Some(1_735_689_600_000.0))
         );
+        // Upstream `NotionProviderDescriptor.swift:32`: "Monthly".
+        assert_eq!(
+            snap.secondary_label_key,
+            Some(crate::locale::LocaleKey::ProviderLabelMonthly)
+        );
 
         assert_eq!(snap.account_email.as_deref(), Some("ada@example.com"));
         assert_eq!(snap.account_organization.as_deref(), Some("Acme Biz"));
@@ -773,6 +788,7 @@ mod tests {
             Some(MONTHLY_WINDOW_SENTINEL_MINUTES)
         );
         assert!(snap.secondary.is_none());
+        assert_eq!(snap.secondary_label_key, None);
     }
 
     #[test]

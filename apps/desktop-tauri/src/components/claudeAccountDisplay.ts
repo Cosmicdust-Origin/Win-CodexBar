@@ -8,10 +8,11 @@ export interface PrivateClaudeAccountLabel {
 /**
  * Assign opaque labels from stable account ids rather than the current array
  * order. The account list can be reordered when the active login changes, but
- * the saved Claude account id remains source-owned and stable.
+ * the saved account id remains source-owned and stable. The tray numbers
+ * Claude and Grok accounts by the same rule (`ordinals_by_sorted_id`).
  */
-export function buildClaudeAccountOrdinals(
-  accounts: readonly ClaudeAccount[],
+export function buildAccountOrdinals(
+  accounts: readonly { id: string }[],
 ): Record<string, number> {
   const ids = [...new Set(accounts.map((account) => account.id))].sort((left, right) =>
     left < right ? -1 : left > right ? 1 : 0,

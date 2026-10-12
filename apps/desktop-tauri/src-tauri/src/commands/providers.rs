@@ -1691,6 +1691,8 @@ mod reset_backfill_tests {
             reserve_eta_seconds: None,
             pace: None,
             description_is_detail: false,
+            reset_regenerates: false,
+            hidden_on_card: false,
             monthly_limit_block: None,
         }
     }
@@ -1702,6 +1704,7 @@ mod reset_backfill_tests {
             primary_label: None,
             secondary: None,
             secondary_label: None,
+            secondary_label_key: None,
             model_specific: None,
             tertiary: None,
             tertiary_label: None,

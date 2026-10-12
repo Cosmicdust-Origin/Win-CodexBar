@@ -38,6 +38,7 @@ mod provider_workspace;
 mod raw;
 mod spend_dashboard;
 mod status;
+mod system_language;
 mod types;
 
 pub use api_keys::*;
@@ -333,6 +334,13 @@ pub struct Settings {
     /// UI language for the application (English default for backward compatibility)
     #[serde(default)]
     pub ui_language: Language,
+
+    /// Language "System": `ui_language` follows the Windows display
+    /// language (Mac `AppLanguage.system`). True for new installs; false
+    /// for files written before this setting existed, so their chosen
+    /// language stays put.
+    #[serde(default)]
+    pub ui_language_follows_system: bool,
 
     /// UI theme preference (Phase 12). Defaults to Auto (prefers-color-scheme).
     #[serde(default)]
@@ -701,7 +709,8 @@ impl Default for Settings {
             http_proxy_password: String::new(),
             auto_download_updates: false, // Require explicit opt-in for background downloads
             install_updates_on_quit: false, // Don't auto-install on quit by default
-            ui_language: Language::default(), // English by default
+            ui_language: Language::default(), // English until the system language resolves
+            ui_language_follows_system: true,
             theme: ThemePreference::default(), // Auto (follows prefers-color-scheme)
             window_scale_percent: default_window_scale_percent(),
             tray_scale_percent: default_tray_scale_percent(),
@@ -780,6 +789,8 @@ impl Settings {
         // from the pre-0.62 per-provider visibility flags. After this the list
         // is the sole source of truth and the flags stay untouched.
         settings.migrate_legacy_usage_item_flags();
+
+        settings.resolve_system_language();
 
         settings
     }

@@ -33,6 +33,12 @@ pub struct RateWindowSnapshot {
     /// `reset_description` is a detail line (for example spend amounts), not reset wording.
     #[serde(default)]
     pub description_is_detail: bool,
+    /// The reset is the next quota regeneration; the card says "Regenerates in".
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reset_regenerates: bool,
+    /// The window feeds the tray and float bar only; the card draws no row for it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hidden_on_card: bool,
     #[serde(default)]
     pub reserve_percent: Option<f64>,
     #[serde(default)]
@@ -72,6 +78,8 @@ impl RateWindowSnapshot {
             pace: None,
             monthly_limit_block: None,
             description_is_detail: rw.description_is_detail,
+            reset_regenerates: rw.reset_regenerates,
+            hidden_on_card: rw.hidden_on_card,
         }
     }
 
@@ -131,6 +139,9 @@ pub struct CostSnapshotBridge {
     pub daily: Vec<CostDailyPointBridge>,
     #[serde(default)]
     pub always_visible: bool,
+    /// Provider-owned cost-block title as a locale key name; absent keeps the shared title.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title_key: Option<String>,
 }
 
 fn default_currency() -> String {
@@ -197,6 +208,18 @@ pub struct PaceSnapshot {
     /// Block of the window this pace comes from (upstream hides its pace).
     #[serde(default)]
     pub monthly_limit_block: Option<MonthlyLimitBlockSnapshot>,
+    /// Whether the window this pace comes from carries its own length.
+    /// Upstream `UsageStore.weeklyPace` (UsageStore+HistoricalPace.swift)
+    /// gives the menu bar no pace for a generic window without
+    /// `windowMinutes`, rather than scoring it against the 7-day fallback,
+    /// so the tray pace tint skips it. Card lanes keep their own pace.
+    /// Tray-only; not sent to the frontend.
+    #[serde(default = "default_window_has_length", skip_serializing)]
+    pub window_has_length: bool,
+}
+
+fn default_window_has_length() -> bool {
+    true
 }
 
 /// One burndown chart point (RFC 3339 capture time + remaining percent).
@@ -291,6 +314,10 @@ pub struct ProviderUsageSnapshot {
     pub secondary: Option<RateWindowSnapshot>,
     #[serde(default)]
     pub secondary_label: Option<String>,
+    /// Locale key that names the secondary lane instead of `secondary_label`
+    /// (provider-owned, see `UsageSnapshot::secondary_label_key`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secondary_label_key: Option<String>,
     #[serde(default)]
     pub model_specific: Option<RateWindowSnapshot>,
     #[serde(default)]
@@ -448,6 +475,8 @@ impl ProviderUsageSnapshot {
             expected_used_percent: p.expected_used_percent,
             actual_used_percent: p.actual_used_percent,
             monthly_limit_block: MonthlyLimitBlockSnapshot::for_pace(usage, &blocked),
+            window_has_length: primary_pace_window
+                .is_some_and(|window| window.window_minutes.is_some()),
         });
 
         // Pace of the secondary lane, which also derives the row's reserve.
@@ -539,6 +568,11 @@ impl ProviderUsageSnapshot {
                     .clone()
                     .unwrap_or_else(|| metadata.weekly_label.to_string())
             }),
+            secondary_label_key: usage
+                .secondary
+                .as_ref()
+                .and(usage.secondary_label_key)
+                .map(|key| key.name().to_string()),
             model_specific: usage.model_specific.as_ref().map(|w| {
                 lane(
                     w,
@@ -633,6 +667,7 @@ impl ProviderUsageSnapshot {
                     })
                     .collect(),
                 always_visible: c.always_visible,
+                title_key: c.card_title_key.map(|key| key.name().to_string()),
             }),
             plan_name: usage.login_method.clone(),
             account_email: usage.account_email.clone(),
@@ -685,10 +720,13 @@ impl ProviderUsageSnapshot {
                 pace: None,
                 monthly_limit_block: None,
                 description_is_detail: false,
+                reset_regenerates: false,
+                hidden_on_card: false,
             },
             primary_label: Some(metadata.session_label.to_string()),
             secondary: None,
             secondary_label: None,
+            secondary_label_key: None,
             model_specific: None,
             tertiary: None,
             tertiary_label: None,
@@ -937,6 +975,7 @@ pub struct SettingsSnapshot {
     http_proxy_username: String,
     http_proxy_password: String,
     ui_language: &'static str,
+    ui_language_follows_system: bool,
     theme: &'static str,
     window_scale_percent: u16,
     tray_scale_percent: u16,
@@ -1102,6 +1141,7 @@ impl From<Settings> for SettingsSnapshot {
             http_proxy_username: settings.http_proxy_username,
             http_proxy_password: settings.http_proxy_password,
             ui_language: language_label(settings.ui_language),
+            ui_language_follows_system: settings.ui_language_follows_system,
             theme: theme_label(settings.theme),
             window_scale_percent: settings.window_scale_percent,
             tray_scale_percent: settings.tray_scale_percent,
@@ -1286,7 +1326,49 @@ mod tests {
             pace: None,
             monthly_limit_block: None,
             description_is_detail: false,
+            reset_regenerates: false,
+            hidden_on_card: false,
         }
+    }
+
+    /// Notion names its billing lane with the "Monthly" app string
+    /// (upstream `NotionProviderDescriptor.swift:32`); a provider that only
+    /// sets the raw "Monthly" label sends no key.
+    #[test]
+    fn secondary_label_key_crosses_the_bridge_only_when_the_provider_sets_it() {
+        let now = chrono::Utc::now();
+        let monthly = || {
+            RateWindow::with_details(
+                25.0,
+                Some(43_200),
+                Some(now + chrono::Duration::days(9)),
+                None,
+            )
+        };
+        let bridge = |id: ProviderId, usage: codexbar::core::UsageSnapshot| {
+            let metadata = codexbar::core::instantiate_provider(id).metadata().clone();
+            let result = ProviderFetchResult::new(usage, "web");
+            serde_json::to_value(ProviderUsageSnapshot::from_fetch_result(
+                id, &metadata, &result, None, None,
+            ))
+            .unwrap()
+        };
+
+        let notion = bridge(
+            ProviderId::Notion,
+            codexbar::core::UsageSnapshot::new(monthly())
+                .with_secondary(monthly())
+                .with_secondary_label_key(codexbar::locale::LocaleKey::ProviderLabelMonthly),
+        );
+        assert_eq!(notion["secondaryLabelKey"], "ProviderLabelMonthly");
+        assert_eq!(notion["secondaryLabel"], "Monthly");
+
+        let augment = bridge(
+            ProviderId::Augment,
+            codexbar::core::UsageSnapshot::new(monthly()).with_secondary(monthly()),
+        );
+        assert!(augment.get("secondaryLabelKey").is_none());
+        assert_eq!(augment["secondaryLabel"], "Monthly");
     }
 
     #[test]
@@ -1385,5 +1467,58 @@ mod tests {
             !japanese.to_ascii_lowercase().contains("resets in"),
             "{japanese}"
         );
+    }
+
+    /// Provider-declared card wording (Synthetic's regen countdown, LithosAI's
+    /// card-hidden headline and cost titles) reaches the card.
+    #[test]
+    fn provider_card_wording_crosses_the_bridge() {
+        let regen =
+            RateWindowSnapshot::from_rate_window(&RateWindow::new(10.0).with_regenerating_reset());
+        let hidden = RateWindowSnapshot::from_rate_window(
+            &RateWindow::informational("Balance: $1.00").hidden_on_card(),
+        );
+        let regen_json = serde_json::to_value(&regen).unwrap();
+        let hidden_json = serde_json::to_value(&hidden).unwrap();
+        assert_eq!(regen_json["resetRegenerates"], true);
+        assert!(regen_json.get("hiddenOnCard").is_none());
+        assert_eq!(hidden_json["hiddenOnCard"], true);
+        assert!(hidden_json.get("resetRegenerates").is_none());
+
+        let metadata = codexbar::core::instantiate_provider(ProviderId::LithosAI)
+            .metadata()
+            .clone();
+        let cost = codexbar::core::CostSnapshot::new(0.0, "USD", "Prepaid credits")
+            .with_balance(4.0)
+            .with_card_title(codexbar::locale::LocaleKey::CreditsTitle);
+        let result = codexbar::core::ProviderFetchResult::new(
+            codexbar::core::UsageSnapshot::new(RateWindow::new(0.0)),
+            "web",
+        )
+        .with_cost(cost);
+        let snapshot = ProviderUsageSnapshot::from_fetch_result(
+            ProviderId::LithosAI,
+            &metadata,
+            &result,
+            None,
+            None,
+        );
+        let json = serde_json::to_value(&snapshot).unwrap();
+        assert_eq!(json["cost"]["titleKey"], "CreditsTitle");
+
+        let plain = codexbar::core::ProviderFetchResult::new(
+            codexbar::core::UsageSnapshot::new(RateWindow::new(0.0)),
+            "web",
+        )
+        .with_cost(codexbar::core::CostSnapshot::new(1.0, "USD", "This month"));
+        let json = serde_json::to_value(ProviderUsageSnapshot::from_fetch_result(
+            ProviderId::LithosAI,
+            &metadata,
+            &plain,
+            None,
+            None,
+        ))
+        .unwrap();
+        assert!(json["cost"].get("titleKey").is_none());
     }
 }

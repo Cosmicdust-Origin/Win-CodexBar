@@ -1373,9 +1373,9 @@ fn usage_item_descriptors_keep_raw_ids_and_redact_titles() {
     let items = super::usage_item_descriptors(Some(&snapshot), &settings, ProviderId::Codex);
 
     assert_eq!(items[0].id, "metric:primary");
-    assert_eq!(items[0].title, "Account Hidden");
+    assert_eq!(items[0].title, "Account");
     assert_eq!(items[1].id, "metric:extra-credits");
-    assert_eq!(items[1].title, "Credits Hidden");
+    assert_eq!(items[1].title, "Credits");
     assert_eq!(items[2].id, "metric:extra-missing");
     assert!(!items[2].available);
 }
@@ -1434,7 +1434,7 @@ fn usage_item_descriptors_include_detail_sections() {
         .find(|item| item.id.starts_with("detailSection:") && !item.available)
         .expect("hidden detail placeholder");
     assert!(hidden.id.contains("owner@example.com quota"));
-    assert_eq!(hidden.title, "Hidden quota");
+    assert_eq!(hidden.title, "quota");
 }
 
 #[test]

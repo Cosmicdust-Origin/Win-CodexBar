@@ -14,6 +14,15 @@ use crate::core::{
 
 pub use api::{CopilotApi, SEAT_CREDIT_WINDOW_ID};
 
+/// Reset-window pace (upstream `CopilotProviderDescriptor.pace`, v0.70.0): any
+/// window with a reset date; a window without a length takes the calendar
+/// month ending at the reset.
+pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
+    crate::core::ProviderPaceCapability {
+        reset_window_pace: crate::core::PaceWindowRule::ResetDatePresent,
+        inferred_monthly_duration: crate::core::PaceDurationRule::WindowDurationMissing,
+    };
+
 /// GitHub Copilot provider for fetching AI usage limits
 pub struct CopilotProvider {
     metadata: ProviderMetadata,

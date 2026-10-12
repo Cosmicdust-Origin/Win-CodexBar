@@ -28,6 +28,11 @@ const PROBE_MODELS: &[&str] = &[
     "doubao-lite-32k",
 ];
 
+/// Reset-window pace (upstream `DoubaoProviderDescriptor.pace`, v0.70.0):
+/// `.calendarMonthResetWindow`.
+pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
+    crate::core::ProviderPaceCapability::CALENDAR_MONTH_RESET_WINDOW;
+
 pub struct DoubaoProvider {
     metadata: ProviderMetadata,
     client: Client,

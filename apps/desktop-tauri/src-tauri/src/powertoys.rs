@@ -184,6 +184,8 @@ mod tests {
             pace: None,
             monthly_limit_block: None,
             description_is_detail: false,
+            reset_regenerates: false,
+            hidden_on_card: false,
             reserve_will_last_to_reset: false,
         }
     }
@@ -197,6 +199,7 @@ mod tests {
             primary_label: Some("Session".to_string()),
             secondary: None,
             secondary_label: None,
+            secondary_label_key: None,
             model_specific: None,
             tertiary: None,
             tertiary_label: None,
@@ -255,6 +258,7 @@ mod tests {
             primary_label: Some("Session".to_string()),
             secondary: None,
             secondary_label: None,
+            secondary_label_key: None,
             model_specific: None,
             tertiary: None,
             tertiary_label: None,

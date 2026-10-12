@@ -23,6 +23,7 @@ import InlineDashboard from "./card/InlineDashboard";
 import ExtraUsageBlock from "./card/ExtraUsageBlock";
 import WayfinderBlock from "./card/WayfinderBlock";
 import { describeCard } from "./card/describeCard";
+import { hideEmailsInText } from "../lib/personalInfo";
 
 export interface MenuCardDisplayOptions {
   hideEmail: boolean;
@@ -53,25 +54,18 @@ interface MenuCardProps {
   onLayoutChange?: () => void;
 }
 
-export function maskEmail(email: string): string {
-  const at = email.indexOf("@");
-  if (at <= 1) return "••••@••••";
-  return email[0] + "•".repeat(at - 1) + email.slice(at);
-}
-
 /**
  * Upstream `MenuCardView.email(from:)`: the provider-reported email, else the
- * active token-account label. Hide Personal Info masks the email and drops the
- * label, as upstream `PersonalInfoRedactor.redactAccountLabel` blanks it.
+ * active token-account label. Hide Personal Info shows neither, as upstream
+ * `PersonalInfoRedactor.redactEmail` / `redactAccountLabel` blank them
+ * (`PersonalInfoRedactor.swift:18`, `emailPlaceholder = ""`).
  */
 export function headerAccount(
   provider: Pick<ProviderUsageSnapshot, "accountEmail" | "accountLabel">,
   hideEmail: boolean,
 ): string | null {
-  const email = provider.accountEmail?.trim();
-  if (email) return hideEmail ? maskEmail(email) : email;
   if (hideEmail) return null;
-  return provider.accountLabel?.trim() || null;
+  return provider.accountEmail?.trim() || provider.accountLabel?.trim() || null;
 }
 
 function cardMetrics(
@@ -93,7 +87,9 @@ function cardMetrics(
   if (provider.secondary) {
     metrics.push({
       id: "secondary",
-      label: localizeWindowLabel(provider.secondaryLabel, t) || t("DetailWindowSecondary"),
+      label: provider.secondaryLabelKey
+        ? t(provider.secondaryLabelKey)
+        : localizeWindowLabel(provider.secondaryLabel, t) || t("DetailWindowSecondary"),
       snap: provider.secondary,
       lane: "secondary",
     });
@@ -126,7 +122,11 @@ function cardMetrics(
       resetFormatMode: extra.id === "reset-credits" ? "expires" : "reset",
     });
   }
-  return metrics.filter((metric) => isUsageItemVisible(provider.hiddenUsageItemIds, metric.id));
+  // A window the provider keeps for the tray and float bar only (upstream LithosAI has no card bar).
+  return metrics.filter(
+    (metric) =>
+      !metric.snap.hiddenOnCard && isUsageItemVisible(provider.hiddenUsageItemIds, metric.id),
+  );
 }
 
 /**
@@ -220,7 +220,7 @@ export default function MenuCard({
           t,
         })
       : null;
-  const showDetailSections = !compactOverview && presence.hasDetailSections;
+  const showDetailSections = presence.showsDetailSections;
   const showCost = !compactOverview && presence.hasCost && !!provider.cost;
   const metricDisplay = {
     resetTimeRelative,
@@ -255,7 +255,7 @@ export default function MenuCard({
         name={provider.displayName}
         email={email}
         plan={plan}
-        error={provider.error}
+        error={hideEmail ? hideEmailsInText(provider.error) : provider.error}
         updatedAt={provider.updatedAt}
         isRefreshing={isRefreshing}
       />

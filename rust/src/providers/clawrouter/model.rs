@@ -9,6 +9,7 @@ use crate::core::{
     CostSnapshot, ProviderDisplayDetail, ProviderError, ProviderFetchResult, RateWindow,
     UsageSnapshot,
 };
+use crate::locale::LocaleKey;
 
 /// Upstream shows at most 20 routed-provider rows.
 const MAX_PROVIDER_ROWS: usize = 20;
@@ -241,6 +242,8 @@ pub(super) fn build_result(usage: &ClawRouterUsage) -> ProviderFetchResult {
         None => None,
     };
     if let Some(mut cost) = cost {
+        let title = cost_card_title(cost.limit);
+        cost = cost.with_card_title(title);
         if let Some(resets_at) = budget.resets_at {
             cost = cost.with_resets_at(resets_at);
         }
@@ -250,6 +253,15 @@ pub(super) fn build_result(usage: &ClawRouterUsage) -> ProviderFetchResult {
         result = result.with_display_detail(detail);
     }
     result
+}
+
+/// Upstream `ProviderCostMenuCardStyle.clawRouter` (`MenuCardView+Costs.swift`):
+/// "Monthly budget" when a positive limit is reported, else "ClawRouter spend".
+fn cost_card_title(limit: Option<f64>) -> LocaleKey {
+    match limit {
+        Some(limit) if limit > 0.0 => LocaleKey::CostTitleClawRouterMonthlyBudget,
+        _ => LocaleKey::CostTitleClawRouterSpend,
+    }
 }
 
 fn usage_row(id: &str, title: &str, value: String) -> Option<ProviderDisplayDetail> {

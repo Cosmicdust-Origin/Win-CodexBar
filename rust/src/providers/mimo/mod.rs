@@ -15,6 +15,11 @@ use crate::core::{
 const MIMO_API_BASE: &str = "https://platform.xiaomimimo.com/api/v1";
 const BALANCE_DETAIL_ID: &str = "mimo-balance";
 
+/// Reset-window pace (upstream `MiMoProviderDescriptor.pace`, v0.70.0):
+/// `.calendarMonthResetWindow`.
+pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
+    crate::core::ProviderPaceCapability::CALENDAR_MONTH_RESET_WINDOW;
+
 pub struct MiMoProvider {
     metadata: ProviderMetadata,
     client: Client,
