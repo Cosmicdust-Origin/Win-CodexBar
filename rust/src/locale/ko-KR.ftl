@@ -1586,6 +1586,3 @@ ProviderCodexBatterySaver = OpenAI 웹 배터리 절약
 ProviderCodexBatterySaverHelp = chatgpt.com 백그라운드 새로 고침을 제한해 배터리와 네트워크 사용량을 줄입니다. 대시보드 추가 정보는 수동으로 새로 고칠 때까지 오래된 상태일 수 있습니다.
 ProviderOptionNotUsedOnWindows = 아직 Windows에서는 사용되지 않습니다. 선택은 지원될 때를 위해 저장됩니다.
 ClaudeSwapExecutablePathHelp = cswap 실행 파일 경로 (github.com/realiti4/claude-swap).
-CookieHelpXapiAuto = console.x.com에서 브라우저 쿠키를 자동으로 가져옵니다.
-CookieHelpXapiManual = console.x.com에서 Cookie 헤더를 붙여넣으세요.
-CookieHelpXapiOff = X API 쿠키가 비활성화되었습니다.

@@ -1587,6 +1587,3 @@ ProviderCodexBatterySaver = OpenAI web pil tasarrufu
 ProviderCodexBatterySaverHelp = Pil ve ağ kullanımını azaltmak için arka plandaki chatgpt.com yenilemelerini sınırlar. Pano ekstraları siz elle yenileyene kadar eski kalabilir.
 ProviderOptionNotUsedOnWindows = Henüz Windows'ta kullanılmıyor; seçim, desteklendiğinde kullanılmak üzere kaydedilir.
 ClaudeSwapExecutablePathHelp = cswap yürütülebilir dosyasının yolu (github.com/realiti4/claude-swap).
-CookieHelpXapiAuto = console.x.com'den tarayıcı tanımlama bilgilerini otomatik olarak içeri aktarır.
-CookieHelpXapiManual = console.x.com'dan bir Cookie başlığı yapıştırın.
-CookieHelpXapiOff = X API tanımlama bilgileri devre dışı bırakıldı.
