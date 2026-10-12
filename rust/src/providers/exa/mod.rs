@@ -269,16 +269,16 @@ fn parse_usage(
         ));
     }
 
-    // Build usage snapshot - Exa only has spend, no quota
-    let usage = UsageSnapshot::new(RateWindow::new(0.0)) // placeholder, not displayed
-        .with_login_method("Service key");
+    let spend = format!("${total_cost_usd:.2}");
+    // Upstream has no quota window; the spend only reaches the tray and float bar.
+    let usage =
+        UsageSnapshot::new(RateWindow::informational(format!("Spend: {spend}")).hidden_on_card())
+            .with_login_method("Service key");
 
-    // Build display details
     let mut details = Vec::new();
 
-    if let Some(detail) =
-        ProviderDisplayDetail::new("spend", "Spend", format!("${:.2}", total_cost_usd))
-            .and_then(|d| d.with_section_title("API key this month (UTC)"))
+    if let Some(detail) = ProviderDisplayDetail::new("spend", "Spend", spend)
+        .and_then(|d| d.with_section_title("API key this month (UTC)"))
     {
         details.push(detail);
     }
@@ -318,6 +318,12 @@ mod tests {
         assert!(!result.details.is_empty());
         assert_eq!(result.details[0].title(), "Spend");
         assert!(result.details[0].value().contains("$45.67"));
+        assert!(result.usage.primary.is_informational);
+        assert!(result.usage.primary.hidden_on_card);
+        assert_eq!(
+            result.usage.primary.reset_description.as_deref(),
+            Some("Spend: $45.67")
+        );
     }
 
     #[test]
