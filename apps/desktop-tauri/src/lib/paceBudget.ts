@@ -19,7 +19,10 @@ function paceWindow(
   snap: RateWindowSnapshot,
   nowMs: number,
 ): PaceWindow | null {
+  // A regenerating window refills continuously, so it has no linear
+  // pace (upstream hides pace for these windows on the card).
   if (
+    snap.resetRegenerates ||
     snap.windowMinutes == null ||
     !Number.isFinite(snap.windowMinutes) ||
     snap.windowMinutes <= 0 ||
