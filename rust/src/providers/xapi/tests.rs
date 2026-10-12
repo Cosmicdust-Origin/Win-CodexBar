@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod xapi_tests {
-    use crate::core::{ProviderId, Provider};
+    use crate::core::{Provider, ProviderId};
     use crate::providers::xapi::XapiProvider;
 
     #[test]

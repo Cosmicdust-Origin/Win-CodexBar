@@ -39,8 +39,7 @@ const MAX_RESPONSE_BYTES: usize = 512 * 1024;
 
 /// Upstream's message when every offered session answered 401.
 const SESSION_EXPIRED: &str = "X API session expired. Sign in to console.x.com again.";
-const MISSING_SESSION: &str =
-    "Sign in to console.x.com in the selected browser, or paste its Cookie header with auth_token and ct0.";
+const MISSING_SESSION: &str = "Sign in to console.x.com in the selected browser, or paste its Cookie header with auth_token and ct0.";
 const COOKIES_OFF: &str = "X API cookies are disabled.";
 
 /// Every detected browser's Cookie header for the console, in browser order.
@@ -122,10 +121,9 @@ impl crate::core::Provider for XapiProvider {
     async fn fetch_usage(&self, ctx: &FetchContext) -> Result<ProviderFetchResult, ProviderError> {
         match ctx.source_mode {
             SourceMode::Auto | SourceMode::Web => {
-                self.fetch_web(
-                    ctx,
-                    &|| crate::providers::browser_cookie_headers_for_domain(COOKIE_DOMAIN),
-                )
+                self.fetch_web(ctx, &|| {
+                    crate::providers::browser_cookie_headers_for_domain(COOKIE_DOMAIN)
+                })
                 .await
             }
             // The shell maps an Off cookie source to Cli for web-only
@@ -209,9 +207,8 @@ fn sessions(
     browser: &BrowserCookieHeaders,
 ) -> (Vec<Session>, Option<ProviderError>) {
     if let Some(header) = ctx.manual_cookie_header.as_deref() {
-        let session = crate::providers::normalize_cookie_header(header).and_then(|header| {
-            session_from_header(&header)
-        });
+        let session = crate::providers::normalize_cookie_header(header)
+            .and_then(|header| session_from_header(&header));
         return (session.into_iter().collect(), None);
     }
     if ctx.manual_cookie_missing {
@@ -273,8 +270,7 @@ async fn get_json(
             BoundedBodyError::Read(error) => ProviderError::Network(error),
         })?;
 
-    let body = std::str::from_utf8(&body_bytes)
-        .map_err(|_| invalid("JSON response"))?;
+    let body = std::str::from_utf8(&body_bytes).map_err(|_| invalid("JSON response"))?;
     parse_object(body)
 }
 
@@ -301,7 +297,9 @@ fn parse_account_id(me: &Map<String, Value>) -> Result<String, ProviderError> {
     // Validate account ID format
     if account_id.is_empty()
         || account_id.len() > 128
-        || !account_id.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        || !account_id
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
     {
         return Err(invalid("account.id format"));
     }
@@ -359,10 +357,16 @@ fn parse_credits(
     if let Some(row) = ProviderDisplayDetail::new("balance", "Balance", balance_text) {
         rows.push(row);
     }
-    if let Some(row) = ProviderDisplayDetail::new("purchased-credits", "Purchased credits", format!("${:.2}", paid)) {
+    if let Some(row) = ProviderDisplayDetail::new(
+        "purchased-credits",
+        "Purchased credits",
+        format!("${:.2}", paid),
+    ) {
         rows.push(row);
     }
-    if let Some(row) = ProviderDisplayDetail::new("free-credits", "Free credits", format!("${:.2}", free)) {
+    if let Some(row) =
+        ProviderDisplayDetail::new("free-credits", "Free credits", format!("${:.2}", free))
+    {
         rows.push(row);
     }
 
