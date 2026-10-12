@@ -178,6 +178,7 @@ function settings(overrides: Partial<SettingsSnapshot> = {}): SettingsSnapshot {
     switcherShortcuts: {},
     codexCustomSessionsDirs: [],
     uiLanguage: "english",
+    uiLanguageFollowsSystem: false,
     theme: "dark",
     windowScalePercent: 125,
     trayScalePercent: 100,

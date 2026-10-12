@@ -1045,6 +1045,64 @@ fn test_language_defaults_to_english() {
 }
 
 #[test]
+fn new_install_language_follows_the_system() {
+    // No settings file: a new install, which follows the Windows display language.
+    let settings = Settings::load_from_path(None);
+    assert!(settings.ui_language_follows_system);
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let missing = dir.path().join("settings.json");
+    assert!(Settings::load_from_path(Some(&missing)).ui_language_follows_system);
+}
+
+#[test]
+fn legacy_settings_file_keeps_its_chosen_language() {
+    // A file written before "System" existed keeps the language it chose.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("settings.json");
+    std::fs::write(&path, r#"{ "ui_language": "japanese" }"#).expect("write");
+    let mut settings = Settings::load_from_path(Some(&path));
+    assert!(!settings.ui_language_follows_system);
+    assert!(!settings.resolve_system_language_with(Language::Korean));
+    assert_eq!(settings.ui_language, Language::Japanese);
+
+    std::fs::write(&path, "{}").expect("write");
+    let settings = Settings::load_from_path(Some(&path));
+    assert!(!settings.ui_language_follows_system);
+    assert_eq!(settings.ui_language, Language::English);
+}
+
+#[test]
+fn full_legacy_settings_file_keeps_its_chosen_language() {
+    // A complete file as the previous release wrote it: every field, but no
+    // `ui_language_follows_system` key.
+    let mut legacy = serde_json::to_value(Settings::default()).expect("json");
+    let object = legacy.as_object_mut().expect("settings object");
+    assert!(object.remove("ui_language_follows_system").is_some());
+    object.insert("ui_language".into(), serde_json::json!("japanese"));
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("settings.json");
+    std::fs::write(&path, serde_json::to_string_pretty(&legacy).expect("json")).expect("write");
+
+    let mut settings = Settings::load_from_path(Some(&path));
+    assert!(!settings.ui_language_follows_system);
+    assert!(!settings.resolve_system_language_with(Language::Turkish));
+    assert_eq!(settings.ui_language, Language::Japanese);
+}
+
+#[test]
+fn following_the_system_round_trips_through_the_file() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("settings.json");
+    let following = Settings::default();
+    std::fs::write(&path, serde_json::to_string(&following).expect("json")).expect("write");
+    let mut loaded = Settings::load_from_path(Some(&path));
+    assert!(loaded.ui_language_follows_system);
+    assert!(loaded.resolve_system_language_with(Language::Turkish));
+    assert_eq!(loaded.ui_language, Language::Turkish);
+}
+
+#[test]
 fn test_language_all_variants_available() {
     let languages = Language::all();
     assert_eq!(languages.len(), 10);

@@ -55,6 +55,8 @@ describe("ProviderIssueNotice", () => {
     const status = screen.getByRole("status");
     expect(status).toHaveTextContent("token expired for");
     expect(status).not.toHaveTextContent("person@example.com");
+    expect(status.textContent).not.toContain("@");
+    expect(status.textContent).not.toContain("example.com");
   });
 
   it("falls back to the unknown state and offers no details without a diagnostic", () => {

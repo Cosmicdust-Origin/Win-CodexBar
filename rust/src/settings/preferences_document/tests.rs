@@ -1,5 +1,8 @@
 use super::*;
-use crate::settings::{Language, ProviderConfig, ThemePreference, TrayIconMode};
+use crate::settings::{
+    Language, ProviderConfig, ProviderQuotaWarnings, QuotaWarningWindow, ThemePreference,
+    TrayIconMode,
+};
 use serde_json::json;
 use std::collections::BTreeMap;
 
@@ -59,6 +62,7 @@ fn customized_settings() -> Settings {
         ]),
         theme: ThemePreference::Dark,
         ui_language: Language::Japanese,
+        ui_language_follows_system: false,
         window_scale_percent: 150,
         tray_scale_percent: 120,
         float_bar_opacity: 60,
@@ -119,7 +123,10 @@ fn secret_settings() -> Settings {
 fn round_trips_every_allowlisted_preference() {
     let source = customized_settings();
     let exported = PreferencesDocument::from_settings(&source).expect("export");
-    assert_eq!(exported.len(), ALLOWED_PREFERENCES.len());
+    assert_eq!(
+        exported.len(),
+        ALLOWED_PREFERENCES.len() + PROVIDER_PREFERENCES.len()
+    );
 
     let reparsed = PreferencesDocument::from_json(&exported.to_json()).expect("reimport");
     assert_eq!(reparsed, exported);
@@ -130,7 +137,10 @@ fn round_trips_every_allowlisted_preference() {
         ..Settings::default()
     };
     let applied = reparsed.apply_to(&mut target).expect("apply");
-    assert_eq!(applied, ALLOWED_PREFERENCES.len());
+    assert_eq!(
+        applied,
+        ALLOWED_PREFERENCES.len() + PROVIDER_PREFERENCES.len()
+    );
 
     let again = PreferencesDocument::from_settings(&target).expect("re-export");
     assert_eq!(again, exported);
@@ -235,6 +245,144 @@ fn importing_legacy_threshold_overrides_migrates_them_to_quota_warnings() {
     assert_eq!(claude.session.critical, Some(97.0));
     assert_eq!(claude.weekly.critical, Some(97.0));
     assert_eq!(claude.weekly.high, None);
+}
+
+fn quota_window(
+    enabled: Option<bool>,
+    high: Option<f64>,
+    critical: Option<f64>,
+) -> QuotaWarningWindow {
+    QuotaWarningWindow {
+        enabled,
+        high,
+        critical,
+    }
+}
+
+/// #827: a preferences export carries each provider's quota-warning settings
+/// and an import restores them, without any other `provider_configs` field.
+#[test]
+fn provider_quota_warnings_round_trip_with_literal_values() {
+    let mut source = secret_settings();
+    source.set_quota_warnings(
+        ProviderId::Codex,
+        ProviderQuotaWarnings {
+            session: quota_window(Some(true), Some(55.0), Some(85.0)),
+            weekly: QuotaWarningWindow::default(),
+        },
+    );
+    source.set_quota_warnings(
+        ProviderId::Claude,
+        ProviderQuotaWarnings {
+            session: QuotaWarningWindow::default(),
+            weekly: quota_window(Some(false), Some(60.0), Some(90.0)),
+        },
+    );
+
+    let text = PreferencesDocument::from_settings(&source)
+        .expect("export")
+        .to_json();
+    let json: Value = serde_json::from_str(&text).expect("valid JSON");
+    assert_eq!(
+        json["preferences"]["provider_quota_warnings"],
+        json!({
+            "claude": { "weekly": { "enabled": false, "high": 60.0, "critical": 90.0 } },
+            "codex": { "session": { "enabled": true, "high": 55.0, "critical": 85.0 } }
+        })
+    );
+    // Only the quota warnings leave `provider_configs`; its secrets stay home.
+    assert!(!text.contains("SECRET"));
+    assert!(!text.contains("provider_configs"));
+
+    // The receiving machine has its own Claude token and a Gemini override
+    // that the document does not list.
+    let mut target = Settings::default();
+    target.provider_config_mut(ProviderId::Claude).api_token = Some("TARGET-TOKEN".to_string());
+    target.set_quota_warnings(
+        ProviderId::Gemini,
+        ProviderQuotaWarnings {
+            session: quota_window(None, Some(40.0), None),
+            weekly: QuotaWarningWindow::default(),
+        },
+    );
+    PreferencesDocument::from_json(&text)
+        .expect("reimport")
+        .apply_to(&mut target)
+        .expect("apply");
+
+    let codex = target.quota_warnings(ProviderId::Codex);
+    assert_eq!(
+        codex.session,
+        quota_window(Some(true), Some(55.0), Some(85.0))
+    );
+    assert!(codex.weekly.is_global());
+    let claude = target.quota_warnings(ProviderId::Claude);
+    assert!(claude.session.is_global());
+    assert_eq!(
+        claude.weekly,
+        quota_window(Some(false), Some(60.0), Some(90.0))
+    );
+    // The document is the full picture: an unlisted provider goes back to global.
+    assert!(target.quota_warnings(ProviderId::Gemini).is_empty());
+    // Other provider config on the receiving machine is untouched.
+    assert_eq!(
+        target
+            .provider_config(ProviderId::Claude)
+            .and_then(|config| config.api_token.as_deref()),
+        Some("TARGET-TOKEN")
+    );
+    // Re-exporting gives the same document.
+    assert_eq!(
+        PreferencesDocument::from_settings(&target)
+            .expect("re-export")
+            .to_json(),
+        text
+    );
+}
+
+#[test]
+fn provider_quota_warnings_null_resets_and_wins_over_the_legacy_key() {
+    let codex_off = ProviderQuotaWarnings {
+        session: quota_window(Some(false), None, None),
+        weekly: QuotaWarningWindow::default(),
+    };
+    let mut settings = Settings::default();
+    settings.set_quota_warnings(ProviderId::Codex, codex_off);
+    parse(json!({ "provider_quota_warnings": null }))
+        .expect("null")
+        .apply_to(&mut settings)
+        .expect("apply");
+    assert!(settings.quota_warnings(ProviderId::Codex).is_empty());
+
+    // A document without the key leaves the warnings alone.
+    settings.set_quota_warnings(ProviderId::Codex, codex_off);
+    parse(json!({ "theme": "dark" }))
+        .expect("theme")
+        .apply_to(&mut settings)
+        .expect("apply");
+    assert_eq!(settings.quota_warnings(ProviderId::Codex), codex_off);
+
+    // With both keys, the current one wins over the legacy one.
+    parse(json!({
+        "provider_usage_thresholds": { "codex:session": { "high": 10 } },
+        "provider_quota_warnings": { "codex": { "session": { "high": 70 } } }
+    }))
+    .expect("both")
+    .apply_to(&mut settings)
+    .expect("apply");
+    assert_eq!(
+        settings.quota_warnings(ProviderId::Codex).session,
+        quota_window(None, Some(70.0), None)
+    );
+
+    // The document key is not a Settings field.
+    let fields = serde_json::to_value(Settings::default()).expect("serialize");
+    for (key, _) in PROVIDER_PREFERENCES {
+        assert!(
+            fields.get(*key).is_none(),
+            "`{key}` shadows a Settings field"
+        );
+    }
 }
 
 #[test]
@@ -457,6 +605,31 @@ fn rejection_matrix_names_the_offending_key() {
             "switcher shortcut as number",
             json!({ "switcher_shortcuts": { "next": 3 } }),
             "switcher_shortcuts",
+        ),
+        (
+            "quota warnings for an unknown provider",
+            json!({ "provider_quota_warnings": { "future-provider": { "session": { "high": 50 } } } }),
+            "provider_quota_warnings",
+        ),
+        (
+            "quota warnings for an unknown window",
+            json!({ "provider_quota_warnings": { "codex": { "monthly": { "high": 50 } } } }),
+            "provider_quota_warnings",
+        ),
+        (
+            "quota warning above 100 percent",
+            json!({ "provider_quota_warnings": { "codex": { "session": { "critical": 101 } } } }),
+            "provider_quota_warnings",
+        ),
+        (
+            "quota warning secret smuggled in",
+            json!({ "provider_quota_warnings": { "claude": { "session": { "api_token": "x" } } } }),
+            "provider_quota_warnings",
+        ),
+        (
+            "quota warning enabled as string",
+            json!({ "provider_quota_warnings": { "codex": { "weekly": { "enabled": "no" } } } }),
+            "provider_quota_warnings",
         ),
     ];
     for (name, preferences, key) in cases {
@@ -697,4 +870,29 @@ fn tray_scale_document_bounds_match_the_settings_clamp() {
             "{rejected} should be rejected"
         );
     }
+}
+
+#[test]
+fn a_document_without_the_follow_flag_keeps_its_chosen_language() {
+    // Exported before "System" existed: a language but no follow flag.
+    let document = parse(json!({ "ui_language": "japanese" })).expect("parse");
+    let mut target = Settings::default();
+    assert!(target.ui_language_follows_system);
+    document.apply_to(&mut target).expect("apply");
+    assert!(!target.ui_language_follows_system);
+    assert_eq!(target.ui_language, Language::Japanese);
+    assert!(!target.resolve_system_language_with(Language::Korean));
+    assert_eq!(target.ui_language, Language::Japanese);
+
+    // A document that carries the flag keeps following the system.
+    let document = parse(json!({
+        "ui_language": "japanese",
+        "ui_language_follows_system": true,
+    }))
+    .expect("parse");
+    let mut target = Settings::default();
+    document.apply_to(&mut target).expect("apply");
+    assert!(target.ui_language_follows_system);
+    assert!(target.resolve_system_language_with(Language::Korean));
+    assert_eq!(target.ui_language, Language::Korean);
 }

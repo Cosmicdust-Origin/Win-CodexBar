@@ -16,7 +16,7 @@ import {
 import { ClaudeSwapAccountsSection } from "./ClaudeSwapAccountsSection";
 import ClaudeAccountUsage from "../../../../../components/ClaudeAccountUsage";
 import {
-  buildClaudeAccountOrdinals,
+  buildAccountOrdinals,
   buildPrivateClaudeAccountLabel,
 } from "../../../../../components/claudeAccountDisplay";
 import {
@@ -104,7 +104,7 @@ export function ClaudeAccountsSection({
       }
     }
   };
-  const accountOrdinals = buildClaudeAccountOrdinals(accounts);
+  const accountOrdinals = buildAccountOrdinals(accounts);
   return (
     <>
       <section className="provider-detail-section codex-accounts">
