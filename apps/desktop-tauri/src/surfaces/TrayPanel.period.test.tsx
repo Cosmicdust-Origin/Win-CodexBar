@@ -106,6 +106,7 @@ const settings = {
   refreshIntervalSecs: 300,
   adaptiveRefresh: false,
   refreshAllProvidersOnMenuOpen: false,
+  statusChecksEnabled: true,
   lowPowerMode: false,
   highUsageThreshold: 70,
   criticalUsageThreshold: 90,
