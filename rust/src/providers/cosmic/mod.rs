@@ -11,6 +11,7 @@ use crate::core::{
     FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
     SourceMode,
 };
+use super::format;
 
 pub struct CosmicProvider {
     client: Client,
@@ -151,14 +152,14 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
     // Input tokens section
     if let Some(used) = input_used
         && let Some(d) =
-            ProviderDisplayDetail::new("input_tokens_used", "Used", format_number(used))
+            ProviderDisplayDetail::new("input_tokens_used", "Used", format::number(used, 0))
                 .and_then(|row| row.with_section_title("Input tokens"))
     {
         display_details.push(d);
     }
     if let Some(limit) = input_limit {
         if let Some(d) =
-            ProviderDisplayDetail::new("input_tokens_allowance", "Allowance", format_number(limit))
+            ProviderDisplayDetail::new("input_tokens_allowance", "Allowance", format::number(limit, 0))
                 .and_then(|row| row.with_section_title("Input tokens"))
         {
             display_details.push(d);
@@ -186,7 +187,7 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
         if let Some(d) = ProviderDisplayDetail::new(
             "input_tokens_remaining",
             "Remaining",
-            format_number(remaining),
+            format::number(remaining, 0),
         )
         .and_then(|row| row.with_section_title("Input tokens"))
         {
@@ -196,7 +197,7 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
             && let Some(d) = ProviderDisplayDetail::new(
                 "input_tokens_above",
                 "Above allowance",
-                format_number(used - limit),
+                format::number(used - limit, 0),
             )
             .and_then(|row| row.with_section_title("Input tokens"))
         {
@@ -207,14 +208,14 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
     // Output tokens section
     if let Some(used) = output_used
         && let Some(d) =
-            ProviderDisplayDetail::new("output_tokens_used", "Used", format_number(used))
+            ProviderDisplayDetail::new("output_tokens_used", "Used", format::number(used, 0))
                 .and_then(|row| row.with_section_title("Output tokens"))
     {
         display_details.push(d);
     }
     if let Some(limit) = output_limit {
         if let Some(d) =
-            ProviderDisplayDetail::new("output_tokens_allowance", "Allowance", format_number(limit))
+            ProviderDisplayDetail::new("output_tokens_allowance", "Allowance", format::number(limit, 0))
                 .and_then(|row| row.with_section_title("Output tokens"))
         {
             display_details.push(d);
@@ -242,7 +243,7 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
         if let Some(d) = ProviderDisplayDetail::new(
             "output_tokens_remaining",
             "Remaining",
-            format_number(remaining),
+            format::number(remaining, 0),
         )
         .and_then(|row| row.with_section_title("Output tokens"))
         {
@@ -252,7 +253,7 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
             && let Some(d) = ProviderDisplayDetail::new(
                 "output_tokens_above",
                 "Above allowance",
-                format_number(used - limit),
+                format::number(used - limit, 0),
             )
             .and_then(|row| row.with_section_title("Output tokens"))
         {
@@ -408,10 +409,6 @@ fn parse_limit_string(s: &str) -> Result<Option<f64>, ProviderError> {
     }
 
     Ok(Some(num * multiplier))
-}
-
-fn format_number(n: f64) -> String {
-    format!("{:.0}", n)
 }
 
 const COSMIC_METADATA: ProviderMetadata = ProviderMetadata {
