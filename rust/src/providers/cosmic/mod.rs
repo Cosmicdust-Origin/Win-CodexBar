@@ -76,42 +76,40 @@ impl Provider for CosmicProvider {
             .header("Origin", "https://app.cosmicjs.com")
             .send()
             .await
-            .map_err(|e| ProviderError::Network(e))?;
+            .map_err(ProviderError::Network)?;
 
         let status = response.status().as_u16();
-        let body = response
-            .text()
-            .await
-            .map_err(|e| ProviderError::Network(e))?;
+        let body = response.text().await.map_err(ProviderError::Network)?;
 
         // Check HTTP status
         match status {
             401 => {
                 return Err(ProviderError::Other(
                     "Cosmic AI returned HTTP 401.".to_string(),
-                ))
+                ));
             }
             403 => {
                 return Err(ProviderError::Other(
                     "Cosmic AI returned HTTP 403.".to_string(),
-                ))
+                ));
             }
             429 => {
                 return Err(ProviderError::Other(
                     "Cosmic AI returned HTTP 429.".to_string(),
-                ))
+                ));
             }
             500..=599 => {
-                return Err(ProviderError::Other(
-                    format!("Cosmic AI returned HTTP {}.", status),
-                ))
+                return Err(ProviderError::Other(format!(
+                    "Cosmic AI returned HTTP {}.",
+                    status
+                )));
             }
             200 => {}
             _ => {
                 return Err(ProviderError::Other(format!(
                     "Cosmic AI returned HTTP {}.",
                     status
-                )))
+                )));
             }
         }
 
@@ -131,7 +129,7 @@ impl Provider for CosmicProvider {
 }
 
 fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderError> {
-    use crate::core::{RateWindow, UsageSnapshot, ProviderDisplayDetail};
+    use crate::core::{ProviderDisplayDetail, RateWindow, UsageSnapshot};
 
     let fail = || {
         ProviderError::Other(
@@ -161,7 +159,11 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
     let output_limit = parse_limit_value(allowance.get("max_output"))?;
 
     // Both dimensions must have at least some data
-    if input_used.is_none() && input_limit.is_none() && output_used.is_none() && output_limit.is_none() {
+    if input_used.is_none()
+        && input_limit.is_none()
+        && output_used.is_none()
+        && output_limit.is_none()
+    {
         return Err(fail());
     }
 
@@ -169,18 +171,22 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
 
     // Input tokens detail
     if let Some(used) = input_used {
-        let _ = ProviderDisplayDetail::new("input_tokens_used", "Input tokens used", format_number(used))
-            .and_then(|d| {
-                display_details.push(d);
-                Some(())
-            });
+        if let Some(d) = ProviderDisplayDetail::new(
+            "input_tokens_used",
+            "Input tokens used",
+            format_number(used),
+        ) {
+            display_details.push(d);
+        }
     }
     if let Some(limit) = input_limit {
-        let _ = ProviderDisplayDetail::new("input_tokens_allowance", "Input tokens allowance", format_number(limit))
-            .and_then(|d| {
-                display_details.push(d);
-                Some(())
-            });
+        if let Some(d) = ProviderDisplayDetail::new(
+            "input_tokens_allowance",
+            "Input tokens allowance",
+            format_number(limit),
+        ) {
+            display_details.push(d);
+        }
     } else if let Some(raw_limit) = allowance.get("max_input") {
         if let Some(s) = raw_limit.as_str() {
             let s = s.trim();
@@ -190,44 +196,54 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
                 } else {
                     "Not reported"
                 };
-                let _ = ProviderDisplayDetail::new("input_tokens_allowance", "Input tokens allowance", label)
-                    .and_then(|d| {
-                        display_details.push(d);
-                        Some(())
-                    });
+                if let Some(d) = ProviderDisplayDetail::new(
+                    "input_tokens_allowance",
+                    "Input tokens allowance",
+                    label,
+                ) {
+                    display_details.push(d);
+                }
             }
         }
     }
     if let (Some(used), Some(limit)) = (input_used, input_limit) {
         let remaining = (limit - used).max(0.0);
-        let _ = ProviderDisplayDetail::new("input_tokens_remaining", "Input tokens remaining", format_number(remaining))
-            .and_then(|d| {
-                display_details.push(d);
-                Some(())
-            });
-        if used > limit {
-            let _ = ProviderDisplayDetail::new("input_tokens_above", "Above allowance", format_number(used - limit))
-                .and_then(|d| {
-                    display_details.push(d);
-                    Some(())
-                });
+        if let Some(d) = ProviderDisplayDetail::new(
+            "input_tokens_remaining",
+            "Input tokens remaining",
+            format_number(remaining),
+        ) {
+            display_details.push(d);
+        }
+        if used > limit
+            && let Some(d) = ProviderDisplayDetail::new(
+                "input_tokens_above",
+                "Above allowance",
+                format_number(used - limit),
+            )
+        {
+            display_details.push(d);
         }
     }
 
     // Output tokens detail
     if let Some(used) = output_used {
-        let _ = ProviderDisplayDetail::new("output_tokens_used", "Output tokens used", format_number(used))
-            .and_then(|d| {
-                display_details.push(d);
-                Some(())
-            });
+        if let Some(d) = ProviderDisplayDetail::new(
+            "output_tokens_used",
+            "Output tokens used",
+            format_number(used),
+        ) {
+            display_details.push(d);
+        }
     }
     if let Some(limit) = output_limit {
-        let _ = ProviderDisplayDetail::new("output_tokens_allowance", "Output tokens allowance", format_number(limit))
-            .and_then(|d| {
-                display_details.push(d);
-                Some(())
-            });
+        if let Some(d) = ProviderDisplayDetail::new(
+            "output_tokens_allowance",
+            "Output tokens allowance",
+            format_number(limit),
+        ) {
+            display_details.push(d);
+        }
     } else if let Some(raw_limit) = allowance.get("max_output") {
         if let Some(s) = raw_limit.as_str() {
             let s = s.trim();
@@ -237,27 +253,33 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
                 } else {
                     "Not reported"
                 };
-                let _ = ProviderDisplayDetail::new("output_tokens_allowance", "Output tokens allowance", label)
-                    .and_then(|d| {
-                        display_details.push(d);
-                        Some(())
-                    });
+                if let Some(d) = ProviderDisplayDetail::new(
+                    "output_tokens_allowance",
+                    "Output tokens allowance",
+                    label,
+                ) {
+                    display_details.push(d);
+                }
             }
         }
     }
     if let (Some(used), Some(limit)) = (output_used, output_limit) {
         let remaining = (limit - used).max(0.0);
-        let _ = ProviderDisplayDetail::new("output_tokens_remaining", "Output tokens remaining", format_number(remaining))
-            .and_then(|d| {
-                display_details.push(d);
-                Some(())
-            });
-        if used > limit {
-            let _ = ProviderDisplayDetail::new("output_tokens_above", "Above allowance", format_number(used - limit))
-                .and_then(|d| {
-                    display_details.push(d);
-                    Some(())
-                });
+        if let Some(d) = ProviderDisplayDetail::new(
+            "output_tokens_remaining",
+            "Output tokens remaining",
+            format_number(remaining),
+        ) {
+            display_details.push(d);
+        }
+        if used > limit
+            && let Some(d) = ProviderDisplayDetail::new(
+                "output_tokens_above",
+                "Above allowance",
+                format_number(used - limit),
+            )
+        {
+            display_details.push(d);
         }
     }
 
@@ -268,7 +290,7 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
     // Calculate percentages for primary and secondary windows
     let primary_percent = if let (Some(used), Some(limit)) = (input_used, input_limit) {
         if limit > 0.0 {
-            ((used / limit) * 100.0).min(100.0).max(0.0)
+            ((used / limit) * 100.0).clamp(0.0, 100.0)
         } else {
             0.0
         }
@@ -279,7 +301,7 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
 
     let secondary_percent = if let (Some(used), Some(limit)) = (output_used, output_limit) {
         if limit > 0.0 {
-            ((used / limit) * 100.0).min(100.0).max(0.0)
+            ((used / limit) * 100.0).clamp(0.0, 100.0)
         } else {
             0.0
         }
@@ -288,9 +310,8 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
     };
     let secondary = Some(RateWindow::new(secondary_percent));
 
-    let mut snapshot = UsageSnapshot::new(primary)
-        .with_secondary_label("Output tokens");
-    
+    let mut snapshot = UsageSnapshot::new(primary).with_secondary_label("Output tokens");
+
     if let Some(sec) = secondary {
         snapshot = snapshot.with_secondary(sec);
     }
