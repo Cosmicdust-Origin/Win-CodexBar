@@ -90,6 +90,19 @@ fn measures_only_matching_valid_period_bounds() {
     }
 }
 
+/// Upstream `GrokCreditsProxyFetcher.windowMinutes` requires only
+/// `end > start` and `start <= now`: a period that ended before the fetch
+/// keeps its 7-day length, and the reset stays at that end.
+#[test]
+fn ended_period_keeps_its_length() {
+    let parsed = parse(
+        r#"{"config":{"creditUsagePercent":40,"currentPeriod":{"start":"2026-08-01T00:00:00Z","end":"2026-08-08T00:00:00Z"}}}"#,
+    );
+    assert_eq!(parsed.billing.used_percent, Some(40.0));
+    assert_eq!(parsed.billing.resets_at, Some(at("2026-08-08T00:00:00Z")));
+    assert_eq!(parsed.billing.window_minutes, Some(10_080));
+}
+
 #[test]
 fn derives_percent_from_on_demand_cap_and_usage() {
     let parsed = parse(r#"{"config":{"onDemandCap":{"val":1000.0},"onDemandUsed":{"val":250.5}}}"#);

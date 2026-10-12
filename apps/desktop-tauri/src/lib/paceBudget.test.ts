@@ -70,6 +70,18 @@ describe("getPaceBudget", () => {
     ).toBeNull();
     expect(getPaceBudget(snapshot({ isExhausted: true }), now)).toBeNull();
   });
+
+  it("returns no budget for a regenerating window", () => {
+    const now = new Date("2026-06-12T04:00:00.000Z");
+
+    expect(getPaceBudget(snapshot({ resetRegenerates: false }), now)).toEqual({
+      now: 20,
+      nextHour: 30,
+      nextFiveHours: 70,
+      today: 80,
+    });
+    expect(getPaceBudget(snapshot({ resetRegenerates: true }), now)).toBeNull();
+  });
 });
 
 describe("getPaceChartSnapshot", () => {
@@ -122,6 +134,17 @@ describe("getPaceChartSnapshot", () => {
         snapshot({ resetsAt: "2026-06-12T03:00:00.000Z" }),
         now,
       ),
+    ).toBeNull();
+  });
+
+  it("returns no chart for a regenerating window", () => {
+    const now = new Date("2026-06-12T04:00:00.000Z");
+
+    expect(
+      getPaceChartSnapshot(snapshot({ usedPercent: 30, resetRegenerates: false }), now),
+    ).toEqual({ elapsedPercent: 40, usedPercent: 30, projectedPercent: 75 });
+    expect(
+      getPaceChartSnapshot(snapshot({ usedPercent: 30, resetRegenerates: true }), now),
     ).toBeNull();
   });
 });

@@ -81,8 +81,9 @@ fn pack_result_matches_the_mac_card() {
     assert!(usage.primary.description_is_detail);
     // The card says "Regenerates in 45m", not "Resets in 45m".
     assert!(usage.primary.reset_regenerates);
-    // No window length, so the card shows no pace line on the regen lane.
-    assert_eq!(usage.primary.window_minutes, None);
+    // The regen lane keeps its five-hour length (upstream synthetic.js); the
+    // card hides its pace line because the reset regenerates.
+    assert_eq!(usage.primary.window_minutes, Some(300));
 
     // "Weekly tokens 42% left", "Resets in 4d 12h", pace from the 7-day window.
     let weekly = usage.secondary.as_ref().expect("weekly lane");
@@ -248,7 +249,8 @@ fn weekly_cost_with_next_regen_amount_drives_the_weekly_regen_line() {
     );
     assert!(weekly.description_is_detail);
     assert!(weekly.reset_regenerates);
-    assert_eq!(weekly.window_minutes, None);
+    // windowDays 7 survives the regen line, as upstream keeps it.
+    assert_eq!(weekly.window_minutes, Some(10_080));
     assert_eq!(result.usage.login_method.as_deref(), Some("Pro"));
     // The Mac card hides Synthetic's cost block, so the credits never reach
     // the result.
