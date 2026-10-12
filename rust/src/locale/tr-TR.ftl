@@ -561,6 +561,7 @@ ServiceStatusMajorOutage = Büyük kesinti
 ServiceStatusCriticalIssue = Kritik sorun
 ServiceStatusMaintenance = Bakım
 ServiceStatusUnknown = Durum bilinmiyor
+ProviderServiceStatusHelp = Provider service status: { "{}" }
 LowPowerMode = Düşük Güç Modu
 LowPowerModeHelper = Otomatik arka plan yenilemesini 30 dakikada birle sınırla. Elle yenileme anında gerçekleşir.
 LowPowerModeOff = Kapalı

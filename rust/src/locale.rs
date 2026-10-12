@@ -963,6 +963,7 @@ locale_keys! {
     ServiceStatusCriticalIssue,
     ServiceStatusMaintenance,
     ServiceStatusUnknown,
+    ProviderServiceStatusHelp,
     LowPowerMode,
     LowPowerModeHelper,
     LowPowerModeOff,

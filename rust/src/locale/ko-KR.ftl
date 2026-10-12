@@ -579,6 +579,7 @@ ServiceStatusMajorOutage = 주요 장애
 ServiceStatusCriticalIssue = 심각한 문제
 ServiceStatusMaintenance = 유지 보수
 ServiceStatusUnknown = 상태 알 수 없음
+ProviderServiceStatusHelp = Provider service status: { "{}" }
 LowPowerMode = 저전력 모드
 LowPowerModeHelper = 자동 백그라운드 새로고침을 30분에 한 번으로 제한합니다. 수동 새로고침은 즉시 유지됩니다.
 LowPowerModeOff = 끔

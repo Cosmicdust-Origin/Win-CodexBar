@@ -561,6 +561,7 @@ ServiceStatusMajorOutage = Major outage
 ServiceStatusCriticalIssue = Critical issue
 ServiceStatusMaintenance = Maintenance
 ServiceStatusUnknown = Status unknown
+ProviderServiceStatusHelp = Provider service status: { "{}" }
 LowPowerMode = Low Power Mode
 LowPowerModeHelper = When on, limit automatic background refresh to once every 30 minutes. Manual refresh stays immediate. Automatic follows Windows Battery Saver.
 LowPowerModeOff = Off

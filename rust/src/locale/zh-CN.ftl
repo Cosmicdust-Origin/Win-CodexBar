@@ -534,6 +534,7 @@ ServiceStatusMajorOutage = 重大中断
 ServiceStatusCriticalIssue = 严重问题
 ServiceStatusMaintenance = 维护中
 ServiceStatusUnknown = 状态未知
+ProviderServiceStatusHelp = Provider service status: { "{}" }
 LowPowerMode = 低功耗模式
 LowPowerModeHelper = 将自动后台刷新限制为每 30 分钟一次。手动刷新仍可立即执行。
 LowPowerModeOff = 关

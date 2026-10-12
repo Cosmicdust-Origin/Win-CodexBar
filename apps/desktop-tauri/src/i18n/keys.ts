@@ -695,6 +695,7 @@ export const ALL_LOCALE_KEYS = [
   "ServiceStatusCriticalIssue",
   "ServiceStatusMaintenance",
   "ServiceStatusUnknown",
+  "ProviderServiceStatusHelp",
   "LowPowerMode",
   "LowPowerModeHelper",
   "LowPowerModeOff",

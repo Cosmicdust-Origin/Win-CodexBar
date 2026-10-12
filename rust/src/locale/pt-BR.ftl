@@ -550,6 +550,7 @@ ServiceStatusMajorOutage = Falha geral
 ServiceStatusCriticalIssue = Problema crítico
 ServiceStatusMaintenance = Manutenção
 ServiceStatusUnknown = Status desconhecido
+ProviderServiceStatusHelp = Provider service status: { "{}" }
 LowPowerMode = Modo de baixo consumo
 LowPowerModeHelper = Quando ativado, limite a atualização automática em segundo plano a uma vez a cada 30 minutos. A atualização manual permanece imediata. Automático segue o Windows Battery Saver.
 LowPowerModeOff = Desligado

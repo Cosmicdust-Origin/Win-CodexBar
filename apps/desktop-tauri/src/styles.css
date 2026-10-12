@@ -87,6 +87,12 @@
   --provider-status-error: #ff453a; /* macOS NSColor.systemRed */
   --provider-status-disabled: rgba(235, 235, 245, 0.28);
   --provider-status-loading: #60a5fa;
+  /* Service-status dot: macOS system colors (PreferencesSidebar.swift:236-244). */
+  --service-status-none: #30d158;
+  --service-status-minor: #ffd60a;
+  --service-status-major: #ff9f0a;
+  --service-status-critical: #ff453a;
+  --service-status-gray: #8e8e93;
   --provider-icon-ring: rgba(255, 255, 255, 0.06);
   --provider-icon-bg: rgba(255, 255, 255, 0.04);
 
@@ -189,6 +195,12 @@
   --provider-status-error: #ff453a; /* macOS NSColor.systemRed */
   --provider-status-disabled: rgba(235, 235, 245, 0.28);
   --provider-status-loading: #60a5fa;
+  /* Service-status dot: macOS system colors (PreferencesSidebar.swift:236-244). */
+  --service-status-none: #30d158;
+  --service-status-minor: #ffd60a;
+  --service-status-major: #ff9f0a;
+  --service-status-critical: #ff453a;
+  --service-status-gray: #8e8e93;
   --provider-icon-ring: rgba(255, 255, 255, 0.06);
   --provider-icon-bg: rgba(255, 255, 255, 0.04);
 
@@ -258,6 +270,11 @@
   --provider-status-error: #b91c1c;
   --provider-status-disabled: rgba(60, 60, 67, 0.28);
   --provider-status-loading: #007aff;
+  --service-status-none: #34c759;
+  --service-status-minor: #ffcc00;
+  --service-status-major: #ff9500;
+  --service-status-critical: #ff3b30;
+  --service-status-gray: #8e8e93;
   --provider-icon-ring: rgba(0, 0, 0, 0.08);
   --provider-icon-bg: rgba(0, 0, 0, 0.04);
 
@@ -1907,6 +1924,32 @@ body:has(.tray-panel-reveal),
 .providers-sidebar__status--loading {
   background: var(--provider-status-loading);
   animation: provider-sidebar-pulse 1.4s ease-in-out infinite;
+}
+
+/* Service-status dot: shown instead of the fetch-status dot while
+   "Check provider status" is on and the provider has a status page. */
+.providers-sidebar__service {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--service-status-gray);
+}
+
+.providers-sidebar__service--none {
+  background: var(--service-status-none);
+}
+
+.providers-sidebar__service--minor {
+  background: var(--service-status-minor);
+}
+
+.providers-sidebar__service--major {
+  background: var(--service-status-major);
+}
+
+.providers-sidebar__service--critical {
+  background: var(--service-status-critical);
 }
 
 @keyframes provider-sidebar-pulse {

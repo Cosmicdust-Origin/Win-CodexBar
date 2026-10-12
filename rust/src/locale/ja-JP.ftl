@@ -534,6 +534,7 @@ ServiceStatusMajorOutage = 重大な障害
 ServiceStatusCriticalIssue = 致命的な問題
 ServiceStatusMaintenance = メンテナンス中
 ServiceStatusUnknown = ステータス不明
+ProviderServiceStatusHelp = Provider service status: { "{}" }
 LowPowerMode = 低電力モード
 LowPowerModeHelper = 自動のバックグラウンド更新を30分に1回までに制限します。手動更新はすぐ実行されます。
 LowPowerModeOff = オフ

@@ -561,6 +561,7 @@ ServiceStatusMajorOutage = Серйозний збій
 ServiceStatusCriticalIssue = Критична проблема
 ServiceStatusMaintenance = Технічне обслуговування
 ServiceStatusUnknown = Статус невідомий
+ProviderServiceStatusHelp = Provider service status: { "{}" }
 LowPowerMode = Режим енергозбереження
 LowPowerModeHelper = Коли увімкнено, автоматичне фонове оновлення виконується не частіше ніж раз на 30 хвилин. Ручне оновлення лишається миттєвим. «Авто» вмикається разом з економією заряду Windows.
 LowPowerModeOff = Вимк.

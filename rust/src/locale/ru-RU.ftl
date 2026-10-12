@@ -561,6 +561,7 @@ ServiceStatusMajorOutage = Серьёзный сбой
 ServiceStatusCriticalIssue = Критическая проблема
 ServiceStatusMaintenance = Техническое обслуживание
 ServiceStatusUnknown = Статус неизвестен
+ProviderServiceStatusHelp = Provider service status: { "{}" }
 LowPowerMode = Режим энергосбережения
 LowPowerModeHelper = Ограничивает автоматическое фоновое обновление раз в 30 минут. Ручное обновление остаётся мгновенным.
 LowPowerModeOff = Выкл.

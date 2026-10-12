@@ -579,6 +579,7 @@ ServiceStatusMajorOutage = Interrupción grave
 ServiceStatusCriticalIssue = Problema crítico
 ServiceStatusMaintenance = Mantenimiento
 ServiceStatusUnknown = Estado desconocido
+ProviderServiceStatusHelp = Provider service status: { "{}" }
 LowPowerMode = Modo de bajo consumo
 LowPowerModeHelper = Limita la actualización automática en segundo plano a una vez cada 30 minutos. La actualización manual sigue siendo inmediata.
 LowPowerModeOff = Desactivado

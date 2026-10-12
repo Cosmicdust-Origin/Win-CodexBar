@@ -534,6 +534,7 @@ ServiceStatusMajorOutage = 重大服務中斷
 ServiceStatusCriticalIssue = 嚴重問題
 ServiceStatusMaintenance = 維護中
 ServiceStatusUnknown = 狀態未知
+ProviderServiceStatusHelp = Provider service status: { "{}" }
 LowPowerMode = 低耗電模式
 LowPowerModeHelper = 將自動背景重新整理限制為每 30 分鐘一次。手動重新整理仍可立即執行。
 LowPowerModeOff = 關閉

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { loadStyles, ruleBlock } from "../../../test/styles";
 import { ProvidersSidebar, type ProviderSidebarRow } from "./ProvidersSidebar";
 
 vi.mock("../../../hooks/useLocale", () => ({
@@ -40,6 +41,66 @@ describe("ProvidersSidebar", () => {
     expect(cursor.querySelector(".providers-sidebar__status")).toBeNull();
     expect(cursor).toHaveClass("providers-sidebar__row--disabled");
     expect(option("Codex")).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("shows the service-status dot instead of the fetch dot while status is polled", () => {
+    renderSidebar({
+      providers: [
+        { id: "codex", displayName: "Codex", enabled: true, status: "ok", service: "none" },
+        { id: "claude", displayName: "Claude", enabled: true, status: "ok", service: "minor" },
+        { id: "copilot", displayName: "Copilot", enabled: true, status: "ok", service: "critical" },
+        { id: "gemini", displayName: "Gemini", enabled: true, status: "ok", service: "unknown" },
+        { id: "zai", displayName: "Zai", enabled: true, status: "error" },
+      ],
+    });
+    const dot = (name: string) => option(name).querySelector("[aria-hidden='true']:last-child");
+
+    expect(dot("Codex")).toHaveClass("providers-sidebar__service providers-sidebar__service--none");
+    expect(dot("Claude")).toHaveClass("providers-sidebar__service--minor");
+    expect(dot("Copilot")).toHaveClass("providers-sidebar__service--critical");
+    expect(dot("Gemini")).toHaveClass("providers-sidebar__service--unknown");
+    expect(option("Codex").querySelector(".providers-sidebar__status")).toBeNull();
+    expect(dot("Copilot")).toHaveAttribute(
+      "title",
+      "ProviderServiceStatusHelp".replace("{}", "ServiceStatusCriticalIssue"),
+    );
+    // No status page: the fetch-status dot stays.
+    expect(dot("Zai")).toHaveClass("providers-sidebar__status--error");
+    expect(option("Zai").querySelector(".providers-sidebar__service")).toBeNull();
+  });
+
+  it("colors the service dot with the macOS system colors at 6px", () => {
+    const css = loadStyles();
+    const base = ruleBlock(css, ".providers-sidebar__service");
+    expect(base).toContain("width: 6px;");
+    expect(base).toContain("height: 6px;");
+    expect(base).toContain("background: var(--service-status-gray);");
+    expect(ruleBlock(css, ".providers-sidebar__service--none")).toContain("var(--service-status-none)");
+    expect(ruleBlock(css, ".providers-sidebar__service--minor")).toContain("var(--service-status-minor)");
+    expect(ruleBlock(css, ".providers-sidebar__service--major")).toContain("var(--service-status-major)");
+    expect(ruleBlock(css, ".providers-sidebar__service--critical")).toContain(
+      "var(--service-status-critical)",
+    );
+    const dark = ruleBlock(css, '[data-theme="dark"]');
+    for (const decl of [
+      "--service-status-none: #30d158;",
+      "--service-status-minor: #ffd60a;",
+      "--service-status-major: #ff9f0a;",
+      "--service-status-critical: #ff453a;",
+      "--service-status-gray: #8e8e93;",
+    ]) {
+      expect(dark).toContain(decl);
+    }
+    const light = ruleBlock(css, '[data-theme="light"]');
+    for (const decl of [
+      "--service-status-none: #34c759;",
+      "--service-status-minor: #ffcc00;",
+      "--service-status-major: #ff9500;",
+      "--service-status-critical: #ff3b30;",
+      "--service-status-gray: #8e8e93;",
+    ]) {
+      expect(light).toContain(decl);
+    }
   });
 
   it("says when no provider matches", () => {

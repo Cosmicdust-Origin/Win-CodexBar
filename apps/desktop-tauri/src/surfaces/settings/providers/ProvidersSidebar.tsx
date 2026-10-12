@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import { useLocale } from "../../../hooks/useLocale";
 import type { LocaleKey } from "../../../i18n/keys";
 import { ProviderIcon } from "../../../components/providers/ProviderIcon";
+import type { ServiceStatusIndicator } from "../../../types/bridge";
 
 /** Last-fetch state mapped from a ProviderUsageSnapshot / settings pair. */
 export type ProviderSidebarStatus =
@@ -25,6 +26,12 @@ export interface ProviderSidebarRow {
   displayName: string;
   enabled: boolean;
   status: ProviderSidebarStatus;
+  /**
+   * Service status while "Check provider status" is on and the provider has
+   * a status page (`unknown` before the first poll). It replaces the
+   * fetch-status dot, as on macOS (`PreferencesSidebar.swift:197-203`).
+   */
+  service?: ServiceStatusIndicator;
 }
 
 interface Props {
@@ -47,6 +54,16 @@ const STATUS_TO_KEY: Record<ProviderSidebarStatus, LocaleKey> = {
   error: "ProviderStatusError",
   disabled: "ProviderStatusDisabled",
   loading: "ProviderStatusLoading",
+};
+
+/** macOS `ProviderStatusIndicator.label` (`UsageStoreSupport.swift:4-15`). */
+export const SERVICE_STATUS_TO_KEY: Record<ServiceStatusIndicator, LocaleKey> = {
+  none: "ServiceStatusOperational",
+  minor: "ServiceStatusPartialOutage",
+  major: "ServiceStatusMajorOutage",
+  critical: "ServiceStatusCriticalIssue",
+  maintenance: "ServiceStatusMaintenance",
+  unknown: "ServiceStatusUnknown",
 };
 
 interface MenuState {
@@ -187,7 +204,9 @@ export function ProvidersSidebar({
         )}
         {providers.map((p, index) => {
           const isSelected = p.id === selectedId;
-          const statusLabel = t(STATUS_TO_KEY[p.status]);
+          const statusLabel = p.service
+            ? t("ProviderServiceStatusHelp").replace("{}", t(SERVICE_STATUS_TO_KEY[p.service]))
+            : t(STATUS_TO_KEY[p.status]);
           const cls = [
             "providers-sidebar__row",
             isSelected && "providers-sidebar__row--selected",
@@ -224,7 +243,14 @@ export function ProvidersSidebar({
               <span className="providers-sidebar__name" title={p.displayName}>
                 {p.displayName}
               </span>
-              {p.enabled && (
+              {p.enabled && p.service && (
+                <span
+                  className={`providers-sidebar__service providers-sidebar__service--${p.service}`}
+                  title={statusLabel}
+                  aria-hidden="true"
+                />
+              )}
+              {p.enabled && !p.service && (
                 <span
                   className={`providers-sidebar__status providers-sidebar__status--${p.status}`}
                   title={statusLabel}
