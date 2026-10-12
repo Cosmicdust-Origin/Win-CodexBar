@@ -21,11 +21,10 @@ use serde_json::{Map, Value};
 
 use crate::core::RateWindow;
 use crate::core::{
-    CostSnapshot, FetchContext, ManualEmptyCookiePolicy, ProviderDisplayDetail, ProviderError,
+    FetchContext, ManualEmptyCookiePolicy, ProviderDisplayDetail, ProviderError,
     ProviderFetchResult, ProviderId, ProviderMetadata, ProviderStateKind, SourceMode,
     UsageSnapshot,
 };
-use crate::locale::LocaleKey;
 use crate::providers::{BoundedBodyError, read_bounded_response};
 
 const BASE_URL: &str = "https://console.x.com";
@@ -354,14 +353,9 @@ fn parse_credits(
     )
     .with_login_method("Browser session");
 
+    // Upstream's cost presenter uses `menuCardStyle: .hidden`, so no cost
+    // block: the Credits detail rows are the only card surface.
     let mut result = ProviderFetchResult::new(usage, "web");
-
-    // Add cost block with balance
-    result = result.with_cost(
-        CostSnapshot::new(0.0, "USD", "Prepaid credits")
-            .with_balance(balance)
-            .with_card_title(LocaleKey::CreditsTitle),
-    );
 
     // Add display details as three rows, all with "Credits" section title
     let balance_text = super::format::usd(balance);

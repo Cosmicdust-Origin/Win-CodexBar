@@ -74,7 +74,7 @@ mod xapi_tests {
             primary.reset_description.as_deref(),
             Some("Balance: $49.75")
         );
-        assert_eq!(result.cost.as_ref().and_then(|c| c.balance), Some(49.75));
+        assert!(result.cost.is_none(), "upstream hides the X API cost block");
     }
 
     #[test]
