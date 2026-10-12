@@ -1457,6 +1457,7 @@ mod tests {
         assert!(all.contains(&ProviderId::QwenCloud));
         assert!(all.contains(&ProviderId::Notion));
         assert!(all.contains(&ProviderId::Xai));
+        assert!(all.contains(&ProviderId::Xapi));
         assert!(all.contains(&ProviderId::Meta));
         assert!(all.contains(&ProviderId::Replicate));
         assert!(all.contains(&ProviderId::Muse));
