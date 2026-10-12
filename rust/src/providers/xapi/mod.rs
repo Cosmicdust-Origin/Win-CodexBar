@@ -19,9 +19,10 @@ use async_trait::async_trait;
 use reqwest::{Client, StatusCode, header::ACCEPT};
 use serde_json::{Map, Value};
 
+use crate::core::RateWindow;
 use crate::core::{
     CostSnapshot, FetchContext, ManualEmptyCookiePolicy, ProviderDisplayDetail, ProviderError,
-    ProviderFetchResult, ProviderId, ProviderMetadata, ProviderStateKind, RateWindow, SourceMode,
+    ProviderFetchResult, ProviderId, ProviderMetadata, ProviderStateKind, SourceMode,
     UsageSnapshot,
 };
 use crate::locale::LocaleKey;
@@ -262,7 +263,7 @@ async fn get_json(
         .send()
         .await?;
 
-    check_status(response.status())?;
+    let status = response.status();
     let body_bytes = read_bounded_response(response, MAX_RESPONSE_BYTES)
         .await
         .map_err(|error| match error {
@@ -271,6 +272,19 @@ async fn get_json(
         })?;
 
     let body = std::str::from_utf8(&body_bytes).map_err(|_| invalid("JSON response"))?;
+
+    // For 400, check if it's code 215 (legacy auth error) before parsing the body
+    if status == StatusCode::BAD_REQUEST
+        && let Ok(json) = serde_json::from_str::<Value>(body)
+        && let Some(errors) = json.get("errors").and_then(|v| v.as_array())
+        && errors
+            .iter()
+            .any(|e| e.get("code").and_then(|c| c.as_i64()) == Some(215))
+    {
+        return Err(ProviderError::Other(SESSION_EXPIRED.to_owned()));
+    }
+
+    check_status(status)?;
     parse_object(body)
 }
 
@@ -285,23 +299,28 @@ fn parse_account_id(me: &Map<String, Value>) -> Result<String, ProviderError> {
     let id = me
         .get("account")
         .and_then(|v| v.get("id"))
-        .ok_or_else(|| invalid("account.id"))?;
+        .ok_or_else(|| invalid("account or dollar balance"))?;
 
     // Handle both string and integer IDs
     let account_id = match id {
-        Value::Number(n) => n.to_string(),
+        Value::Number(n) => {
+            if !n.is_u64() || n.as_u64().unwrap() > i64::MAX as u64 {
+                return Err(invalid("account or dollar balance"));
+            }
+            n.to_string()
+        }
         Value::String(s) => s.clone(),
-        _ => return Err(invalid("account.id type")),
+        _ => return Err(invalid("account or dollar balance")),
     };
 
-    // Validate account ID format
+    // Validate account ID format: ASCII alphanumeric, underscore, hyphen; 1-128 chars
     if account_id.is_empty()
         || account_id.len() > 128
         || !account_id
             .chars()
-            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
     {
-        return Err(invalid("account.id format"));
+        return Err(invalid("account or dollar balance"));
     }
 
     Ok(account_id)
@@ -311,35 +330,47 @@ fn parse_credits(
     _account_id: &str,
     credits: &Map<String, Value>,
 ) -> Result<ProviderFetchResult, ProviderError> {
-    let get_balance = |key: &str| -> Result<f64, ProviderError> {
-        credits
-            .get(key)
-            .and_then(|v| v.get("balance"))
-            .and_then(|v| v.as_f64())
-            .ok_or_else(|| invalid("balance amount"))
-            .and_then(|n| {
-                if n.is_finite() {
-                    Ok(n)
+    // Paid credits: required
+    let paid = credits
+        .get("credits")
+        .and_then(|v| v.get("balance"))
+        .ok_or_else(|| invalid("account or dollar balance"))
+        .and_then(|v| match v {
+            Value::Number(n) if n.is_f64() => {
+                let f = n.as_f64().unwrap();
+                if f.is_finite() {
+                    Ok(f)
                 } else {
-                    Err(invalid("balance amount"))
+                    Err(invalid("account or dollar balance"))
                 }
-            })
+            }
+            _ => Err(invalid("account or dollar balance")),
+        })?;
+
+    // Free credits: if undefined, use 0; if present, must be valid or error
+    let free = match credits.get("freeCredits") {
+        None => 0.0,
+        Some(v) => match v.get("balance") {
+            None => 0.0,
+            Some(b) => match b {
+                Value::Number(n) if n.is_f64() => {
+                    let f = n.as_f64().unwrap();
+                    if f.is_finite() {
+                        f
+                    } else {
+                        return Err(invalid("account or dollar balance"));
+                    }
+                }
+                _ => return Err(invalid("account or dollar balance")),
+            },
+        },
     };
 
-    let paid = get_balance("credits")?;
-    let free = credits
-        .get("freeCredits")
-        .and_then(|v| v.get("balance"))
-        .and_then(|v| v.as_f64())
-        .filter(|n| n.is_finite())
-        .unwrap_or(0.0);
-
     let balance = paid + free;
-    let balance_text = format!("${:.2}", balance);
 
-    // Build the usage snapshot with balance as informational
-    let usage = UsageSnapshot::new(RateWindow::informational(balance_text.clone()))
-        .with_login_method("Browser session");
+    // Build the usage snapshot with placeholder (not displayed for this provider)
+    let usage =
+        UsageSnapshot::new(RateWindow::informational("")).with_login_method("Browser session");
 
     let mut result = ProviderFetchResult::new(usage, "web");
 
@@ -350,25 +381,27 @@ fn parse_credits(
             .with_card_title(LocaleKey::CreditsTitle),
     );
 
-    // Add display details rows
-    let mut rows = vec![];
-    if let Some(row) = ProviderDisplayDetail::new("balance", "Balance", balance_text) {
-        rows.push(row);
-    }
-    if let Some(row) = ProviderDisplayDetail::new(
-        "purchased-credits",
-        "Purchased credits",
-        format!("${:.2}", paid),
-    ) {
-        rows.push(row);
-    }
-    if let Some(row) =
-        ProviderDisplayDetail::new("free-credits", "Free credits", format!("${:.2}", free))
-    {
-        rows.push(row);
+    // Add display details as three rows, all with "Credits" section title
+    let balance_text = format!("${:.2}", balance);
+    let paid_text = format!("${:.2}", paid);
+    let free_text = format!("${:.2}", free);
+
+    let detail_rows = vec![
+        ProviderDisplayDetail::new("balance", "Balance", balance_text)
+            .and_then(|d| d.with_section_title("Credits")),
+        ProviderDisplayDetail::new("purchased-credits", "Purchased credits", paid_text)
+            .and_then(|d| d.with_section_title("Credits")),
+        ProviderDisplayDetail::new("free-credits", "Free credits", free_text)
+            .and_then(|d| d.with_section_title("Credits")),
+    ];
+
+    let detail_rows: Vec<_> = detail_rows.into_iter().flatten().collect();
+
+    if detail_rows.len() != 3 {
+        return Err(invalid("account or dollar balance"));
     }
 
-    result = result.with_display_details(rows);
+    result = result.with_display_details(detail_rows);
     Ok(result)
 }
 
@@ -377,13 +410,10 @@ fn invalid(field: &str) -> ProviderError {
 }
 
 /// Upstream's HTTP status taxonomy; only 200 continues to the body.
+/// Note: 400 with code 215 is handled specially in get_json; this is for generic 400s.
 fn check_status(status: StatusCode) -> Result<(), ProviderError> {
     let message = match status.as_u16() {
         200 => return Ok(()),
-        400 => {
-            // 400 might be an authentication error (code 215)
-            SESSION_EXPIRED.to_owned()
-        }
         401 => SESSION_EXPIRED.to_owned(),
         403 => "X developer console access was denied.".to_owned(),
         429 => "X API console is rate limited. Wait before refreshing.".to_owned(),
