@@ -663,6 +663,8 @@ impl Quota {
             )),
         )
         .with_description_as_detail()
+        // Upstream `syntheticRegenDetail`: the card counts down to the regen.
+        .with_regenerating_reset()
     }
 
     /// Five-hour lane: regen line when the payload has a tick percent.

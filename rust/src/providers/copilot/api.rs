@@ -497,6 +497,8 @@ impl UsableQuota {
             reset_description,
             is_informational: false,
             description_is_detail: false,
+            reset_regenerates: false,
+            hidden_on_card: false,
             usage_known: true,
         }
     }

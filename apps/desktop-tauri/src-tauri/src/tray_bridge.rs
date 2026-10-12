@@ -696,6 +696,8 @@ mod tests {
                 pace: None,
                 monthly_limit_block: None,
                 description_is_detail: false,
+                reset_regenerates: false,
+                hidden_on_card: false,
             },
             primary_label: None,
             secondary: secondary_percent.map(|pct| crate::commands::RateWindowSnapshot {
@@ -713,6 +715,8 @@ mod tests {
                 pace: None,
                 monthly_limit_block: None,
                 description_is_detail: false,
+                reset_regenerates: false,
+                hidden_on_card: false,
             }),
             secondary_label: None,
             secondary_label_key: None,
@@ -732,6 +736,8 @@ mod tests {
                 pace: None,
                 monthly_limit_block: None,
                 description_is_detail: false,
+                reset_regenerates: false,
+                hidden_on_card: false,
             }),
             tertiary_label: None,
             extra_rate_windows: Vec::new(),
@@ -753,6 +759,7 @@ mod tests {
                 account_id: None,
                 daily: Vec::new(),
                 always_visible: false,
+                title_key: None,
             }),
             plan_name: None,
             account_email: None,
@@ -809,6 +816,8 @@ mod tests {
                 reserve_eta_seconds: None,
                 pace: None,
                 description_is_detail: false,
+                reset_regenerates: false,
+                hidden_on_card: false,
                 monthly_limit_block: None,
             },
         }
@@ -1111,6 +1120,8 @@ mod tests {
             reserve_eta_seconds: None,
             pace: None,
             description_is_detail: false,
+            reset_regenerates: false,
+            hidden_on_card: false,
             monthly_limit_block: None,
         });
         let (primary, _) = selected_tray_percents(&snapshot, &settings);
@@ -1152,6 +1163,8 @@ mod tests {
             reserve_eta_seconds: None,
             pace: None,
             description_is_detail: false,
+            reset_regenerates: false,
+            hidden_on_card: false,
             monthly_limit_block: None,
         });
         snapshot.extra_rate_windows.push(fake_extra_window(90.0));

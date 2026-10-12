@@ -99,6 +99,18 @@ pub struct RateWindow {
     #[serde(default, skip_serializing)]
     pub description_is_detail: bool,
 
+    /// The card counts down to the next quota regeneration ("Regenerates in
+    /// 45m", upstream `syntheticRegenDetail`) instead of a reset.
+    /// Provider-owned; kept out of serialized output so CLI JSON is unchanged.
+    #[serde(default, skip_serializing)]
+    pub reset_regenerates: bool,
+
+    /// Not drawn as a card row: the window only carries a value for the tray
+    /// and float bar, and the card shows that value elsewhere (a provider whose
+    /// upstream snapshot has no window). Provider-owned; not serialized.
+    #[serde(default, skip_serializing)]
+    pub hidden_on_card: bool,
+
     /// Whether the provider explicitly supplied the usage percentage.
     /// Internal-only metadata prevents a missing value normalized to zero from
     /// becoming an exported quota measurement.
@@ -120,6 +132,8 @@ impl RateWindow {
             reset_description: None,
             is_informational: false,
             description_is_detail: false,
+            reset_regenerates: false,
+            hidden_on_card: false,
             usage_known: true,
         }
     }
@@ -161,6 +175,8 @@ impl RateWindow {
             reset_description,
             is_informational: false,
             description_is_detail: false,
+            reset_regenerates: false,
+            hidden_on_card: false,
             usage_known: true,
         }
     }
@@ -168,6 +184,18 @@ impl RateWindow {
     /// Mark `reset_description` as a detail line instead of reset wording.
     pub fn with_description_as_detail(mut self) -> Self {
         self.description_is_detail = true;
+        self
+    }
+
+    /// The reset is the next quota regeneration ("Regenerates in ...").
+    pub fn with_regenerating_reset(mut self) -> Self {
+        self.reset_regenerates = true;
+        self
+    }
+
+    /// Keep the window for the tray and float bar but off the card.
+    pub fn hidden_on_card(mut self) -> Self {
+        self.hidden_on_card = true;
         self
     }
 

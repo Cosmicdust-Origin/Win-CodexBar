@@ -531,6 +531,12 @@ pub struct CostSnapshot {
     /// rendering only; not serialized.
     #[serde(skip)]
     pub provenance: Option<CostProvenance>,
+
+    /// Provider-owned title for the card's cost block (upstream
+    /// `ProviderCostMenuCardStyle`, for example ClawRouter's "Monthly budget").
+    /// `None` keeps the shared title. Presentation only; not serialized.
+    #[serde(skip)]
+    pub card_title_key: Option<crate::locale::LocaleKey>,
 }
 
 impl CostSnapshot {
@@ -551,7 +557,14 @@ impl CostSnapshot {
             always_visible: false,
             history_tokens: None,
             provenance: None,
+            card_title_key: None,
         }
+    }
+
+    /// Builder pattern: the provider's own title for the card's cost block.
+    pub fn with_card_title(mut self, key: crate::locale::LocaleKey) -> Self {
+        self.card_title_key = Some(key);
+        self
     }
 
     /// Builder pattern: set limit
