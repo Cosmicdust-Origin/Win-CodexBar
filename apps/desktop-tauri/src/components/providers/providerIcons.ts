@@ -32,6 +32,7 @@ import zenmux from "./icons/ProviderIcon-zenmux.svg?raw";
 import deepseek from "./icons/ProviderIcon-deepseek.svg?raw";
 import doubao from "./icons/ProviderIcon-doubao.svg?raw";
 import elevenlabs from "./icons/ProviderIcon-elevenlabs.svg?raw";
+import exa from "./icons/ProviderIcon-exa.svg?raw";
 import factory from "./icons/ProviderIcon-factory.svg?raw";
 import gemini from "./icons/ProviderIcon-gemini.svg?raw";
 import grok from "./icons/ProviderIcon-grok.svg?raw";
@@ -134,6 +135,7 @@ const RAW: Record<string, string> = {
   deepseek: tint(deepseek),
   doubao: tint(doubao),
   elevenlabs: tint(elevenlabs),
+  exa: tint(exa),
   factory: tint(factory),
   gemini: tint(gemini),
   grok: tint(grok),
@@ -256,6 +258,7 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   manus:       { id: "manus",       brandColor: "#34322d", fallbackLetter: "M", svgPath: RAW.manus },
   mimo:        { id: "mimo",        brandColor: "#ff6900", fallbackLetter: "M", svgPath: RAW.mimo },
   doubao:      { id: "doubao",      brandColor: "#3370ff", fallbackLetter: "D", svgPath: RAW.doubao },
+  exa:         { id: "exa",         brandColor: "#0143D9", fallbackLetter: "E", svgPath: RAW.exa },
   commandcode: { id: "commandcode", brandColor: "#8c4edd", fallbackLetter: "C", svgPath: RAW.commandcode },
   crossmodel:  { id: "crossmodel",  brandColor: "#c084fc", fallbackLetter: "X", svgPath: RAW.crossmodel },
   qoder:       { id: "qoder",       brandColor: "#10b981", fallbackLetter: "Q", svgPath: RAW.qoder },
