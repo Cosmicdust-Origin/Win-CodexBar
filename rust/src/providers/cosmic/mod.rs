@@ -273,14 +273,12 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
 
     // Calculate percentages for primary window (only if we have both used and a valid numeric limit > 0)
     // Matches upstream: return window only if used !== undefined && limit !== undefined && limit > 0
-    let primary = if let (Some(used), Some(limit)) = (input_used, input_limit) {
-        if limit > 0.0 {
+    // Without a window upstream draws no input bar, so the placeholder stays off the card.
+    let primary = match (input_used, input_limit) {
+        (Some(used), Some(limit)) if limit > 0.0 => {
             RateWindow::new(((used / limit) * 100.0).clamp(0.0, 100.0))
-        } else {
-            RateWindow::new(0.0)
         }
-    } else {
-        RateWindow::new(0.0)
+        _ => RateWindow::informational("Input tokens").hidden_on_card(),
     };
 
     // Calculate percentages for secondary window (only if we have both used and a valid numeric limit > 0)
@@ -461,6 +459,30 @@ mod tests {
     fn test_parse_limit_string_unlimited() {
         // "Unlimited" is not a valid numeric format, returns None
         assert!(matches!(parse_limit_string("unlimited"), Ok(None)));
+    }
+
+    #[test]
+    fn unlimited_plan_draws_no_card_bars() {
+        let root = serde_json::json!({
+            "usage": { "ai": { "input_tokens": 1200, "output_tokens": 300 } },
+            "plan_info": { "ai_tokens": { "max_input": "unlimited", "max_output": "unlimited" } }
+        });
+        let result = parse_cosmic_response(&root).unwrap();
+        assert!(result.usage.primary.hidden_on_card);
+        assert!(result.usage.primary.is_informational);
+        assert!(result.usage.secondary.is_none());
+        assert!(!result.display_details.is_empty());
+    }
+
+    #[test]
+    fn limited_plan_keeps_input_bar() {
+        let root = serde_json::json!({
+            "usage": { "ai": { "input_tokens": 250, "output_tokens": 10 } },
+            "plan_info": { "ai_tokens": { "max_input": "1k", "max_output": "1k" } }
+        });
+        let result = parse_cosmic_response(&root).unwrap();
+        assert!(!result.usage.primary.hidden_on_card);
+        assert_eq!(result.usage.primary.used_percent, 25.0);
     }
 
     #[tokio::test]
