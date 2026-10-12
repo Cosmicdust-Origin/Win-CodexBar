@@ -15,6 +15,9 @@ const STRINGS: Partial<Record<LocaleKey, string>> = {
   PanelToday: "Today",
   ProviderLabelMonthly: "Monthly",
   WindowLabelMonthlyCredits: "Monthly credits",
+  CreditsTitle: "Credits",
+  CostTitleClawRouterMonthlyBudget: "Monthly budget",
+  CostTitleClawRouterSpend: "ClawRouter spend",
 };
 const t = (key: LocaleKey) => STRINGS[key] ?? key;
 
@@ -171,5 +174,35 @@ describe("cardCostSection", () => {
     expect(section?.title).toBe("Extra usage");
     expect(section?.spendLine).toBe("Monthly: €2.00");
     expect(section?.inline).toBe(true);
+  });
+
+  // Upstream `ProviderCostMenuCardStyle`: the provider names its block.
+  it("uses the provider's card title for capped, inline and balance blocks", () => {
+    const budget = cardCostSection(
+      cost({ used: 18.42, limit: 50, period: "This month", titleKey: "CostTitleClawRouterMonthlyBudget" }),
+      "detailed",
+      t,
+      "clawrouter",
+    );
+    expect(budget?.title).toBe("Monthly budget");
+    expect(budget?.spendLine).toBe("This month: $18.42 / $50.00");
+
+    const spend = cardCostSection(
+      cost({ used: 18.42, period: "This month", titleKey: "CostTitleClawRouterSpend" }),
+      "detailed",
+      t,
+      "clawrouter",
+    );
+    expect(spend?.title).toBe("ClawRouter spend");
+    expect(spend?.spendLine).toBe("This month: $18.42");
+
+    const credits = cardCostSection(
+      cost({ used: 0, balance: 42.37, period: "Prepaid credits", titleKey: "CreditsTitle" }),
+      "detailed",
+      t,
+      "lithosai",
+    );
+    expect(credits?.title).toBe("Credits");
+    expect(credits?.spendLine).toBe("Balance: $42.37");
   });
 });

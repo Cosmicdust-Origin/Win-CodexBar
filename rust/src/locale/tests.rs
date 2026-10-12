@@ -692,3 +692,22 @@ fn avoid_keychain_prompts_helper_says_it_is_not_enforced_on_windows() {
         );
     }
 }
+
+#[test]
+fn clawrouter_cost_titles_stay_english_in_every_locale_as_on_the_mac() {
+    // Upstream `MenuCardView+Costs.swift` `.clawRouter` passes both titles as bare
+    // literals (no `L()`, no Localizable.strings entry), so every locale reads English.
+    assert_eq!(Language::all().len(), 10);
+    for &language in Language::all() {
+        assert_eq!(
+            get_text(language, LocaleKey::CostTitleClawRouterMonthlyBudget),
+            "Monthly budget",
+            "{language:?}"
+        );
+        assert_eq!(
+            get_text(language, LocaleKey::CostTitleClawRouterSpend),
+            "ClawRouter spend",
+            "{language:?}"
+        );
+    }
+}

@@ -28,6 +28,8 @@ fn fake_snapshot_with(
         pace: None,
         monthly_limit_block: None,
         description_is_detail: false,
+        reset_regenerates: false,
+        hidden_on_card: false,
     };
 
     ProviderUsageSnapshot {
@@ -60,6 +62,7 @@ fn fake_snapshot_with(
             account_id: None,
             daily: Vec::new(),
             always_visible: false,
+            title_key: None,
         }),
         plan_name: None,
         account_email: None,
@@ -399,6 +402,8 @@ fn fake_extra_window(percent: f64) -> crate::commands::NamedRateWindowSnapshot {
             pace: None,
             monthly_limit_block: None,
             description_is_detail: false,
+            reset_regenerates: false,
+            hidden_on_card: false,
         },
     }
 }
@@ -623,6 +628,8 @@ fn claude_automatic_prefers_weekly_when_model_exhausted() {
         pace: None,
         monthly_limit_block: None,
         description_is_detail: false,
+        reset_regenerates: false,
+        hidden_on_card: false,
     });
 
     let (primary, _) = selected_tray_percents(&snapshot, &settings);
@@ -669,6 +676,8 @@ fn automatic_picks_highest_among_model_and_extra_windows() {
         pace: None,
         monthly_limit_block: None,
         description_is_detail: false,
+        reset_regenerates: false,
+        hidden_on_card: false,
     });
     snapshot.extra_rate_windows.push(fake_extra_window(90.0));
 

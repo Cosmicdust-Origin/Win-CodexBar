@@ -10,6 +10,7 @@ use crate::core::{
     CostSnapshot, ProviderDisplayDetail, ProviderError, ProviderFetchResult, RateWindow,
     UsageSnapshot,
 };
+use crate::locale::LocaleKey;
 use crate::providers::format;
 
 /// `Number.MAX_SAFE_INTEGER`.
@@ -214,9 +215,12 @@ pub(super) fn result(
 ) -> ProviderFetchResult {
     let balance = usd(billing.balance_nanos);
     let balance_text = money(balance);
-    let mut usage = UsageSnapshot::new(RateWindow::informational(format!(
-        "Balance: {balance_text}"
-    )))
+    // Upstream's snapshot has no window (lithosai.ts:71-79). The primary
+    // carries the balance for the tray and float bar only; the card shows it
+    // in the Billing row and the Credits block, as the Mac does.
+    let mut usage = UsageSnapshot::new(
+        RateWindow::informational(format!("Balance: {balance_text}")).hidden_on_card(),
+    )
     .with_login_method("Browser session");
     if let Some(email) = &account.email {
         usage = usage.with_email(email.clone());
@@ -263,7 +267,15 @@ pub(super) fn result(
     // as "$0.00". Upstream keeps negative balances visible, so a debt is left
     // to the primary line and the Balance row.
     let result = if billing.balance_nanos >= 0 {
-        result.with_cost(CostSnapshot::new(0.0, "USD", "Prepaid credits").with_balance(balance))
+        // Upstream `.prepaidCredits` (LithosAIProviderDescriptor.swift:16-19):
+        // a "Credits" block reading "Balance: $X" (MenuCardView+Costs.swift:511-518),
+        // drawn after the Billing rows, which keep their own "Balance" row
+        // (lithosai.ts:63). The Mac card shows the balance twice.
+        result.with_cost(
+            CostSnapshot::new(0.0, "USD", "Prepaid credits")
+                .with_balance(balance)
+                .with_card_title(LocaleKey::CreditsTitle),
+        )
     } else {
         result
     };
