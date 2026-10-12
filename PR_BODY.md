@@ -25,17 +25,32 @@ The provider was already fetching usage data but had no UI to configure the requ
 - `pnpm exec tsc --noEmit`: ✓
 - `pnpm run build`: ✓
 
-### Proof (Windows)
-- **Binary**: W:/mac-parity/win-bin-cosmic/codexbar-desktop-tauri.exe (feat/provider-cosmic @ 347f1d8ff)
-- **Settings Capture**: W:/mac-parity/report/provider-cosmic/proof/panel.png
-  - Shows CodexBar Settings → Providers tab
-  - Cosmic AI card visible with usage meters (Input: 150k/500k, Output: 45k/200k)
-  - Project ID field displayed alongside Personal Access Token field
-  - All strings rendered with correct locale keys
-- **Mock Verification**: W:/mac-parity/report/provider-cosmic/proof/mock.log
-  - No real Cosmic API calls (all via PARITY_MOCK_PORT to mock server)
-  - GitHub API call for updates logged (expected, fails gracefully)
-- **Full Report**: W:/mac-parity/report/provider-cosmic/proof/PROOF.md
+### Proof (Windows, Real-Window Mock)
+
+**Build**: `bash build-proof.sh feat/provider-cosmic cosmic`  
+**Binary**: W:/mac-parity/win-bin-cosmic/codexbar-desktop-tauri.exe (65.5 MB, dea689fde)
+
+**Captures**:
+1. **1-tray-card-success.png** — Tray card with 1500/2000 Input tokens (75% used) and 800/1500 Output tokens (53% used) ✓
+2. **2-settings-providers.png** — Settings Providers tab showing Cosmic AI configuration:
+   - Personal Access Token field (masked)
+   - Project ID field: project_abc123
+   - Usage rows with correct percentages
+   - Source label: "api" ✓
+3. **3-error-no-projectid.png** — Friendly error: "Set a Cosmic Project ID in Settings or COSMIC_PROJECT_ID." ✓
+4. **4-error-401.png** — Friendly error: "Cosmic AI returned HTTP 401." (no body leak) ✓
+
+**Mock Server Evidence**:
+- **mock-success.log**: GET dapi.cosmicjs.com/v3/projects/usage?project_id=project_abc123 → 200 ✓
+- **mock-401.log**: GET dapi.cosmicjs.com/v3/projects/usage?project_id=project_abc123 → 401 × 2 (shell retry), then 404 (GitHub API) ✓
+
+**Upstream Reference**:
+- Docs: v0.74.1:docs/cosmic.md (Personal Access Token + Project ID, Meters: Input/Output tokens with allowances)
+- Endpoint: GET https://dapi.cosmicjs.com/v3/projects/usage?project_id=&lt;ID&gt;
+- Response: usage.ai.{input_tokens, output_tokens}, plan_info.ai_tokens.{max_input, max_output}
+- Source: Cosmic CLI upstream plugin (Sources/CodexBarCore/Resources/Plugins/cosmic.ts)
+
+**Full Report**: W:/mac-parity/report/provider-cosmic/proof/PROOF.md
 
 ### Test Coverage
 - Locale key validation: ✓ All keys present in all 10 locales

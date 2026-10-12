@@ -83,29 +83,6 @@ impl Provider for CosmicProvider {
 
         // Check HTTP status
         match status {
-            401 => {
-                return Err(ProviderError::Other(
-                    "Cosmic AI Personal Access Token is invalid or expired. Check your settings."
-                        .to_string(),
-                ));
-            }
-            403 => {
-                return Err(ProviderError::Other(
-                    "Cosmic AI Personal Access Token does not have permission to access this project. Check your settings.".to_string(),
-                ));
-            }
-            429 => {
-                return Err(ProviderError::Other(
-                    "Cosmic AI returned HTTP 429 (rate limited). Try again in a few minutes."
-                        .to_string(),
-                ));
-            }
-            500..=599 => {
-                return Err(ProviderError::Other(format!(
-                    "Cosmic AI service is unavailable (HTTP {}).",
-                    status
-                )));
-            }
             200 => {}
             _ => {
                 return Err(ProviderError::Other(format!(
@@ -171,22 +148,19 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
 
     let mut display_details = Vec::new();
 
-    // Input tokens detail
+    // Input tokens section
     if let Some(used) = input_used
-        && let Some(d) = ProviderDisplayDetail::new(
-            "input_tokens_used",
-            "Input tokens used",
-            format_number(used),
-        )
+        && let Some(d) =
+            ProviderDisplayDetail::new("input_tokens_used", "Used", format_number(used))
+                .and_then(|row| row.with_section_title("Input tokens"))
     {
         display_details.push(d);
     }
     if let Some(limit) = input_limit {
-        if let Some(d) = ProviderDisplayDetail::new(
-            "input_tokens_allowance",
-            "Input tokens allowance",
-            format_number(limit),
-        ) {
+        if let Some(d) =
+            ProviderDisplayDetail::new("input_tokens_allowance", "Allowance", format_number(limit))
+                .and_then(|row| row.with_section_title("Input tokens"))
+        {
             display_details.push(d);
         }
     } else if let Some(raw_limit) = allowance.get("max_input")
@@ -199,11 +173,10 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
             } else {
                 "Not reported"
             };
-            if let Some(d) = ProviderDisplayDetail::new(
-                "input_tokens_allowance",
-                "Input tokens allowance",
-                label,
-            ) {
+            if let Some(d) =
+                ProviderDisplayDetail::new("input_tokens_allowance", "Allowance", label)
+                    .and_then(|row| row.with_section_title("Input tokens"))
+            {
                 display_details.push(d);
             }
         }
@@ -212,9 +185,11 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
         let remaining = (limit - used).max(0.0);
         if let Some(d) = ProviderDisplayDetail::new(
             "input_tokens_remaining",
-            "Input tokens remaining",
+            "Remaining",
             format_number(remaining),
-        ) {
+        )
+        .and_then(|row| row.with_section_title("Input tokens"))
+        {
             display_details.push(d);
         }
         if used > limit
@@ -223,27 +198,25 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
                 "Above allowance",
                 format_number(used - limit),
             )
+            .and_then(|row| row.with_section_title("Input tokens"))
         {
             display_details.push(d);
         }
     }
 
-    // Output tokens detail
+    // Output tokens section
     if let Some(used) = output_used
-        && let Some(d) = ProviderDisplayDetail::new(
-            "output_tokens_used",
-            "Output tokens used",
-            format_number(used),
-        )
+        && let Some(d) =
+            ProviderDisplayDetail::new("output_tokens_used", "Used", format_number(used))
+                .and_then(|row| row.with_section_title("Output tokens"))
     {
         display_details.push(d);
     }
     if let Some(limit) = output_limit {
-        if let Some(d) = ProviderDisplayDetail::new(
-            "output_tokens_allowance",
-            "Output tokens allowance",
-            format_number(limit),
-        ) {
+        if let Some(d) =
+            ProviderDisplayDetail::new("output_tokens_allowance", "Allowance", format_number(limit))
+                .and_then(|row| row.with_section_title("Output tokens"))
+        {
             display_details.push(d);
         }
     } else if let Some(raw_limit) = allowance.get("max_output")
@@ -256,11 +229,10 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
             } else {
                 "Not reported"
             };
-            if let Some(d) = ProviderDisplayDetail::new(
-                "output_tokens_allowance",
-                "Output tokens allowance",
-                label,
-            ) {
+            if let Some(d) =
+                ProviderDisplayDetail::new("output_tokens_allowance", "Allowance", label)
+                    .and_then(|row| row.with_section_title("Output tokens"))
+            {
                 display_details.push(d);
             }
         }
@@ -269,9 +241,11 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
         let remaining = (limit - used).max(0.0);
         if let Some(d) = ProviderDisplayDetail::new(
             "output_tokens_remaining",
-            "Output tokens remaining",
+            "Remaining",
             format_number(remaining),
-        ) {
+        )
+        .and_then(|row| row.with_section_title("Output tokens"))
+        {
             display_details.push(d);
         }
         if used > limit
@@ -280,6 +254,7 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
                 "Above allowance",
                 format_number(used - limit),
             )
+            .and_then(|row| row.with_section_title("Output tokens"))
         {
             display_details.push(d);
         }
