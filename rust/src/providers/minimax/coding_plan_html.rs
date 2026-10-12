@@ -9,7 +9,9 @@ use serde_json::Value;
 
 use crate::core::{ProviderError, RateWindow, UsageSnapshot};
 
-use super::coding_plan::{MiniMaxCodingPlanSnapshot, parse_coding_plan_value};
+use super::coding_plan::{
+    MiniMaxCodingPlanSnapshot, parse_coding_plan_value, window_minutes_for_window_type,
+};
 #[cfg(test)]
 use super::coding_plan::{RemainsRow, ServiceRow};
 
@@ -364,7 +366,7 @@ pub(super) fn to_usage_snapshot(
             let first = &rows[0];
             let primary = RateWindow::with_details(
                 first.percent,
-                None,
+                window_minutes_for_window_type(&first.window_type),
                 first.resets_at,
                 first.reset_description.clone(),
             );
@@ -375,7 +377,7 @@ pub(super) fn to_usage_snapshot(
                 let second = &rows[1];
                 usage = usage.with_secondary(RateWindow::with_details(
                     second.percent,
-                    None,
+                    window_minutes_for_window_type(&second.window_type),
                     second.resets_at,
                     second.reset_description.clone(),
                 ));
@@ -388,7 +390,7 @@ pub(super) fn to_usage_snapshot(
                     format!("{} · {}", row.service_type, row.window_type),
                     RateWindow::with_details(
                         row.percent,
-                        None,
+                        window_minutes_for_window_type(&row.window_type),
                         row.resets_at,
                         row.reset_description.clone(),
                     ),
@@ -650,5 +652,72 @@ mod tests {
         assert_eq!(minutes_from_duration(f64::MAX, "hours"), None);
         assert_eq!(minutes_from_duration(f64::INFINITY, "days"), None);
         assert_eq!(minutes_from_duration(5.0, "hours"), Some(300));
+    }
+
+    #[test]
+    fn services_rows_take_their_length_from_the_window_type() {
+        // Upstream `MiniMaxUsageSnapshot.rateWindow(for:)` /
+        // `windowMinutes(for:)`: Today 1440, Weekly 10080, "N hours" N*60.
+        let json = serde_json::json!({
+            "data": {
+                "services": [
+                    {
+                        "service_type": "Text Generation",
+                        "window_type": "5 hours",
+                        "time_range": "10:00-15:00(UTC+8)",
+                        "usage": 30,
+                        "limit": 100
+                    },
+                    {
+                        "service_type": "Text Generation",
+                        "window_type": "Weekly",
+                        "time_range": "08/03 00:00 - 08/10 00:00(UTC+8)",
+                        "usage": 400,
+                        "limit": 1000
+                    },
+                    {
+                        "service_type": "Image Generation",
+                        "window_type": "Today",
+                        "time_range": "00:00-24:00(UTC+8)",
+                        "usage": 2,
+                        "limit": 10
+                    },
+                    {
+                        "service_type": "Video Generation",
+                        "window_type": "Custom",
+                        "time_range": "N/A",
+                        "usage": 1,
+                        "limit": 4
+                    }
+                ]
+            }
+        });
+        let snapshot = parse_coding_plan_value(&json, now()).unwrap();
+        let usage = to_usage_snapshot(&snapshot, now()).unwrap();
+
+        assert_eq!(usage.primary.window_minutes, Some(300));
+        assert_eq!(
+            usage.secondary.as_ref().and_then(|w| w.window_minutes),
+            Some(10_080)
+        );
+        let extra: Vec<Option<u32>> = usage
+            .extra_rate_windows
+            .iter()
+            .map(|w| w.window.window_minutes)
+            .collect();
+        assert_eq!(extra, vec![Some(1440), None]);
+    }
+
+    #[test]
+    fn window_type_minutes_follow_the_mac_units() {
+        assert_eq!(window_minutes_for_window_type(" Today "), Some(1440));
+        assert_eq!(window_minutes_for_window_type("WEEKLY"), Some(10_080));
+        assert_eq!(window_minutes_for_window_type("5 hours"), Some(300));
+        assert_eq!(window_minutes_for_window_type("1 hr"), Some(60));
+        assert_eq!(window_minutes_for_window_type("30 minutes"), Some(30));
+        assert_eq!(window_minutes_for_window_type("2 days"), Some(2880));
+        assert_eq!(window_minutes_for_window_type("Custom"), None);
+        assert_eq!(window_minutes_for_window_type("Unknown"), None);
+        assert_eq!(window_minutes_for_window_type("5 fortnights"), None);
     }
 }

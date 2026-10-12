@@ -111,6 +111,27 @@ fn window_minutes(start: Option<DateTime<Utc>>, end: Option<DateTime<Utc>>) -> O
     }
 }
 
+/// Upstream `MiniMaxUsageSnapshot.windowMinutes(for:)`: the length a service
+/// row's window type names ("Today", "Weekly", "5 hours", "30 minutes",
+/// "2 days"). Other labels ("Custom", "Unknown") have no length.
+pub(super) fn window_minutes_for_window_type(window_type: &str) -> Option<u32> {
+    let window_type = window_type.trim().to_lowercase();
+    match window_type.as_str() {
+        "today" => return Some(24 * 60),
+        "weekly" => return Some(7 * 24 * 60),
+        _ => {}
+    }
+    let mut parts = window_type.split_whitespace();
+    let value = parts.next()?.parse::<u32>().ok()?;
+    let per_unit = match parts.next()? {
+        "hour" | "hours" | "h" | "hr" | "hrs" => 60,
+        "minute" | "minutes" | "min" | "mins" | "m" => 1,
+        "day" | "days" | "d" => 24 * 60,
+        _ => return None,
+    };
+    value.checked_mul(per_unit)
+}
+
 /// `resetsAt(end:remains:now:)`.
 fn resets_at(
     end: Option<DateTime<Utc>>,
