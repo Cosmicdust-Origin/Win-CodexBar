@@ -33,6 +33,7 @@ const tauriMocks = vi.hoisted(() => ({
   getProviderDetail: vi.fn().mockResolvedValue({ dashboardUrl: null, statusPageUrl: null }),
   openProviderDashboard: vi.fn(),
   openProviderStatusPage: vi.fn(),
+  getProviderStatuses: vi.fn().mockResolvedValue([]),
   getProviderChartData: vi.fn(),
   getCurrentSurfaceState: vi.fn(),
   getLocaleStrings: vi.fn(),

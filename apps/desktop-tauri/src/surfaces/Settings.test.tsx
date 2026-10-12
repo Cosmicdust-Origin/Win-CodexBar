@@ -25,6 +25,7 @@ vi.mock("@tauri-apps/api/webviewWindow", () => ({
 vi.mock("../lib/tauri", () => ({
   closeSettingsWindow: vi.fn(),
   getWorkAreaRect: () => Promise.resolve(null),
+  getProviderStatuses: () => Promise.resolve([]),
   setSurfaceMode: mocks.setSurfaceMode,
   reorderProviders: mocks.reorderProviders,
 }));
