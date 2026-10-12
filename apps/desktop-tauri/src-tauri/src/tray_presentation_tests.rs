@@ -907,6 +907,11 @@ fn stacked_tray_icon_keeps_usage_colours_when_pace_tint_is_enabled() {
     codex.secondary = Some(paced_window(90.0, Some(10_080), 5_040));
     let claude = paced_snapshot("claude", paced_window(80.0, Some(300), 150));
     let snapshots = vec![codex, claude];
+    // Both providers are ahead of pace, so the single icon would tint.
+    assert_eq!(
+        tint(&tint_settings(), &snapshots),
+        Some(TrayPaceColor::Ahead)
+    );
     let stacked = |color_pace: bool| Settings {
         tray_icon_mode: TrayIconMode::Stacked,
         menu_bar_color_pace: color_pace,
