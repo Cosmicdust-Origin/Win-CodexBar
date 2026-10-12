@@ -111,6 +111,7 @@ pub enum ProviderId {
     MuseAI,
     WorkBuddy,
     Tavily,
+    Exa,
 }
 
 impl ProviderId {
@@ -214,6 +215,7 @@ impl ProviderId {
             ProviderId::MuseAI,
             ProviderId::WorkBuddy,
             ProviderId::Tavily,
+            ProviderId::Exa,
         ]
     }
 
@@ -317,6 +319,7 @@ impl ProviderId {
             ProviderId::Xai => "xai",
             ProviderId::Replicate => "replicate",
             ProviderId::AtlasCloud => "atlascloud",
+            ProviderId::Exa => "exa",
         }
     }
 
@@ -422,6 +425,7 @@ impl ProviderId {
             ProviderId::Xai => "xAI",
             ProviderId::Replicate => "Replicate",
             ProviderId::AtlasCloud => "Atlas Cloud",
+            ProviderId::Exa => "Exa",
         }
     }
 
@@ -532,6 +536,9 @@ impl ProviderId {
             ProviderId::QwenCloud => Some("qwencloud.com"),
             ProviderId::Notion => Some("app.notion.com"),
             ProviderId::Xai => None,
+            ProviderId::Replicate => None,
+            ProviderId::AtlasCloud => None,
+            ProviderId::Exa => None,
         }
     }
 
@@ -669,6 +676,7 @@ impl ProviderId {
             "museai" | "muse (muse.ai)" => Some(ProviderId::MuseAI),
             "workbuddy" => Some(ProviderId::WorkBuddy),
             "tavily" => Some(ProviderId::Tavily),
+            "exa" => Some(ProviderId::Exa),
             _ => None,
         }
     }
@@ -1387,6 +1395,7 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::MuseAI => "#0668E1",
         ProviderId::WorkBuddy => "#0DC8A6",
         ProviderId::Tavily => "#0F766E",
+        ProviderId::Exa => "#0143D9",
     }
 }
 
@@ -1401,7 +1410,7 @@ mod tests {
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 97);
+        assert_eq!(all.len(), 98);
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Pi));
@@ -1479,6 +1488,7 @@ mod tests {
         assert!(all.contains(&ProviderId::MuseAI));
         assert!(all.contains(&ProviderId::WorkBuddy));
         assert!(all.contains(&ProviderId::Tavily));
+        assert!(all.contains(&ProviderId::Exa));
     }
 
     #[test]

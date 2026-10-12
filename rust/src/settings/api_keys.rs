@@ -774,6 +774,17 @@ pub fn get_api_key_providers() -> Vec<ProviderConfigInfo> {
             dashboard_url: Some("https://app.tavily.com"),
         },
         ProviderConfigInfo {
+            id: ProviderId::Exa,
+            name: "Exa",
+            requires_api_key: true,
+            api_key_env_var: Some(crate::providers::exa::SERVICE_KEY_ENV),
+            api_key_help: Some(
+                "Save an Exa Team Management service key to fetch selected API key monthly spend (UTC). Both keys must belong to the same team. Or set EXA_SERVICE_KEY and EXA_API_KEY_ID.",
+            ),
+            config_file_path: None,
+            dashboard_url: Some("https://dashboard.exa.ai/api-keys"),
+        },
+        ProviderConfigInfo {
             id: ProviderId::ClawRouter,
             name: "ClawRouter",
             requires_api_key: true,
