@@ -88,7 +88,11 @@ impl SailResearchProvider {
 
         let body = read_bounded_response(response, MAX_RESPONSE_BYTES)
             .await
-            .map_err(|_| ProviderError::Other("Failed to read Sail Research response.".into()))?;
+            .map_err(|_| {
+                ProviderError::Other(
+                    "Sail Research returned an unrecognized billing summary.".into(),
+                )
+            })?;
 
         let data: Value = serde_json::from_slice(&body).map_err(|_| {
             ProviderError::Other("Sail Research returned an unrecognized billing summary.".into())
@@ -226,8 +230,10 @@ fn parse_usage(payload: &Value) -> Result<ProviderFetchResult, ProviderError> {
     };
 
     let mut result = ProviderFetchResult::new(
-        UsageSnapshot::new(RateWindow::informational("Organization billing").hidden_on_card())
-            .with_login_method("API key"),
+        UsageSnapshot::new(
+            RateWindow::informational(format!("Credit balance: {balance_value}")).hidden_on_card(),
+        )
+        .with_login_method("API key"),
         "api",
     );
 
@@ -261,8 +267,8 @@ mod tests {
             "available": true,
             "has_metronome_customer": true,
             "balance_unavailable": false,
-            "balance": 1234567,
-            "period_spend": 123400,
+            "balance": 12345.67,
+            "period_spend": 1234,
             "effective_range": "30d",
         })
     }
@@ -284,11 +290,15 @@ mod tests {
         assert_eq!(
             rows(&result),
             vec![
-                ("Credit balance".to_string(), "$12,345.67".to_string()),
-                ("Last 30 days spend".to_string(), "$1,234.00".to_string()),
+                ("Credit balance".to_string(), "$123.46".to_string()),
+                ("Last 30 days spend".to_string(), "$12.34".to_string()),
             ]
         );
         assert_eq!(result.usage.login_method.as_deref(), Some("API key"));
+        assert_eq!(
+            result.usage.primary.reset_description.as_deref(),
+            Some("Credit balance: $123.46")
+        );
     }
 
     #[test]
@@ -302,14 +312,14 @@ mod tests {
 
     #[test]
     fn zero_and_negative_balances_remain_authoritative() {
-        for balance in &[0.0, -12500.0] {
+        for balance in &[0.0, -125.0] {
             let mut data = fixture();
             data["balance"] = json!(balance);
             data["period_spend"] = json!(0);
             let result = parse_usage(&data).unwrap();
             let row_values: Vec<String> = rows(&result).iter().map(|(_, v)| v.clone()).collect();
 
-            let expected = if *balance == 0.0 { "$0.00" } else { "-$125.00" };
+            let expected = if *balance == 0.0 { "$0.00" } else { "-$1.25" };
             assert_eq!(row_values[0], expected);
             assert_eq!(row_values[1], "$0.00");
         }
@@ -323,7 +333,7 @@ mod tests {
         let result = parse_usage(&data).unwrap();
         let row_values: Vec<String> = rows(&result).iter().map(|(_, v)| v.clone()).collect();
         assert_eq!(row_values[0], "Unavailable");
-        assert_eq!(row_values[1], "$1,234.00");
+        assert_eq!(row_values[1], "$12.34");
     }
 
     #[test]
