@@ -80,8 +80,10 @@ fn parse_timestamp(raw: Option<&str>) -> Option<DateTime<Utc>> {
         .map(|parsed| parsed.with_timezone(&Utc))
 }
 
-/// Full billing-cycle length; `None` unless the start precedes both the end
-/// and `now`, so a reset timestamp alone never invents a cadence.
+/// Full billing-cycle length; `None` unless the start precedes the end and
+/// is not in the future, so a reset timestamp alone never invents a cadence.
+/// Upstream `GrokCreditsProxyFetcher.windowMinutes` keeps the length of a
+/// period that has already ended.
 fn window_minutes(
     start: Option<&str>,
     end: Option<DateTime<Utc>>,
@@ -89,7 +91,7 @@ fn window_minutes(
 ) -> Option<u32> {
     let start = parse_timestamp(start)?;
     let end = end?;
-    if start > now || now >= end {
+    if start > now || end <= start {
         return None;
     }
     u32::try_from((end - start).num_minutes())
