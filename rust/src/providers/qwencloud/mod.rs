@@ -3,11 +3,13 @@
 //! Cookie-authenticated OneConsole gateway:
 //! `POST https://cs-data.qwencloud.com/data/api.json?...`
 //! with `IntlBroadScopeAspnGateway` / `sfm_bailian` for individual.
-//! Team uses `BssOpenAPI-V3` RPC gateway with `GetSeatSubscriptionSummary` (cn-hangzhou)
-//! and `ea-service` RPC for `LoadHumanInfo` to discover billing selector.
+//! Team (see [`team`]) runs first and falls back to Individual.
 
 #[cfg(test)]
 mod monthly_tests;
+mod team;
+#[cfg(test)]
+mod team_tests;
 
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
@@ -16,8 +18,8 @@ use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
 use crate::core::{
-    FetchContext, Provider, ProviderDisplayDetail, ProviderError, ProviderFetchResult, ProviderId,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
+    RateWindow, SourceMode, UsageSnapshot,
 };
 use crate::providers::browser_cookie_header;
 
@@ -54,16 +56,6 @@ const WEEKLY_MINUTES: u32 = 7 * 24 * 60;
 const LEGACY_MINUTES: u32 = 30 * 24 * 60;
 const MONTHLY_MINUTES: u32 = 30 * 24 * 60;
 
-// Team RPC constants (upstream v0.74.0+)
-const TEAM_PRODUCT_CODE: &str = "sfm_tokenplanteams_dp_intl";
-const TEAM_EA_SERVICE_PRODUCT: &str = "ea-service";
-const TEAM_EA_SERVICE_ACTION: &str = "LoadHumanInfo";
-const TEAM_BILLING_PRODUCT: &str = "BssOpenAPI-V3";
-const TEAM_BILLING_ACTION: &str = "GetSeatSubscriptionSummary";
-const TEAM_REGION: &str = "cn-hangzhou";
-const TEAM_LANGUAGE: &str = "zh-CN";
-const TEAM_EA_REGION: &str = "ap-southeast-1";
-
 pub struct QwenCloudProvider {
     metadata: ProviderMetadata,
 }
@@ -84,17 +76,6 @@ struct QwenCloudSnapshot {
     monthly_used_percent: Option<f64>,
     monthly_total_quota: Option<f64>,
     monthly_resets_at: Option<DateTime<Utc>>,
-}
-
-/// Team subscription credit pool (upstream v0.74.0+).
-#[derive(Debug, Clone, PartialEq)]
-struct TeamSnapshot {
-    plan_name: Option<String>,
-    used_credits: Option<f64>,
-    total_credits: Option<f64>,
-    resets_at: Option<DateTime<Utc>>,
-    assigned_seats: Option<i64>,
-    total_seats: Option<i64>,
 }
 
 /// Per-window credit totals from the quota-config payload.
@@ -134,7 +115,7 @@ impl QwenCloudProvider {
     async fn fetch_via_web(
         &self,
         ctx: &FetchContext,
-    ) -> Result<(UsageSnapshot, Option<TeamSnapshot>), ProviderError> {
+    ) -> Result<ProviderFetchResult, ProviderError> {
         let cookie_header = Self::resolve_cookie_header(ctx)?;
         let client = crate::core::credentialed_http_client_builder()
             .timeout(std::time::Duration::from_secs(ctx.web_timeout.max(1)))
@@ -142,42 +123,51 @@ impl QwenCloudProvider {
             .build()
             .map_err(|e| ProviderError::Other(e.to_string()))?;
 
-        let sec_token = Self::resolve_sec_token(&client, &cookie_header, ctx)
+        let team_timeout =
+            team::REQUEST_TIMEOUT.min(std::time::Duration::from_secs(ctx.web_timeout.max(1)));
+        let team_error = match team::fetch(
+            &client,
+            team::BASE_URL,
+            &cookie_header,
+            team_timeout,
+            Utc::now().timestamp_millis(),
+        )
+        .await
+        {
+            Ok(Some(team)) => return Ok(team::to_result(&team)),
+            Ok(None) => None,
+            Err(error) => Some(error),
+        };
+
+        let individual = self
+            .fetch_individual(&client, &cookie_header, ctx)
+            .await
+            .map(|usage| ProviderFetchResult::new(usage, "web"));
+        team::choose_result(team_error, individual)
+    }
+
+    async fn fetch_individual(
+        &self,
+        client: &reqwest::Client,
+        cookie_header: &str,
+        ctx: &FetchContext,
+    ) -> Result<UsageSnapshot, ProviderError> {
+        let sec_token = Self::resolve_sec_token(client, cookie_header, ctx)
             .await
             .ok_or(ProviderError::AuthRequired)?;
 
-        // Try team subscription first (v0.74.0+)
-        match self
-            .fetch_team(&client, &sec_token, &cookie_header, ctx)
-            .await
-        {
-            Ok(Some((team_usage, team_snapshot))) => return Ok((team_usage, Some(team_snapshot))),
-            Ok(None) => {
-                // No active team plan, fall through to individual
-            }
-            Err(ProviderError::AuthRequired) => {
-                // Auth failure in team path; will retry after cookie refresh
-                let _ = Self::resolve_sec_token(&client, &cookie_header, ctx).await;
-                // If auth still fails, fall through
-            }
-            Err(_other_error) => {
-                // Other errors (parse, network) don't block individual fallback
-            }
-        }
-
-        // Fall back to individual token plan
         let usage_body = Self::post_api(
-            &client,
+            client,
             USAGE_API,
             Map::new(),
             &sec_token,
-            &cookie_header,
+            cookie_header,
             ctx,
         )
         .await?;
 
         let subscription_body = Self::post_api_optional(
-            &client,
+            client,
             SUBSCRIPTION_API,
             {
                 let mut data = Map::new();
@@ -188,17 +178,17 @@ impl QwenCloudProvider {
                 data
             },
             &sec_token,
-            &cookie_header,
+            cookie_header,
             ctx,
         )
         .await;
 
         let quota_config_body = Self::post_api_optional(
-            &client,
+            client,
             QUOTA_CONFIG_API,
             Map::new(),
             &sec_token,
-            &cookie_header,
+            cookie_header,
             ctx,
         )
         .await;
@@ -208,7 +198,7 @@ impl QwenCloudProvider {
             subscription_body.as_deref(),
             quota_config_body.as_deref(),
         )?;
-        Ok((self.snapshot_to_usage(snapshot)?, None))
+        self.snapshot_to_usage(snapshot)
     }
 
     fn resolve_cookie_header(ctx: &FetchContext) -> Result<String, ProviderError> {
@@ -358,175 +348,6 @@ impl QwenCloudProvider {
             .ok()
     }
 
-    /// Try to fetch team subscription data. Returns None if no active team plan.
-    async fn fetch_team(
-        &self,
-        client: &reqwest::Client,
-        sec_token: &str,
-        cookie_header: &str,
-        ctx: &FetchContext,
-    ) -> Result<Option<(UsageSnapshot, TeamSnapshot)>, ProviderError> {
-        // First, try to discover billing selector via LoadHumanInfo
-        let human_info = self
-            .call_team_rpc(
-                client,
-                TEAM_EA_SERVICE_PRODUCT,
-                TEAM_EA_SERVICE_ACTION,
-                Map::new(),
-                TEAM_EA_REGION,
-                sec_token,
-                cookie_header,
-                ctx,
-            )
-            .await
-            .ok();
-
-        let nbid = human_info.and_then(|info| {
-            find_first_object_with_any_key(&info, &["SellerInfoDto"])
-                .and_then(|seller| find_first_string(&seller, &["Nbid"]))
-        });
-
-        // Build params for GetSeatSubscriptionSummary
-        let mut params = Map::new();
-        params.insert(
-            "productCode".into(),
-            Value::String(TEAM_PRODUCT_CODE.to_string()),
-        );
-        if let Some(nbid_value) = nbid {
-            params.insert("Nbid".into(), Value::String(nbid_value));
-        }
-
-        // Fetch team subscription summary
-        let summary = self
-            .call_team_rpc(
-                client,
-                TEAM_BILLING_PRODUCT,
-                TEAM_BILLING_ACTION,
-                params,
-                TEAM_REGION,
-                sec_token,
-                cookie_header,
-                ctx,
-            )
-            .await?;
-
-        // Parse team snapshot from response
-        match parse_team_response(&summary)? {
-            Some(team_snapshot) => {
-                let usage = self.team_snapshot_to_usage(&team_snapshot)?;
-                Ok(Some((usage, team_snapshot)))
-            }
-            None => Ok(None),
-        }
-    }
-
-    /// Call team RPC gateway (BssOpenAPI-V3 or ea-service).
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "RPC call needs distinct param name, region, and auth"
-    )]
-    async fn call_team_rpc(
-        &self,
-        client: &reqwest::Client,
-        product: &str,
-        action: &str,
-        params: Map<String, Value>,
-        region: &str,
-        sec_token: &str,
-        cookie_header: &str,
-        ctx: &FetchContext,
-    ) -> Result<Value, ProviderError> {
-        let params_json = serde_json::to_string(&params).map_err(|e| {
-            ProviderError::Other(format!("Failed to serialize team RPC params: {}", e))
-        })?;
-
-        let mut form_data = vec![
-            ("product", product.to_string()),
-            ("action", action.to_string()),
-            ("sec_token", sec_token.to_string()),
-            ("region", region.to_string()),
-            ("params", params_json),
-        ];
-
-        // Add language for GetSeatSubscriptionSummary
-        if action == TEAM_BILLING_ACTION {
-            form_data.push(("language", TEAM_LANGUAGE.to_string()));
-        }
-
-        let url = format!("{GATEWAY_BASE_URL}/data/api.json?product={product}&action={action}");
-
-        let response = client
-            .post(&url)
-            .timeout(std::time::Duration::from_secs(ctx.web_timeout.max(1)))
-            .header("Cookie", cookie_header)
-            .header("Accept", "application/json")
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .header("Origin", GATEWAY_BASE_URL)
-            .header(
-                "Referer",
-                "https://home.qwencloud.com/analytics/token-plan/team",
-            )
-            .header("User-Agent", USER_AGENT)
-            .form(&form_data)
-            .send()
-            .await?;
-
-        let status = response.status();
-        let body = response.bytes().await?;
-
-        if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
-            return Err(ProviderError::AuthRequired);
-        }
-
-        if !status.is_success() {
-            return Err(ProviderError::Other(format!(
-                "Qwen Cloud Team RPC error: HTTP {status}"
-            )));
-        }
-
-        let value: Value = serde_json::from_slice(&body)
-            .map_err(|_| ProviderError::Parse("Invalid Qwen Cloud Team RPC response".into()))?;
-
-        // Check for login errors in the response envelope
-        if let Some(code) = value.get("code").and_then(|v| v.as_str()) {
-            #[allow(clippy::collapsible_if, reason = "login error check is distinct")]
-            if matches!(
-                code,
-                "ConsoleNeedLogin" | "BailianGateway.Login.NotLogined" | "NO_LOGIN"
-            ) {
-                return Err(ProviderError::AuthRequired);
-            }
-        }
-
-        Ok(value)
-    }
-
-    fn team_snapshot_to_usage(
-        &self,
-        snapshot: &TeamSnapshot,
-    ) -> Result<UsageSnapshot, ProviderError> {
-        let used_percent = snapshot
-            .total_credits
-            .and_then(|total| snapshot.used_credits.map(|used| (used / total) * 100.0))
-            .unwrap_or(0.0);
-
-        if !used_percent.is_finite() || used_percent < 0.0 || used_percent > 100.0 {
-            return Err(ProviderError::Parse("Invalid team credit percent".into()));
-        }
-
-        let primary =
-            RateWindow::with_details(used_percent, None, snapshot.resets_at, Some("Team".into()));
-
-        let mut usage = UsageSnapshot::new(primary);
-
-        // Add plan name as login method
-        if let Some(plan) = snapshot.plan_name.as_ref().filter(|p| !p.trim().is_empty()) {
-            usage = usage.with_login_method(plan.clone());
-        }
-
-        Ok(usage)
-    }
-
     fn parse(
         usage_data: &[u8],
         subscription_data: Option<&[u8]>,
@@ -659,49 +480,7 @@ impl Provider for QwenCloudProvider {
 
     async fn fetch_usage(&self, ctx: &FetchContext) -> Result<ProviderFetchResult, ProviderError> {
         match ctx.source_mode {
-            SourceMode::Auto | SourceMode::Web => {
-                let (usage, team_snapshot) = self.fetch_via_web(ctx).await?;
-                let mut result = ProviderFetchResult::new(usage, "web");
-
-                // Add team-specific detail rows
-                if let Some(snapshot) = team_snapshot {
-                    if let (Some(used), Some(total)) =
-                        (snapshot.used_credits, snapshot.total_credits)
-                    {
-                        let used_str = format_quota(used);
-                        let total_str = format_quota(total);
-                        let detail = ProviderDisplayDetail::new(
-                            "team-credits",
-                            "Credits",
-                            format!("{} / {} credits used", used_str, total_str),
-                        );
-                        result = result.with_display_detail(detail);
-
-                        let remaining = total - used;
-                        let remaining_str = format_quota(remaining);
-                        let detail = ProviderDisplayDetail::new(
-                            "team-remaining",
-                            "Remaining",
-                            format!("{} credits", remaining_str),
-                        );
-                        result = result.with_display_detail(detail);
-                    }
-
-                    // Add seats row if available
-                    if let (Some(assigned), Some(total)) =
-                        (snapshot.assigned_seats, snapshot.total_seats)
-                    {
-                        let detail = ProviderDisplayDetail::new(
-                            "team-seats",
-                            "Seats",
-                            format!("{} / {}", assigned, total),
-                        );
-                        result = result.with_display_detail(detail);
-                    }
-                }
-
-                Ok(result)
-            }
+            SourceMode::Auto | SourceMode::Web => self.fetch_via_web(ctx).await,
             SourceMode::Cli | SourceMode::OAuth => {
                 Err(ProviderError::UnsupportedSource(ctx.source_mode))
             }
@@ -1458,193 +1237,6 @@ fn active_signal_score(value: &Value) -> i32 {
     .unwrap_or(0)
 }
 
-/// Parse team subscription response (v0.74.0+).
-fn parse_team_response(value: &Value) -> Result<Option<TeamSnapshot>, ProviderError> {
-    // Check if response indicates success
-    if value.get("successResponse").and_then(|v| v.as_bool()) == Some(false) {
-        if let Some(code) = value.get("code").and_then(|v| v.as_str()) {
-            #[allow(clippy::collapsible_if, reason = "login error check is distinct")]
-            if matches!(
-                code,
-                "ConsoleNeedLogin" | "BailianGateway.Login.NotLogined" | "NO_LOGIN"
-            ) {
-                return Err(ProviderError::AuthRequired);
-            }
-        }
-        return Err(ProviderError::Parse(
-            "Qwen Cloud Team response unsuccessful".into(),
-        ));
-    }
-
-    let data = value
-        .get("data")
-        .and_then(|v| v.as_object())
-        .ok_or_else(|| ProviderError::Parse("Team response data missing".into()))?;
-    let success = data
-        .get("Success")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-    let sub_data = data.get("Data");
-
-    if !success {
-        // Request failed
-        return Ok(None);
-    }
-
-    // Check if data is null or missing
-    if sub_data.is_none() || sub_data == Some(&Value::Null) {
-        // No active team subscription
-        return Ok(None);
-    }
-
-    let sub_obj = sub_data
-        .unwrap()
-        .as_object()
-        .ok_or_else(|| ProviderError::Parse("Team subscription data not an object".into()))?;
-
-    // Check subscription period
-    let start_time = sub_obj
-        .get("StartTime")
-        .and_then(|v| parse_i64(Some(v)))
-        .ok_or_else(|| ProviderError::Parse("Team StartTime missing".into()))?;
-    let end_time = sub_obj
-        .get("EndTime")
-        .and_then(|v| parse_i64(Some(v)))
-        .ok_or_else(|| ProviderError::Parse("Team EndTime missing".into()))?;
-
-    let now = chrono::Utc::now().timestamp_millis();
-    if now < start_time || now >= end_time {
-        // Subscription period expired
-        return Ok(None);
-    }
-
-    // Validate product code
-    let product_code = sub_obj
-        .get("ProductCode")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    if product_code != TEAM_PRODUCT_CODE {
-        return Err(ProviderError::Parse(
-            "Unsupported Qwen Cloud Team product".into(),
-        ));
-    }
-
-    // Parse subscription groups
-    let groups = sub_obj
-        .get("SubscriptionGroupList")
-        .and_then(|v| v.as_array())
-        .ok_or_else(|| ProviderError::Parse("Team SubscriptionGroupList missing".into()))?;
-
-    if groups.is_empty() {
-        return Ok(None);
-    }
-
-    if groups.len() != 1 {
-        return Err(ProviderError::Parse(
-            "Unsupported Qwen Cloud Team multiple credit pools".into(),
-        ));
-    }
-
-    let group = groups[0]
-        .as_object()
-        .ok_or_else(|| ProviderError::Parse("Team subscription group not an object".into()))?;
-
-    // Extract equity (credit) data
-    let equities = group
-        .get("EquityList")
-        .and_then(|v| v.as_array())
-        .ok_or_else(|| ProviderError::Parse("Team EquityList missing".into()))?;
-
-    let credit_equity = equities
-        .iter()
-        .find_map(|eq| {
-            let obj = eq.as_object()?;
-            if obj.get("EquityCode").and_then(|v| v.as_str()) == Some("credit_value") {
-                Some(obj)
-            } else {
-                None
-            }
-        })
-        .ok_or_else(|| ProviderError::Parse("Team credit_value equity missing".into()))?;
-
-    let total_credits = credit_equity
-        .get("TotalValue")
-        .and_then(|v| {
-            v.as_str()
-                .and_then(|s| s.parse::<f64>().ok())
-                .or_else(|| v.as_f64())
-        })
-        .ok_or_else(|| ProviderError::Parse("Team TotalValue invalid".into()))?;
-
-    let remaining_credits = credit_equity
-        .get("SurplusValue")
-        .and_then(|v| {
-            v.as_str()
-                .and_then(|s| s.parse::<f64>().ok())
-                .or_else(|| v.as_f64())
-        })
-        .ok_or_else(|| ProviderError::Parse("Team SurplusValue invalid".into()))?;
-
-    // Validate credit counts
-    if total_credits <= 0.0
-        || remaining_credits < 0.0
-        || remaining_credits > total_credits
-        || !total_credits.is_finite()
-        || !remaining_credits.is_finite()
-    {
-        return Err(ProviderError::Parse(
-            "Unsupported Qwen Cloud Team credit count".into(),
-        ));
-    }
-
-    let used_credits = total_credits - remaining_credits;
-
-    // Extract plan name from SpecType
-    let plan_name = group
-        .get("SpecType")
-        .and_then(|v| v.as_str())
-        .and_then(|spec_type| {
-            if !spec_type.is_empty() && spec_type.chars().next().unwrap().is_alphabetic() {
-                Some(format!(
-                    "{} Team",
-                    spec_type.chars().next().unwrap().to_uppercase().to_string() + &spec_type[1..]
-                ))
-            } else {
-                None
-            }
-        })
-        .or_else(|| Some("Team Token Plan".to_string()));
-
-    // Extract reset time
-    let resets_at = group
-        .get("NextCycleFlushTime")
-        .and_then(|v| parse_i64(Some(v)))
-        .and_then(|millis| {
-            if millis > 0 {
-                chrono::DateTime::<Utc>::from_timestamp_millis(millis)
-            } else {
-                None
-            }
-        });
-
-    // Extract seat counts (optional)
-    let assigned_seats = group
-        .get("SubscriptionAssignedNumber")
-        .and_then(|v| parse_i64(Some(v)));
-    let total_seats = group
-        .get("SubscriptionTotalNumber")
-        .and_then(|v| parse_i64(Some(v)));
-
-    Ok(Some(TeamSnapshot {
-        plan_name,
-        used_credits: Some(used_credits),
-        total_credits: Some(total_credits),
-        resets_at,
-        assigned_seats,
-        total_seats,
-    }))
-}
-
 fn used_percent(used: Option<f64>, total: Option<f64>, remaining: Option<f64>) -> Option<f64> {
     let total = total.filter(|total| *total > 0.0)?;
     let used = used.or_else(|| remaining.map(|remaining| total - remaining))?;
@@ -1950,151 +1542,5 @@ mod tests {
         assert_eq!(usage.primary.window_minutes, Some(WEEKLY_MINUTES));
         assert_eq!(usage.primary_label.as_deref(), Some("Weekly"));
         assert!(usage.secondary.is_none());
-    }
-
-    #[test]
-    fn team_parses_standard_credit_pool() {
-        // Fixture based on upstream QwenCloudTeamPluginTests; dates adjusted to be current
-        let now = chrono::Utc::now().timestamp_millis();
-        let future = now + 30 * 24 * 60 * 60 * 1000; // 30 days in the future
-        let payload = serde_json::json!({
-            "code": "200",
-            "successResponse": true,
-            "data": {
-                "Code": "Success",
-                "Success": true,
-                "Data": {
-                    "StartTime": now - 24 * 60 * 60 * 1000,  // Yesterday
-                    "EndTime": future,  // 30 days from now
-                    "ProductCode": "sfm_tokenplanteams_dp_intl",
-                    "SubscriptionGroupList": [{
-                        "SpecType": "standard",
-                        "SubscriptionAssignedNumber": 1,
-                        "SubscriptionTotalNumber": 1,
-                        "NextCycleFlushTime": future,
-                        "EquityList": [{
-                            "EquityCode": "credit_value",
-                            "TotalValue": "25000.00000000",
-                            "SurplusValue": "6373.93922996"
-                        }]
-                    }]
-                }
-            }
-        });
-
-        let team_snapshot = parse_team_response(&payload).unwrap().unwrap();
-        assert_eq!(team_snapshot.total_credits, Some(25000.0));
-        assert_eq!(team_snapshot.used_credits, Some(25000.0 - 6373.93922996));
-        assert_eq!(team_snapshot.plan_name.as_deref(), Some("Standard Team"));
-        assert_eq!(team_snapshot.assigned_seats, Some(1));
-        assert_eq!(team_snapshot.total_seats, Some(1));
-
-        let usage = QwenCloudProvider::new()
-            .team_snapshot_to_usage(&team_snapshot)
-            .unwrap();
-        assert!(
-            (usage.primary.used_percent - 74.50424308016).abs() < 0.00000001,
-            "expected ~74.5%, got {}",
-            usage.primary.used_percent
-        );
-        assert_eq!(usage.primary.reset_description.as_deref(), Some("Team"));
-        assert_eq!(usage.login_method.as_deref(), Some("Standard Team"));
-    }
-
-    #[test]
-    fn team_no_active_subscription_returns_none() {
-        let payload = serde_json::json!({
-            "successResponse": true,
-            "data": {
-                "Success": true,
-                "Data": null
-            }
-        });
-        assert_eq!(parse_team_response(&payload).unwrap(), None);
-    }
-
-    #[test]
-    fn team_empty_groups_returns_none() {
-        let payload = serde_json::json!({
-            "successResponse": true,
-            "data": {
-                "Success": true,
-                "Data": {
-                    "StartTime": 1_784_894_400_000i64,
-                    "EndTime": 1_790_251_200_000i64,
-                    "ProductCode": "sfm_tokenplanteams_dp_intl",
-                    "SubscriptionGroupList": []
-                }
-            }
-        });
-        assert_eq!(parse_team_response(&payload).unwrap(), None);
-    }
-
-    #[test]
-    fn team_expired_subscription_returns_none() {
-        let now_millis = chrono::Utc::now().timestamp_millis();
-        let payload = serde_json::json!({
-            "successResponse": true,
-            "data": {
-                "Success": true,
-                "Data": {
-                    "StartTime": now_millis - 1_000_000,
-                    "EndTime": now_millis - 1000,  // Expired
-                    "ProductCode": "sfm_tokenplanteams_dp_intl",
-                    "SubscriptionGroupList": [{
-                        "SpecType": "standard",
-                        "EquityList": [{
-                            "EquityCode": "credit_value",
-                            "TotalValue": "1000",
-                            "SurplusValue": "500"
-                        }]
-                    }]
-                }
-            }
-        });
-        assert_eq!(parse_team_response(&payload).unwrap(), None);
-    }
-
-    #[test]
-    fn team_invalid_credits_is_error() {
-        let now = chrono::Utc::now().timestamp_millis();
-        let future = now + 30 * 24 * 60 * 60 * 1000;
-        let payload = serde_json::json!({
-            "successResponse": true,
-            "data": {
-                "Success": true,
-                "Data": {
-                    "StartTime": now - 24 * 60 * 60 * 1000,
-                    "EndTime": future,
-                    "ProductCode": "sfm_tokenplanteams_dp_intl",
-                    "SubscriptionGroupList": [{
-                        "EquityList": [{
-                            "EquityCode": "credit_value",
-                            "TotalValue": "25000",
-                            "SurplusValue": "-1"  // Invalid: negative
-                        }]
-                    }]
-                }
-            }
-        });
-        let err = parse_team_response(&payload).unwrap_err();
-        assert!(matches!(err, ProviderError::Parse(_)));
-    }
-
-    #[test]
-    fn team_login_errors_map_to_auth_required() {
-        let codes = vec![
-            "ConsoleNeedLogin",
-            "BailianGateway.Login.NotLogined",
-            "NO_LOGIN",
-        ];
-        for code in codes {
-            let payload = serde_json::json!({
-                "successResponse": false,
-                "code": code
-            });
-            let err = parse_team_response(&payload).unwrap_err();
-            assert!(matches!(err, ProviderError::AuthRequired), "code={}", code);
-        }
     }
 }
