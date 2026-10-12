@@ -1,8 +1,9 @@
 //! Desktop provider-status poller. Upstream polls status pages inside every
 //! provider refresh while "Check provider status" is on
 //! (`UsageStore.swift:842`, `UsageStore+ProviderStatus.swift:5-38`); the
-//! shell does the same by starting a status poll from each provider refresh
-//! and when the switch turns on.
+//! shell does the same by starting a status poll from each full provider
+//! refresh and when the switch turns on, but not from the Windows-only
+//! auto-resume probe.
 
 use std::collections::HashMap;
 use std::future::Future;
