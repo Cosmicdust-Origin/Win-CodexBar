@@ -170,14 +170,14 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
     let mut display_details = Vec::new();
 
     // Input tokens detail
-    if let Some(used) = input_used {
-        if let Some(d) = ProviderDisplayDetail::new(
+    if let Some(used) = input_used
+        && let Some(d) = ProviderDisplayDetail::new(
             "input_tokens_used",
             "Input tokens used",
             format_number(used),
-        ) {
-            display_details.push(d);
-        }
+        )
+    {
+        display_details.push(d);
     }
     if let Some(limit) = input_limit {
         if let Some(d) = ProviderDisplayDetail::new(
@@ -187,22 +187,22 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
         ) {
             display_details.push(d);
         }
-    } else if let Some(raw_limit) = allowance.get("max_input") {
-        if let Some(s) = raw_limit.as_str() {
-            let s = s.trim();
-            if !s.is_empty() {
-                let label = if s.eq_ignore_ascii_case("unlimited") {
-                    "Unlimited"
-                } else {
-                    "Not reported"
-                };
-                if let Some(d) = ProviderDisplayDetail::new(
-                    "input_tokens_allowance",
-                    "Input tokens allowance",
-                    label,
-                ) {
-                    display_details.push(d);
-                }
+    } else if let Some(raw_limit) = allowance.get("max_input")
+        && let Some(s) = raw_limit.as_str()
+    {
+        let s = s.trim();
+        if !s.is_empty() {
+            let label = if s.eq_ignore_ascii_case("unlimited") {
+                "Unlimited"
+            } else {
+                "Not reported"
+            };
+            if let Some(d) = ProviderDisplayDetail::new(
+                "input_tokens_allowance",
+                "Input tokens allowance",
+                label,
+            ) {
+                display_details.push(d);
             }
         }
     }
@@ -227,14 +227,14 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
     }
 
     // Output tokens detail
-    if let Some(used) = output_used {
-        if let Some(d) = ProviderDisplayDetail::new(
+    if let Some(used) = output_used
+        && let Some(d) = ProviderDisplayDetail::new(
             "output_tokens_used",
             "Output tokens used",
             format_number(used),
-        ) {
-            display_details.push(d);
-        }
+        )
+    {
+        display_details.push(d);
     }
     if let Some(limit) = output_limit {
         if let Some(d) = ProviderDisplayDetail::new(
@@ -244,22 +244,22 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
         ) {
             display_details.push(d);
         }
-    } else if let Some(raw_limit) = allowance.get("max_output") {
-        if let Some(s) = raw_limit.as_str() {
-            let s = s.trim();
-            if !s.is_empty() {
-                let label = if s.eq_ignore_ascii_case("unlimited") {
-                    "Unlimited"
-                } else {
-                    "Not reported"
-                };
-                if let Some(d) = ProviderDisplayDetail::new(
-                    "output_tokens_allowance",
-                    "Output tokens allowance",
-                    label,
-                ) {
-                    display_details.push(d);
-                }
+    } else if let Some(raw_limit) = allowance.get("max_output")
+        && let Some(s) = raw_limit.as_str()
+    {
+        let s = s.trim();
+        if !s.is_empty() {
+            let label = if s.eq_ignore_ascii_case("unlimited") {
+                "Unlimited"
+            } else {
+                "Not reported"
+            };
+            if let Some(d) = ProviderDisplayDetail::new(
+                "output_tokens_allowance",
+                "Output tokens allowance",
+                label,
+            ) {
+                display_details.push(d);
             }
         }
     }
@@ -446,7 +446,7 @@ const COSMIC_METADATA: ProviderMetadata = ProviderMetadata {
     supports_credits: false,
     default_enabled: false,
     is_primary: false,
-    dashboard_url: None,
+    dashboard_url: Some("https://app.cosmicjs.com"),
     status_page_url: None,
     tertiary_label_key: None,
 };
