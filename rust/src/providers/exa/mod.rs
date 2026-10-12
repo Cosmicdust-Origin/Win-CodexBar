@@ -91,7 +91,7 @@ impl ExaProvider {
             })
             .ok_or_else(|| {
                 ProviderError::Other(
-                    "Exa API key ID is required. Set it in Settings or EXA_API_KEY_ID.".into(),
+                    "Set the Exa API key ID in Scope or EXA_API_KEY_ID; this is not the service key.".into(),
                 )
             })?;
 
