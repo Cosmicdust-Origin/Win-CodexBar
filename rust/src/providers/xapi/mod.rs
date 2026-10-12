@@ -301,14 +301,15 @@ fn parse_account_id(me: &Map<String, Value>) -> Result<String, ProviderError> {
         .and_then(|v| v.get("id"))
         .ok_or_else(|| invalid("account or dollar balance"))?;
 
-    // Handle both string and integer IDs
+    // Upstream: `Number.isSafeInteger(id) && id >= 0 ? String(id) : id`.
+    const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
     let account_id = match id {
-        Value::Number(n) => {
-            if !n.is_u64() || n.as_u64().unwrap() > i64::MAX as u64 {
-                return Err(invalid("account or dollar balance"));
+        Value::Number(n) => match n.as_f64() {
+            Some(f) if f.fract() == 0.0 && (0.0..=MAX_SAFE_INTEGER).contains(&f) => {
+                format!("{}", f as u64)
             }
-            n.to_string()
-        }
+            _ => return Err(invalid("account or dollar balance")),
+        },
         Value::String(s) => s.clone(),
         _ => return Err(invalid("account or dollar balance")),
     };
@@ -335,42 +336,22 @@ fn parse_credits(
         .get("credits")
         .and_then(|v| v.get("balance"))
         .ok_or_else(|| invalid("account or dollar balance"))
-        .and_then(|v| match v {
-            Value::Number(n) if n.is_f64() => {
-                let f = n.as_f64().unwrap();
-                if f.is_finite() {
-                    Ok(f)
-                } else {
-                    Err(invalid("account or dollar balance"))
-                }
-            }
-            _ => Err(invalid("account or dollar balance")),
-        })?;
+        .and_then(amount)?;
 
-    // Free credits: if undefined, use 0; if present, must be valid or error
+    // Free credits: absent means 0; present (even null) needs a valid balance.
     let free = match credits.get("freeCredits") {
         None => 0.0,
-        Some(v) => match v.get("balance") {
-            None => 0.0,
-            Some(b) => match b {
-                Value::Number(n) if n.is_f64() => {
-                    let f = n.as_f64().unwrap();
-                    if f.is_finite() {
-                        f
-                    } else {
-                        return Err(invalid("account or dollar balance"));
-                    }
-                }
-                _ => return Err(invalid("account or dollar balance")),
-            },
-        },
+        Some(v) => amount(v.get("balance").unwrap_or(&Value::Null))?,
     };
 
     let balance = paid + free;
 
-    // Build the usage snapshot with placeholder (not displayed for this provider)
-    let usage =
-        UsageSnapshot::new(RateWindow::informational("")).with_login_method("Browser session");
+    // Upstream has no window: the balance reaches the tray and float bar only.
+    let usage = UsageSnapshot::new(
+        RateWindow::informational(format!("Balance: {}", super::format::usd(balance)))
+            .hidden_on_card(),
+    )
+    .with_login_method("Browser session");
 
     let mut result = ProviderFetchResult::new(usage, "web");
 
@@ -382,9 +363,9 @@ fn parse_credits(
     );
 
     // Add display details as three rows, all with "Credits" section title
-    let balance_text = format!("${:.2}", balance);
-    let paid_text = format!("${:.2}", paid);
-    let free_text = format!("${:.2}", free);
+    let balance_text = super::format::usd(balance);
+    let paid_text = super::format::usd(paid);
+    let free_text = super::format::usd(free);
 
     let detail_rows = vec![
         ProviderDisplayDetail::new("balance", "Balance", balance_text)
@@ -403,6 +384,14 @@ fn parse_credits(
 
     result = result.with_display_details(detail_rows);
     Ok(result)
+}
+
+/// Any finite JSON number, integers included (upstream `amount`).
+fn amount(value: &Value) -> Result<f64, ProviderError> {
+    value
+        .as_f64()
+        .filter(|f| f.is_finite())
+        .ok_or_else(|| invalid("account or dollar balance"))
 }
 
 fn invalid(field: &str) -> ProviderError {
