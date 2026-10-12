@@ -110,6 +110,7 @@ pub enum ProviderId {
     LithosAI,
     MuseAI,
     WorkBuddy,
+    Cosmic,
 }
 
 impl ProviderId {
@@ -212,6 +213,7 @@ impl ProviderId {
             ProviderId::LithosAI,
             ProviderId::MuseAI,
             ProviderId::WorkBuddy,
+            ProviderId::Cosmic,
         ]
     }
 
@@ -314,6 +316,7 @@ impl ProviderId {
             ProviderId::Xai => "xai",
             ProviderId::Replicate => "replicate",
             ProviderId::AtlasCloud => "atlascloud",
+            ProviderId::Cosmic => "cosmic",
         }
     }
 
@@ -418,6 +421,7 @@ impl ProviderId {
             ProviderId::Xai => "xAI",
             ProviderId::Replicate => "Replicate",
             ProviderId::AtlasCloud => "Atlas Cloud",
+            ProviderId::Cosmic => "Cosmic AI",
         }
     }
 
@@ -527,6 +531,7 @@ impl ProviderId {
             ProviderId::QwenCloud => Some("qwencloud.com"),
             ProviderId::Notion => Some("app.notion.com"),
             ProviderId::Xai => None,
+            ProviderId::Cosmic => None,
         }
     }
 
@@ -663,6 +668,7 @@ impl ProviderId {
             "lithosai" => Some(ProviderId::LithosAI),
             "museai" | "muse (muse.ai)" => Some(ProviderId::MuseAI),
             "workbuddy" => Some(ProviderId::WorkBuddy),
+            "cosmic" => Some(ProviderId::Cosmic),
             _ => None,
         }
     }
@@ -1380,6 +1386,7 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::LithosAI => "#6B7280",
         ProviderId::MuseAI => "#0668E1",
         ProviderId::WorkBuddy => "#0DC8A6",
+        ProviderId::Cosmic => "#6366F1",
     }
 }
 
@@ -1394,7 +1401,7 @@ mod tests {
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 96);
+        assert_eq!(all.len(), 97);
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Pi));

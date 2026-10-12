@@ -8,6 +8,7 @@
 use super::{Provider, ProviderId, ProviderPaceCapability};
 use crate::providers::AtlasCloudProvider;
 use crate::providers::ClawRouterProvider;
+use crate::providers::CosmicProvider;
 use crate::providers::IBMBobProvider;
 use crate::providers::LangdockProvider;
 use crate::providers::LithosAIProvider;
@@ -136,6 +137,7 @@ pub fn instantiate(id: ProviderId) -> Box<dyn Provider> {
         ProviderId::XKiro => Box::new(XKiroProvider::new()),
         ProviderId::Raycast => Box::new(RaycastProvider::new()),
         ProviderId::Vercel => Box::new(VercelProvider::new()),
+        ProviderId::Cosmic => Box::new(CosmicProvider::new()),
     }
 }
 
@@ -241,7 +243,8 @@ pub fn pace_capability(id: ProviderId) -> ProviderPaceCapability {
         | ProviderId::DevPass
         | ProviderId::XKiro
         | ProviderId::Raycast
-        | ProviderId::Vercel => ProviderPaceCapability::UNSUPPORTED,
+        | ProviderId::Vercel
+        | ProviderId::Cosmic => ProviderPaceCapability::UNSUPPORTED,
     }
 }
 
