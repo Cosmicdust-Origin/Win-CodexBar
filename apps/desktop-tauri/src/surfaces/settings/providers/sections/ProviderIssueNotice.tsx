@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProviderDetail } from "../../../../types/bridge";
 import type { LocaleKey } from "../../../../i18n/keys";
 import { describeProviderState } from "../../../../lib/providerState";
-import { maskEmailsInText } from "./IdentitySection";
+import { hideEmailsInText } from "../../../../lib/personalInfo";
 
 interface Props {
   detail: Pick<ProviderDetail, "displayName" | "errorState" | "lastError">;
@@ -22,7 +22,7 @@ export function ProviderIssueNotice({ detail, t, hidePersonalInfo = false }: Pro
   const state = describeProviderState(detail.errorState ?? "unknown");
   const preview = t(state.labelKey);
   const raw = detail.lastError?.trim() || null;
-  const full = raw && hidePersonalInfo ? maskEmailsInText(raw) : raw;
+  const full = raw && hidePersonalInfo ? hideEmailsInText(raw) : raw;
   const title = t("ProviderLastFetchFailedTitle").replace("{}", detail.displayName);
 
   return (

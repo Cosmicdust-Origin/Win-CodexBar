@@ -66,6 +66,7 @@ pub struct SettingsUpdate {
     pub http_proxy_username: Option<String>,
     pub http_proxy_password: Option<String>,
     pub ui_language: Option<String>,
+    pub ui_language_follows_system: Option<bool>,
     pub theme: Option<String>,
     pub window_scale_percent: Option<u16>,
     pub tray_scale_percent: Option<u16>,
@@ -147,7 +148,22 @@ impl SettingsUpdate {
     }
 
     fn rebuilds_tray_menu(&self) -> bool {
-        self.float_bar_enabled.is_some() || self.ui_language.is_some()
+        self.float_bar_enabled.is_some()
+            || self.ui_language.is_some()
+            || self.ui_language_follows_system.is_some()
+    }
+
+    /// Picking a language stops following the system; picking "System"
+    /// (`ui_language_follows_system: true`) resolves to `system`.
+    fn apply_language_with(&self, settings: &mut Settings, system: Language) {
+        if let Some(language) = self.ui_language.as_deref().and_then(parse_language) {
+            settings.ui_language = language;
+            settings.ui_language_follows_system = false;
+        }
+        if let Some(follow) = self.ui_language_follows_system {
+            settings.ui_language_follows_system = follow;
+        }
+        settings.resolve_system_language_with(system);
     }
 
     pub fn changes_tray_promotion(&self) -> bool {
@@ -176,6 +192,7 @@ impl SettingsUpdate {
             || self.cost_reporting_period.is_some()
             || self.enabled_providers.is_some()
             || self.ui_language.is_some()
+            || self.ui_language_follows_system.is_some()
     }
 
     fn validate_shortcut_change(
@@ -289,11 +306,13 @@ impl SettingsUpdate {
         if let Some(v) = self.global_shortcut.clone() {
             settings.global_shortcut = v;
         }
-        if let Some(v) = self.ui_language.as_deref().and_then(parse_language)
-            && settings.ui_language != v
-        {
-            settings.ui_language = v;
-        }
+        // Read the registry only when "System" is being picked.
+        let system = if self.ui_language_follows_system == Some(true) {
+            Language::system()
+        } else {
+            settings.ui_language
+        };
+        self.apply_language_with(settings, system);
         if let Some(v) = self.theme.as_deref().and_then(parse_theme) {
             settings.theme = v;
         }
@@ -1198,6 +1217,45 @@ mod tests {
             settings.stacked_tray_bottom_provider.as_deref(),
             Some("claude")
         );
+    }
+
+    #[test]
+    fn choosing_system_language_follows_the_system() {
+        let mut settings = Settings {
+            ui_language: Language::Spanish,
+            ui_language_follows_system: false,
+            ..Settings::default()
+        };
+        let patch = SettingsUpdate {
+            ui_language_follows_system: Some(true),
+            ..Default::default()
+        };
+        assert!(patch.rebuilds_tray_menu());
+        assert!(patch.refreshes_tray_presentation());
+        patch.apply_language_with(&mut settings, Language::Korean);
+        assert!(settings.ui_language_follows_system);
+        assert_eq!(settings.ui_language, Language::Korean);
+    }
+
+    #[test]
+    fn choosing_a_specific_language_stops_following_the_system() {
+        let mut settings = Settings {
+            ui_language: Language::Korean,
+            ui_language_follows_system: true,
+            ..Settings::default()
+        };
+        SettingsUpdate {
+            ui_language: Some("japanese".to_string()),
+            ..Default::default()
+        }
+        .apply_language_with(&mut settings, Language::Korean);
+        assert!(!settings.ui_language_follows_system);
+        assert_eq!(settings.ui_language, Language::Japanese);
+
+        // An unrelated patch leaves the choice alone.
+        SettingsUpdate::default().apply_language_with(&mut settings, Language::Korean);
+        assert!(!settings.ui_language_follows_system);
+        assert_eq!(settings.ui_language, Language::Japanese);
     }
 
     #[test]

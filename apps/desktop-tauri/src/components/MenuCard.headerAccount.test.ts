@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { headerAccount, maskEmail } from "./MenuCard";
+import { headerAccount } from "./MenuCard";
 
 describe("headerAccount", () => {
   it("prefers the provider email over the token-account label", () => {
@@ -17,10 +17,8 @@ describe("headerAccount", () => {
     );
   });
 
-  it("masks the email and hides the label under Hide Personal Info", () => {
-    expect(headerAccount({ accountEmail: "parity.user@example.com" }, true)).toBe(
-      "p••••••••••@example.com",
-    );
+  it("shows no email and no label under Hide Personal Info", () => {
+    expect(headerAccount({ accountEmail: "parity.user@example.com" }, true)).toBeNull();
     expect(
       headerAccount({ accountEmail: null, accountLabel: "parity-github" }, true),
     ).toBeNull();
@@ -32,9 +30,5 @@ describe("headerAccount", () => {
   it("shows nothing without an email or label", () => {
     expect(headerAccount({ accountEmail: null }, false)).toBeNull();
     expect(headerAccount({ accountEmail: null, accountLabel: "" }, true)).toBeNull();
-  });
-
-  it("masks a non-email label completely", () => {
-    expect(maskEmail("parity-github")).toBe("••••@••••");
   });
 });

@@ -227,39 +227,45 @@ export default function UsageSpendTab({ settings, set, saving }: TabProps) {
               onChange={(value) => set({ costUsageEnabled: value })}
             />
           </Field>
-          <Field label={t("UsageSpendOpenCodexImport")}>
-            <Toggle
-              variant="switch"
-              checked={includeOpenCodex}
-              disabled={saving}
-              onChange={(value) => set({ openCodexUsageLogsEnabled: value })}
-            />
-          </Field>
-          {includeOpenCodex && (
-            <Field label={t("UsageSpendHideNativeCodex")}>
-              <Toggle
-                variant="switch"
-                checked={hideNativeCodex}
-                disabled={saving}
-                onChange={(value) => set({ hideNativeCodexCostWhenOpenCodexPresent: value })}
-              />
-            </Field>
-          )}
-          {sources.length > 0 && (
-            <fieldset className="usage-spend__sources">
-              <legend className="settings-field__label">{t("UsageSpendSources")}</legend>
-              {sources.map((source) => (
+          {/* Mac PreferencesSpendDashboardPane.swift:498-512: OpenCodex and the Sources
+              filter only show while Track costs is on (#825). */}
+          {trackCosts && (
+            <>
+              <Field label={t("UsageSpendOpenCodexImport")}>
                 <Toggle
-                  key={source.id}
-                  label={source.displayName}
-                  checked={!hidden.includes(source.id)}
+                  variant="switch"
+                  checked={includeOpenCodex}
                   disabled={saving}
-                  onChange={(show) =>
-                    set({ spendDashboardHiddenSourceIds: toggleHiddenSource(hidden, source.id, show) })
-                  }
+                  onChange={(value) => set({ openCodexUsageLogsEnabled: value })}
                 />
-              ))}
-            </fieldset>
+              </Field>
+              {includeOpenCodex && (
+                <Field label={t("UsageSpendHideNativeCodex")}>
+                  <Toggle
+                    variant="switch"
+                    checked={hideNativeCodex}
+                    disabled={saving}
+                    onChange={(value) => set({ hideNativeCodexCostWhenOpenCodexPresent: value })}
+                  />
+                </Field>
+              )}
+              {sources.length > 0 && (
+                <fieldset className="usage-spend__sources">
+                  <legend className="settings-field__label">{t("UsageSpendSources")}</legend>
+                  {sources.map((source) => (
+                    <Toggle
+                      key={source.id}
+                      label={source.displayName}
+                      checked={!hidden.includes(source.id)}
+                      disabled={saving}
+                      onChange={(show) =>
+                        set({ spendDashboardHiddenSourceIds: toggleHiddenSource(hidden, source.id, show) })
+                      }
+                    />
+                  ))}
+                </fieldset>
+              )}
+            </>
           )}
           <div className="usage-spend__exports">
             <button

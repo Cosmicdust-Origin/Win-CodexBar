@@ -23,6 +23,7 @@ import InlineDashboard from "./card/InlineDashboard";
 import ExtraUsageBlock from "./card/ExtraUsageBlock";
 import WayfinderBlock from "./card/WayfinderBlock";
 import { describeCard } from "./card/describeCard";
+import { hideEmailsInText } from "../lib/personalInfo";
 
 export interface MenuCardDisplayOptions {
   hideEmail: boolean;
@@ -53,25 +54,18 @@ interface MenuCardProps {
   onLayoutChange?: () => void;
 }
 
-export function maskEmail(email: string): string {
-  const at = email.indexOf("@");
-  if (at <= 1) return "••••@••••";
-  return email[0] + "•".repeat(at - 1) + email.slice(at);
-}
-
 /**
  * Upstream `MenuCardView.email(from:)`: the provider-reported email, else the
- * active token-account label. Hide Personal Info masks the email and drops the
- * label, as upstream `PersonalInfoRedactor.redactAccountLabel` blanks it.
+ * active token-account label. Hide Personal Info shows neither, as upstream
+ * `PersonalInfoRedactor.redactEmail` / `redactAccountLabel` blank them
+ * (`PersonalInfoRedactor.swift:18`, `emailPlaceholder = ""`).
  */
 export function headerAccount(
   provider: Pick<ProviderUsageSnapshot, "accountEmail" | "accountLabel">,
   hideEmail: boolean,
 ): string | null {
-  const email = provider.accountEmail?.trim();
-  if (email) return hideEmail ? maskEmail(email) : email;
   if (hideEmail) return null;
-  return provider.accountLabel?.trim() || null;
+  return provider.accountEmail?.trim() || provider.accountLabel?.trim() || null;
 }
 
 function cardMetrics(
@@ -261,7 +255,7 @@ export default function MenuCard({
         name={provider.displayName}
         email={email}
         plan={plan}
-        error={provider.error}
+        error={hideEmail ? hideEmailsInText(provider.error) : provider.error}
         updatedAt={provider.updatedAt}
         isRefreshing={isRefreshing}
       />
