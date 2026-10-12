@@ -448,7 +448,8 @@ impl TokenAccountSupport {
             | ProviderId::Langdock
             | ProviderId::LithosAI
             | ProviderId::MuseAI
-            | ProviderId::WorkBuddy => None,
+            | ProviderId::WorkBuddy
+            | ProviderId::Xapi => None,
         }
     }
 
