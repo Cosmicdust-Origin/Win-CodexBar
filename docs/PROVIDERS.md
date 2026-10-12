@@ -305,6 +305,27 @@ Synthetic (or `SYNTHETIC_API_KEY`); the CLI also accepts `synthetic.new`.
 - 401 and 403 report "Invalid Synthetic API credentials."; response bodies are
   never echoed in errors.
 
+### Tavily
+
+Tavily reads `GET https://api.tavily.com/usage` with bearer authentication.
+Configure the API key in Settings → Providers → Tavily (or `TAVILY_API_KEY`).
+
+- The "Account plan" lane reads `account.plan_usage` / `account.plan_limit`.
+  The "API key" lane reads `key.usage` / `key.limit`. A null key limit means
+  Unlimited; zero limits and unlimited keys display their rows without a
+  usage percentage. Remaining credits are the nonnegative difference between
+  reported cap and usage.
+- Pay-as-you-go totals, when present (`account.paygo_usage` and
+  `account.paygo_limit`), appear in a separate detail section.
+- The plan name (`account.current_plan`) identifies the account plan. No email
+  or account ID is inferred; unknown plans do not create a phantom identity.
+- 401 and 403 report "Tavily API key is invalid or expired. Check your
+  settings."; 429 reports rate limiting with guidance on request frequency.
+  Response bodies are never echoed in errors.
+- Tavily limits the usage endpoint to 10 requests per 10 minutes. Keep
+  refreshes at least one minute apart and avoid repeated manual refreshes. A
+  throttled request fails as rate-limited without automatic replay.
+
 ### ClawRouter
 
 ClawRouter reports the monthly budget, spend and routed-provider usage of one

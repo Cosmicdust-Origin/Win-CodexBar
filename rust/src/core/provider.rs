@@ -1386,7 +1386,7 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::LithosAI => "#6B7280",
         ProviderId::MuseAI => "#0668E1",
         ProviderId::WorkBuddy => "#0DC8A6",
-        ProviderId::Tavily => "#3B82F6",
+        ProviderId::Tavily => "#0F766E",
     }
 }
 

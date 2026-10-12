@@ -18,7 +18,7 @@ use crate::providers::read_bounded_response;
 
 const USAGE_URL: &str = "https://api.tavily.com/usage";
 const CREDENTIAL_TARGET: &str = "codexbar-tavily";
-const API_KEY_ENV: &str = "TAVILY_API_KEY";
+pub const API_KEY_ENV: &str = "TAVILY_API_KEY";
 const MAX_RESPONSE_BYTES: usize = 256 * 1024;
 const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
@@ -72,7 +72,10 @@ impl TavilyProvider {
         }
     }
 
-    async fn fetch_usage_impl(&self, ctx: &FetchContext) -> Result<ProviderFetchResult, ProviderError> {
+    async fn fetch_usage_impl(
+        &self,
+        ctx: &FetchContext,
+    ) -> Result<ProviderFetchResult, ProviderError> {
         let key = crate::providers::resolve_api_key(
             ctx.api_key.as_deref(),
             CREDENTIAL_TARGET,
@@ -101,14 +104,16 @@ impl TavilyProvider {
                 ));
             }
             status if status.is_server_error() => {
-                return Err(ProviderError::Other(
-                    format!("Tavily service error: HTTP {}.", status.as_u16()),
-                ));
+                return Err(ProviderError::Other(format!(
+                    "Tavily service error: HTTP {}.",
+                    status.as_u16()
+                )));
             }
             _ => {
-                return Err(ProviderError::Other(
-                    format!("Tavily API error: HTTP {}.", status.as_u16()),
-                ));
+                return Err(ProviderError::Other(format!(
+                    "Tavily API error: HTTP {}.",
+                    status.as_u16()
+                )));
             }
         }
 
@@ -116,10 +121,8 @@ impl TavilyProvider {
             .await
             .map_err(|_| ProviderError::Parse("Failed to read Tavily response.".into()))?;
 
-        let data: Value =
-            serde_json::from_slice(&body).map_err(|_| {
-                ProviderError::Parse("Tavily response is not valid JSON.".into())
-            })?;
+        let data: Value = serde_json::from_slice(&body)
+            .map_err(|_| ProviderError::Parse("Tavily response is not valid JSON.".into()))?;
 
         let parsed = parse_usage(&data)?;
         let usage = parsed.into_result();
@@ -178,17 +181,19 @@ impl ParsedUsage {
 }
 
 fn parse_usage(payload: &Value) -> Result<ParsedUsage, ProviderError> {
-    let data = payload.as_object().ok_or_else(|| {
-        ProviderError::Parse("Tavily response is not an object.".into())
-    })?;
+    let data = payload
+        .as_object()
+        .ok_or_else(|| ProviderError::Parse("Tavily response is not an object.".into()))?;
 
-    let account = data.get("account").and_then(|v| v.as_object()).ok_or_else(|| {
-        ProviderError::Parse("Tavily response missing account data.".into())
-    })?;
+    let account = data
+        .get("account")
+        .and_then(|v| v.as_object())
+        .ok_or_else(|| ProviderError::Parse("Tavily response missing account data.".into()))?;
 
-    let key = data.get("key").and_then(|v| v.as_object()).ok_or_else(|| {
-        ProviderError::Parse("Tavily response missing key data.".into())
-    })?;
+    let key = data
+        .get("key")
+        .and_then(|v| v.as_object())
+        .ok_or_else(|| ProviderError::Parse("Tavily response missing key data.".into()))?;
 
     // Extract account plan info
     let plan_usage = account
@@ -224,7 +229,10 @@ fn parse_usage(payload: &Value) -> Result<ParsedUsage, ProviderError> {
 
     // Build primary (account plan) window
     let primary = if plan_limit > 0 {
-        Some(RateWindow::new(percent_of(plan_usage as f64, plan_limit as f64)))
+        Some(RateWindow::new(percent_of(
+            plan_usage as f64,
+            plan_limit as f64,
+        )))
     } else {
         None
     };
@@ -249,7 +257,7 @@ fn percent_of(used: f64, limit: f64) -> f64 {
     if limit <= 0.0 {
         0.0
     } else {
-        ((used / limit) * 100.0).max(0.0).min(100.0)
+        ((used / limit) * 100.0).clamp(0.0, 100.0)
     }
 }
 
