@@ -497,20 +497,18 @@ impl ZaiProvider {
             ((used / limit) * 100.0).clamp(0.0, 100.0)
         }
 
-        // Upstream 0.48.0 `rateWindow`/`resetDescription`: only token-type
-        // windows keep duration minutes; TIME_LIMIT (MCP) carries the "MCP"
-        // label and no window duration, except upstream v0.70.0 zai.js's
-        // monthly MCP marker (unit 5, number 1), which gets the 30-day
-        // sentinel; 5-hour token windows are labeled "5-hour"; otherwise the
-        // explicit window label is used.
+        // Upstream zai.js `window` (v0.73.0 :85-99): every limit takes its
+        // length from the unit multipliers; the monthly MCP marker (TIME_LIMIT
+        // unit 5, number 1) gets the 30-day sentinel instead. TIME_LIMIT (MCP)
+        // carries the "MCP" label; 5-hour token windows are labeled "5-hour";
+        // otherwise the explicit window label is used.
         let now = Utc::now();
         let make_window = |l: &ZaiLimit| -> RateWindow {
-            let window_mins = if is_token_limit_type(l.limit_type.as_deref()) {
-                ZaiProvider::window_minutes(l)
-            } else if is_monthly_mcp_marker(l) {
+            let is_token_limit = is_token_limit_type(l.limit_type.as_deref());
+            let window_mins = if is_monthly_mcp_marker(l) {
                 Some(crate::core::MONTHLY_WINDOW_SENTINEL_MINUTES)
             } else {
-                None
+                ZaiProvider::window_minutes(l)
             };
             let resets_at = l
                 .next_reset_time
@@ -521,8 +519,11 @@ impl ZaiProvider {
                         .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
                         .map(|timestamp| timestamp.with_timezone(&Utc))
                 });
-            let resets_at =
-                resets_at.filter(|reset| is_plausible_five_hour_reset(window_mins, *reset, now));
+            // The five-hour plausibility check is for Coding Plan token
+            // limits only; a five-hour TIME_LIMIT keeps its reset.
+            let resets_at = resets_at.filter(|reset| {
+                !is_token_limit || is_plausible_five_hour_reset(window_mins, *reset, now)
+            });
             RateWindow::with_details(
                 compute_percent(l),
                 window_mins,

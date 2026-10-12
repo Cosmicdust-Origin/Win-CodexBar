@@ -253,9 +253,12 @@ fn usage_signal_overrides_stale_percentage() {
 }
 
 #[test]
-fn time_limit_primary_carries_mcp_label_without_duration() {
-    // Upstream 0.48.0: TIME_LIMIT (MCP) windows no longer keep explicit
-    // duration minutes and label as "MCP", not the old monthly sentinel.
+fn time_limit_primary_takes_its_unit_length() {
+    // Upstream zai.js `window` (v0.73.0 :85-99): a TIME_LIMIT (MCP) window
+    // takes its length from the unit multipliers (unit 3 = hours) and keeps
+    // the "MCP" label. The five-hour reset plausibility check is for token
+    // limits only, so a reset 8 hours away is kept.
+    let reset = Utc::now() + chrono::Duration::hours(8);
     let provider = ZaiProvider::new();
     let quota: ZaiQuotaResponse = serde_json::from_value(serde_json::json!({
         "code": 200,
@@ -268,15 +271,38 @@ fn time_limit_primary_carries_mcp_label_without_duration() {
                 "currentValue": 20,
                 "remaining": 80,
                 "percentage": 25,
-                "nextResetTime": 123000_i64
+                "nextResetTime": reset.timestamp_millis()
             }]
         }
     }))
     .unwrap();
     let usage = provider.parse_quota_response(&quota).unwrap().usage;
-    assert_eq!(usage.primary.window_minutes, None);
+    assert_eq!(usage.primary.window_minutes, Some(300));
     assert_eq!(usage.primary.reset_description.as_deref(), Some("MCP"));
-    assert!(usage.primary.resets_at.is_some());
+    assert_eq!(
+        usage.primary.resets_at.map(|at| at.timestamp_millis()),
+        Some(reset.timestamp_millis())
+    );
+}
+
+#[test]
+fn weekly_time_limit_primary_is_seven_days() {
+    let provider = ZaiProvider::new();
+    let quota: ZaiQuotaResponse = serde_json::from_value(serde_json::json!({
+        "code": 200,
+        "data": {
+            "limits": [{
+                "type": "TIME_LIMIT",
+                "unit": 6,
+                "number": 1,
+                "percentage": 40
+            }]
+        }
+    }))
+    .unwrap();
+    let usage = provider.parse_quota_response(&quota).unwrap().usage;
+    assert_eq!(usage.primary.window_minutes, Some(10_080));
+    assert_eq!(usage.primary.reset_description.as_deref(), Some("MCP"));
 }
 
 #[test]
