@@ -711,3 +711,17 @@ fn clawrouter_cost_titles_stay_english_in_every_locale_as_on_the_mac() {
         );
     }
 }
+
+#[test]
+fn provider_service_status_help_stays_english_in_every_locale_as_on_the_mac() {
+    // Upstream `PreferencesSidebar.swift` passes "Provider service status: %@" through
+    // `L()`, but no Localizable.strings file has an entry, so every Mac locale reads English.
+    assert_eq!(Language::all().len(), 10);
+    for &language in Language::all() {
+        assert_eq!(
+            get_text(language, LocaleKey::ProviderServiceStatusHelp),
+            "Provider service status: {}",
+            "{language:?}"
+        );
+    }
+}

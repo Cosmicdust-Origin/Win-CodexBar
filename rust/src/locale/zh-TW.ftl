@@ -526,6 +526,15 @@ RefreshIntervalLabel = 重新整理間隔
 RefreshIntervalHelper = 兩次自動重新整理之間的秒數（0 = 手動）。
 RefreshAllProvidersOnMenuOpen = 開啟選單時重新整理
 RefreshAllProvidersOnMenuOpenHelper = 每次開啟系統匣選單時強制重新整理已啟用的提供商。
+CheckProviderStatus = 檢查提供者狀態
+CheckProviderStatusHelper = 輪詢 OpenAI/Claude 狀態頁面和 Google Workspace 的 Gemini/Antigravity，並在圖示和選單中顯示服務異常資訊。
+ServiceStatusOperational = 運作正常
+ServiceStatusPartialOutage = 部分服務中斷
+ServiceStatusMajorOutage = 重大服務中斷
+ServiceStatusCriticalIssue = 嚴重問題
+ServiceStatusMaintenance = 維護中
+ServiceStatusUnknown = 狀態未知
+ProviderServiceStatusHelp = Provider service status: { "{}" }
 LowPowerMode = 低耗電模式
 LowPowerModeHelper = 將自動背景重新整理限制為每 30 分鐘一次。手動重新整理仍可立即執行。
 LowPowerModeOff = 關閉

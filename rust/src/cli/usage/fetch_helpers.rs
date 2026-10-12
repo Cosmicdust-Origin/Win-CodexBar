@@ -53,7 +53,7 @@ pub async fn fetch_provider_result(
     let provider = instantiate_provider(provider_id);
     let status_future = command
         .fetch_status
-        .then(|| fetch_provider_status(provider_id.cli_name()));
+        .then(|| fetch_provider_status(provider_id));
     let mut ctx = command.ctx.clone();
     let account_projected = project_cli_account(provider_id, command.account.as_deref(), &mut ctx)?;
     populate_api_region_from_settings(provider_id, &Settings::load(), &mut ctx);

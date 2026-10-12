@@ -1882,6 +1882,21 @@ fn adaptive_refresh_defaults_on_for_new_installs_only() {
     assert!(!explicit_off.adaptive_refresh);
 }
 
+/// Upstream `SettingsStore.swift:737`: `statusChecksEnabled ?? true`.
+#[test]
+fn status_checks_default_on_for_new_and_legacy_settings() {
+    assert!(Settings::default().status_checks_enabled);
+    let dir = tempfile::tempdir().expect("temp dir");
+    let path = dir.path().join("settings.json");
+    std::fs::write(&path, r#"{ "refresh_interval_secs": 600 }"#).expect("write legacy settings");
+    let legacy = Settings::load_from_path(Some(&path));
+    assert!(legacy.status_checks_enabled);
+    assert_eq!(legacy.refresh_interval_secs, 600);
+
+    std::fs::write(&path, r#"{ "status_checks_enabled": false }"#).expect("write explicit off");
+    assert!(!Settings::load_from_path(Some(&path)).status_checks_enabled);
+}
+
 // ── Mac parity PR 3: Menu Bar / Menu pane keys ──────────────────────────
 
 #[test]

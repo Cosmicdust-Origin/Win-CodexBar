@@ -118,6 +118,11 @@ pub struct Settings {
     #[serde(default)]
     pub refresh_all_providers_on_menu_open: bool,
 
+    /// Poll provider status pages and surface incidents (upstream
+    /// `statusChecksEnabled`, default on).
+    #[serde(default = "default_true")]
+    pub status_checks_enabled: bool,
+
     /// Off/On/Automatic background-work power preference (upstream 0.53).
     #[serde(default)]
     pub low_power_mode_preference: LowPowerModePreference,
@@ -657,6 +662,7 @@ impl Default for Settings {
             // keep the fixed interval through the field default in `RawSettings`.
             adaptive_refresh: true,
             refresh_all_providers_on_menu_open: false,
+            status_checks_enabled: true,
             low_power_mode_preference: LowPowerModePreference::Off,
             start_minimized: false,
             start_at_login: false,

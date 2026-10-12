@@ -542,6 +542,15 @@ RefreshIntervalLabel = Intervalo de atualização
 RefreshIntervalHelper = Segundos entre atualizações automáticas do provedor (0 = manual).
 RefreshAllProvidersOnMenuOpen = Atualizar ao abrir o menu
 RefreshAllProvidersOnMenuOpenHelper = Forçar a atualização dos provedores habilitados sempre que o menu da bandeja for aberto.
+CheckProviderStatus = Verificar status dos provedores
+CheckProviderStatusHelper = Consulta páginas de status da OpenAI/Claude e o Google Workspace para Gemini/Antigravity, exibindo incidentes no ícone e no menu.
+ServiceStatusOperational = Operacional
+ServiceStatusPartialOutage = Falha parcial
+ServiceStatusMajorOutage = Falha geral
+ServiceStatusCriticalIssue = Problema crítico
+ServiceStatusMaintenance = Manutenção
+ServiceStatusUnknown = Status desconhecido
+ProviderServiceStatusHelp = Provider service status: { "{}" }
 LowPowerMode = Modo de baixo consumo
 LowPowerModeHelper = Quando ativado, limite a atualização automática em segundo plano a uma vez a cada 30 minutos. A atualização manual permanece imediata. Automático segue o Windows Battery Saver.
 LowPowerModeOff = Desligado

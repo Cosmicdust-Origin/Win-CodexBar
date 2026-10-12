@@ -553,6 +553,15 @@ RefreshIntervalLabel = Интервал обновления
 RefreshIntervalHelper = Секунды между автоматическими обновлениями провайдера (0 = вручную).
 RefreshAllProvidersOnMenuOpen = Обновить при открытии меню
 RefreshAllProvidersOnMenuOpenHelper = Провайдеры с включенным принудительным обновлением всякий раз, когда открывается меню на панели задач.
+CheckProviderStatus = Проверить статус провайдера
+CheckProviderStatusHelper = Опрашивает страницы статуса OpenAI/Claude и Google Workspace для Gemini/Antigravity и показывает инциденты на значке и в меню.
+ServiceStatusOperational = Работает
+ServiceStatusPartialOutage = Частичный сбой
+ServiceStatusMajorOutage = Серьёзный сбой
+ServiceStatusCriticalIssue = Критическая проблема
+ServiceStatusMaintenance = Техническое обслуживание
+ServiceStatusUnknown = Статус неизвестен
+ProviderServiceStatusHelp = Provider service status: { "{}" }
 LowPowerMode = Режим энергосбережения
 LowPowerModeHelper = Ограничивает автоматическое фоновое обновление раз в 30 минут. Ручное обновление остаётся мгновенным.
 LowPowerModeOff = Выкл.

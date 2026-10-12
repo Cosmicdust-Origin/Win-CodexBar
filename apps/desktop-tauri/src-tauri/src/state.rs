@@ -175,6 +175,8 @@ pub struct AppState {
     pub gesture_blur_guard: Option<(std::time::Instant, std::time::Instant)>,
     /// Opt-in exact-session resume arms; intentionally discarded on restart.
     pub auto_resume: crate::auto_resume::AutoResumeState,
+    /// Provider service status from the status poller.
+    pub provider_statuses: crate::status_poller::ProviderStatusCache,
 }
 
 impl Default for AppState {
@@ -227,6 +229,7 @@ impl AppState {
             flyout_reveal_pending: None,
             gesture_blur_guard: None,
             auto_resume: crate::auto_resume::AutoResumeState::default(),
+            provider_statuses: Default::default(),
         }
     }
 

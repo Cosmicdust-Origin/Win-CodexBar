@@ -67,6 +67,7 @@ function settings(overrides: Partial<SettingsSnapshot> = {}): SettingsSnapshot {
     refreshIntervalSecs: 300,
     adaptiveRefresh: false,
     refreshAllProvidersOnMenuOpen: false,
+    statusChecksEnabled: true,
   lowPowerMode: false,
     startAtLogin: false,
     startMinimized: false,

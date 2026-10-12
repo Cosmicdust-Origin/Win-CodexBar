@@ -526,6 +526,15 @@ RefreshIntervalLabel = 刷新间隔
 RefreshIntervalHelper = 两次自动刷新之间的秒数（0 = 手动）。
 RefreshAllProvidersOnMenuOpen = 打开菜单时刷新
 RefreshAllProvidersOnMenuOpenHelper = 每次打开托盘菜单时强制刷新已启用的提供商。
+CheckProviderStatus = 检查提供商状态
+CheckProviderStatusHelper = 轮询 OpenAI/Claude 状态页面和 Google Workspace 的 Gemini/Antigravity，在图标和菜单中显示故障信息。
+ServiceStatusOperational = 正常运行
+ServiceStatusPartialOutage = 部分中断
+ServiceStatusMajorOutage = 重大中断
+ServiceStatusCriticalIssue = 严重问题
+ServiceStatusMaintenance = 维护中
+ServiceStatusUnknown = 状态未知
+ProviderServiceStatusHelp = Provider service status: { "{}" }
 LowPowerMode = 低功耗模式
 LowPowerModeHelper = 将自动后台刷新限制为每 30 分钟一次。手动刷新仍可立即执行。
 LowPowerModeOff = 关

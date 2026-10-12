@@ -526,6 +526,15 @@ RefreshIntervalLabel = 更新間隔
 RefreshIntervalHelper = プロバイダーを自動更新する間隔(秒)(0 = 手動)。
 RefreshAllProvidersOnMenuOpen = メニュー表示時に更新
 RefreshAllProvidersOnMenuOpenHelper = トレイメニューを開くたびに有効なプロバイダーを強制更新。
+CheckProviderStatus = プロバイダのステータスを確認
+CheckProviderStatusHelper = OpenAI/Claude のステータスページと Gemini/Antigravity 用の Google Workspace をポーリングし、障害情報をアイコンとメニューに表示します。
+ServiceStatusOperational = 正常稼働中
+ServiceStatusPartialOutage = 一部障害
+ServiceStatusMajorOutage = 重大な障害
+ServiceStatusCriticalIssue = 致命的な問題
+ServiceStatusMaintenance = メンテナンス中
+ServiceStatusUnknown = ステータス不明
+ProviderServiceStatusHelp = Provider service status: { "{}" }
 LowPowerMode = 低電力モード
 LowPowerModeHelper = 自動のバックグラウンド更新を30分に1回までに制限します。手動更新はすぐ実行されます。
 LowPowerModeOff = オフ

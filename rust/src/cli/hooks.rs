@@ -13,7 +13,7 @@ use crate::core::{
     instantiate_provider,
 };
 use crate::settings::{ApiKeys, Settings};
-use crate::status::{StatusLevel, fetch_provider_status};
+use crate::status::{StatusIndicator, fetch_provider_status};
 
 #[derive(Args, Debug, Clone)]
 pub struct HooksArgs {
@@ -279,8 +279,8 @@ async fn hooks_watch_observation(
     web_timeout: u64,
     verbose: bool,
 ) -> HookProviderObservation {
-    let status = match fetch_provider_status(provider_id.cli_name()).await {
-        Some(s) => map_status_level(s.level),
+    let status = match fetch_provider_status(provider_id).await {
+        Some(s) => map_status_indicator(s.indicator),
         None => HookProviderStatus::Unknown,
     };
 
@@ -384,13 +384,14 @@ fn hooks_watch_lanes(
     lanes
 }
 
-fn map_status_level(level: StatusLevel) -> HookProviderStatus {
-    match level {
-        StatusLevel::Operational => HookProviderStatus::None,
-        StatusLevel::Degraded => HookProviderStatus::Minor,
-        StatusLevel::Partial => HookProviderStatus::Major,
-        StatusLevel::Major => HookProviderStatus::Critical,
-        StatusLevel::Unknown => HookProviderStatus::Unknown,
+fn map_status_indicator(indicator: StatusIndicator) -> HookProviderStatus {
+    match indicator {
+        StatusIndicator::Operational => HookProviderStatus::None,
+        StatusIndicator::Minor => HookProviderStatus::Minor,
+        StatusIndicator::Major => HookProviderStatus::Major,
+        StatusIndicator::Critical => HookProviderStatus::Critical,
+        StatusIndicator::Maintenance => HookProviderStatus::Maintenance,
+        StatusIndicator::Unknown => HookProviderStatus::Unknown,
     }
 }
 

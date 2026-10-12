@@ -18,6 +18,7 @@ import type {
   LocaleStrings,
   NotificationSoundEvent,
   ProviderCatalogEntry,
+  ProviderStatusEntry,
   ProviderChartData,
   ProviderDetail,
   ProviderLocalUsageSummary,
@@ -82,6 +83,10 @@ export function getBootstrapState(): Promise<BootstrapState> {
 
 export function getProviderCatalog(): Promise<ProviderCatalogEntry[]> {
   return invoke<ProviderCatalogEntry[]>("get_provider_catalog");
+}
+
+export function getProviderStatuses(): Promise<ProviderStatusEntry[]> {
+  return invoke<ProviderStatusEntry[]>("get_provider_statuses");
 }
 
 export function reorderProviders(ids: string[]): Promise<ProviderSummary[]> {

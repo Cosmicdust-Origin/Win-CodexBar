@@ -927,6 +927,35 @@ pub struct ProviderCatalogEntry {
     pub(crate) cookie_domain: Option<String>,
 }
 
+/// One provider's service status for the sidebar dot and the tray panel.
+/// `status` is `None` until the first successful poll.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderStatusEntry {
+    pub provider_id: String,
+    pub status: Option<ProviderServiceStatus>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderServiceStatus {
+    /// Upstream raw indicator: none, minor, major, critical, maintenance, unknown.
+    pub indicator: &'static str,
+    pub description: Option<String>,
+    /// Unix milliseconds of the feed's last update.
+    pub updated_at: Option<i64>,
+}
+
+impl From<&codexbar::status::ProviderStatus> for ProviderServiceStatus {
+    fn from(status: &codexbar::status::ProviderStatus) -> Self {
+        Self {
+            indicator: status.indicator.as_raw(),
+            description: status.description.clone(),
+            updated_at: status.updated_at.map(|at| at.timestamp_millis()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsSnapshot {
@@ -936,6 +965,7 @@ pub struct SettingsSnapshot {
     refresh_interval_secs: u64,
     adaptive_refresh: bool,
     refresh_all_providers_on_menu_open: bool,
+    status_checks_enabled: bool,
     low_power_mode: bool,
     low_power_mode_preference: &'static str,
     start_at_login: bool,
@@ -1100,6 +1130,7 @@ impl From<Settings> for SettingsSnapshot {
             refresh_interval_secs: settings.refresh_interval_secs,
             adaptive_refresh: settings.adaptive_refresh,
             refresh_all_providers_on_menu_open: settings.refresh_all_providers_on_menu_open,
+            status_checks_enabled: settings.status_checks_enabled,
             low_power_mode: settings.low_power_mode_preference
                 == codexbar::settings::LowPowerModePreference::On,
             low_power_mode_preference: settings.low_power_mode_preference.as_str(),

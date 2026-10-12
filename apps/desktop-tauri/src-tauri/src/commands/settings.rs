@@ -12,6 +12,7 @@ pub struct SettingsUpdate {
     pub refresh_interval_secs: Option<u64>,
     pub adaptive_refresh: Option<bool>,
     pub refresh_all_providers_on_menu_open: Option<bool>,
+    pub status_checks_enabled: Option<bool>,
     pub low_power_mode: Option<bool>,
     pub low_power_mode_preference: Option<String>,
     pub start_at_login: Option<bool>,
@@ -193,6 +194,7 @@ impl SettingsUpdate {
             || self.enabled_providers.is_some()
             || self.ui_language.is_some()
             || self.ui_language_follows_system.is_some()
+            || self.status_checks_enabled.is_some()
     }
 
     fn validate_shortcut_change(
@@ -225,6 +227,9 @@ impl SettingsUpdate {
         }
         if let Some(v) = self.refresh_all_providers_on_menu_open {
             settings.refresh_all_providers_on_menu_open = v;
+        }
+        if let Some(v) = self.status_checks_enabled {
+            settings.status_checks_enabled = v;
         }
         if let Some(v) = self
             .cost_reporting_period
@@ -710,6 +715,8 @@ pub async fn update_settings(
     let tray_panel_always_on_top_changed = patch.tray_panel_always_on_top.is_some();
     let previous_promoted = settings.promote_tray_icon;
     let previous_language = settings.ui_language;
+    let status_targets_changed =
+        patch.status_checks_enabled.is_some() || patch.enabled_providers.is_some();
 
     patch.validate_shortcut_change(&app, &settings.global_shortcut)?;
     let float_bar_patch = patch.apply_to(&mut settings)?;
@@ -739,6 +746,9 @@ pub async fn update_settings(
     }
     if rebuild_tray_menu {
         crate::tray_bridge::rebuild_tray_menu(&app);
+    }
+    if status_targets_changed {
+        crate::status_poller::settings_changed(&app, &settings, !refresh_provider_data);
     }
     if refresh_tray_presentation {
         crate::tray_bridge::refresh_tray_presentation(&app);

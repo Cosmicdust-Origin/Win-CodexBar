@@ -176,6 +176,31 @@ export interface ProviderCatalogEntry {
   cookieDomain: string | null;
 }
 
+/** Upstream `ProviderStatusIndicator` raw values; `none` is operational. */
+export type ServiceStatusIndicator =
+  | "none"
+  | "minor"
+  | "major"
+  | "critical"
+  | "maintenance"
+  | "unknown";
+
+export interface ProviderServiceStatus {
+  indicator: ServiceStatusIndicator;
+  description: string | null;
+  /** Unix milliseconds of the status feed's last update. */
+  updatedAt: number | null;
+}
+
+/**
+ * One enabled provider with a status page. `status` is null until the first
+ * successful poll. The list is empty while "Check provider status" is off.
+ */
+export interface ProviderStatusEntry {
+  providerId: string;
+  status: ProviderServiceStatus | null;
+}
+
 export interface ProviderSummary {
   id: string;
   displayName: string;
@@ -190,6 +215,7 @@ export interface SettingsSnapshot {
   refreshIntervalSecs: number;
   adaptiveRefresh: boolean;
   refreshAllProvidersOnMenuOpen: boolean;
+  statusChecksEnabled: boolean;
   lowPowerMode: boolean;
   lowPowerModePreference?: "off" | "on" | "automatic";
   startAtLogin: boolean;
@@ -346,6 +372,7 @@ export interface SettingsUpdate {
   refreshIntervalSecs?: number;
   adaptiveRefresh?: boolean;
   refreshAllProvidersOnMenuOpen?: boolean;
+  statusChecksEnabled?: boolean;
   lowPowerMode?: boolean;
   lowPowerModePreference?: "off" | "on" | "automatic";
   startAtLogin?: boolean;
