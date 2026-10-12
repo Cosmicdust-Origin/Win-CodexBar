@@ -449,7 +449,8 @@ impl TokenAccountSupport {
             | ProviderId::LithosAI
             | ProviderId::MuseAI
             | ProviderId::WorkBuddy
-            | ProviderId::Tavily => None,
+            | ProviderId::Tavily
+            | ProviderId::Exa => None,
         }
     }
 

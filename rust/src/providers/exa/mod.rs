@@ -7,7 +7,7 @@
 //! Ported from upstream CodexBar v0.74.1 (`Resources/Plugins/exa.js`).
 
 use async_trait::async_trait;
-use chrono::{Datelike, Utc};
+use chrono::{Datelike, Timelike, Utc};
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -79,7 +79,7 @@ impl ExaProvider {
 
         // Get API key ID (scope/workspace)
         let key_id = ctx
-            .workspace
+            .workspace_id
             .as_deref()
             .and_then(|s| {
                 let trimmed = s.trim();
@@ -117,13 +117,20 @@ impl ExaProvider {
         let start_date = month_start.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
         let end_date = end_time.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
 
-        // Build URL with encoded key ID
+        // Build URL with encoded key ID and query parameters
+        let encoded_key_id = key_id.chars().map(|c| {
+            match c {
+                'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '~' | '.' => c.to_string(),
+                _ => format!("%{:02X}", c as u8),
+            }
+        }).collect::<String>();
+        
         let url = format!(
             "{}/{}/usage?start_date={}&end_date={}",
             USAGE_URL_BASE,
-            urlencoding::encode(&key_id),
-            urlencoding::encode(&start_date),
-            urlencoding::encode(&end_date)
+            encoded_key_id,
+            start_date,
+            end_date
         );
 
         let response = self
@@ -315,8 +322,8 @@ mod tests {
 
         assert_eq!(result.usage.login_method, Some("Service key".to_string()));
         assert!(!result.details.is_empty());
-        assert_eq!(result.details[0].label, "Spend");
-        assert!(result.details[0].value.contains("$45.67"));
+        assert_eq!(result.details[0].title(), "Spend");
+        assert!(result.details[0].value().contains("$45.67"));
     }
 
     #[test]
@@ -339,7 +346,7 @@ mod tests {
         let data: Value = serde_json::from_str(json).unwrap();
         let result = parse_usage(&data, month_start, end_time).unwrap();
 
-        assert_eq!(result.details[0].value, "$0.00");
+        assert_eq!(result.details[0].value(), "$0.00");
     }
 
     #[test]

@@ -536,8 +536,6 @@ impl ProviderId {
             ProviderId::QwenCloud => Some("qwencloud.com"),
             ProviderId::Notion => Some("app.notion.com"),
             ProviderId::Xai => None,
-            ProviderId::Replicate => None,
-            ProviderId::AtlasCloud => None,
             ProviderId::Exa => None,
         }
     }
