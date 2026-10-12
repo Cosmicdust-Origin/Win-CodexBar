@@ -7,11 +7,11 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde_json::Value;
 
+use super::format;
 use crate::core::{
     FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
     SourceMode,
 };
-use super::format;
 
 pub struct CosmicProvider {
     client: Client,
@@ -158,9 +158,12 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
         display_details.push(d);
     }
     if let Some(limit) = input_limit {
-        if let Some(d) =
-            ProviderDisplayDetail::new("input_tokens_allowance", "Allowance", format::number(limit, 0))
-                .and_then(|row| row.with_section_title("Input tokens"))
+        if let Some(d) = ProviderDisplayDetail::new(
+            "input_tokens_allowance",
+            "Allowance",
+            format::number(limit, 0),
+        )
+        .and_then(|row| row.with_section_title("Input tokens"))
         {
             display_details.push(d);
         }
@@ -214,9 +217,12 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
         display_details.push(d);
     }
     if let Some(limit) = output_limit {
-        if let Some(d) =
-            ProviderDisplayDetail::new("output_tokens_allowance", "Allowance", format::number(limit, 0))
-                .and_then(|row| row.with_section_title("Output tokens"))
+        if let Some(d) = ProviderDisplayDetail::new(
+            "output_tokens_allowance",
+            "Allowance",
+            format::number(limit, 0),
+        )
+        .and_then(|row| row.with_section_title("Output tokens"))
         {
             display_details.push(d);
         }
