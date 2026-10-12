@@ -10,12 +10,12 @@ use reqwest::{Client, StatusCode};
 use serde::Deserialize;
 use serde_json::Value;
 
+use super::format;
 use crate::core::{
     FetchContext, Provider, ProviderDisplayDetail, ProviderError, ProviderFetchResult, ProviderId,
     ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
 };
 use crate::providers::read_bounded_response;
-use super::format;
 
 const USAGE_URL: &str = "https://api.tavily.com/usage";
 const CREDENTIAL_TARGET: &str = "codexbar-tavily";
@@ -270,7 +270,10 @@ fn parse_usage(payload: &Value) -> Result<ParsedUsage, ProviderError> {
     if let Some(detail) = ProviderDisplayDetail::new(
         "account-plan-remaining",
         "Remaining",
-        format!("{} credits", format::number((plan_limit - plan_usage).max(0) as f64, 0)),
+        format!(
+            "{} credits",
+            format::number((plan_limit - plan_usage).max(0) as f64, 0)
+        ),
     )
     .and_then(|d| d.with_section_title("Account plan"))
     {
@@ -278,23 +281,32 @@ fn parse_usage(payload: &Value) -> Result<ParsedUsage, ProviderError> {
     }
 
     // API key section
-    if let Some(detail) =
-        ProviderDisplayDetail::new("api-key-used", "Used", format!("{} credits", format::number(key_usage as f64, 0)))
-            .and_then(|d| d.with_section_title("API key"))
+    if let Some(detail) = ProviderDisplayDetail::new(
+        "api-key-used",
+        "Used",
+        format!("{} credits", format::number(key_usage as f64, 0)),
+    )
+    .and_then(|d| d.with_section_title("API key"))
     {
         details.push(detail);
     }
     if let Some(limit) = key_limit {
-        if let Some(detail) =
-            ProviderDisplayDetail::new("api-key-limit", "Limit", format!("{} credits", format::number(limit as f64, 0)))
-                .and_then(|d| d.with_section_title("API key"))
+        if let Some(detail) = ProviderDisplayDetail::new(
+            "api-key-limit",
+            "Limit",
+            format!("{} credits", format::number(limit as f64, 0)),
+        )
+        .and_then(|d| d.with_section_title("API key"))
         {
             details.push(detail);
         }
         if let Some(detail) = ProviderDisplayDetail::new(
             "api-key-remaining",
             "Remaining",
-            format!("{} credits", format::number((limit - key_usage).max(0) as f64, 0)),
+            format!(
+                "{} credits",
+                format::number((limit - key_usage).max(0) as f64, 0)
+            ),
         )
         .and_then(|d| d.with_section_title("API key"))
         {
@@ -312,22 +324,31 @@ fn parse_usage(payload: &Value) -> Result<ParsedUsage, ProviderError> {
 
     // Pay-as-you-go section (if present)
     if let (Some(paygo_u), Some(paygo_l)) = (paygo_usage, paygo_limit) {
-        if let Some(detail) =
-            ProviderDisplayDetail::new("paygo-used", "Used", format!("{} credits", format::number(paygo_u as f64, 0)))
-                .and_then(|d| d.with_section_title("Pay as you go"))
+        if let Some(detail) = ProviderDisplayDetail::new(
+            "paygo-used",
+            "Used",
+            format!("{} credits", format::number(paygo_u as f64, 0)),
+        )
+        .and_then(|d| d.with_section_title("Pay as you go"))
         {
             details.push(detail);
         }
-        if let Some(detail) =
-            ProviderDisplayDetail::new("paygo-limit", "Limit", format!("{} credits", format::number(paygo_l as f64, 0)))
-                .and_then(|d| d.with_section_title("Pay as you go"))
+        if let Some(detail) = ProviderDisplayDetail::new(
+            "paygo-limit",
+            "Limit",
+            format!("{} credits", format::number(paygo_l as f64, 0)),
+        )
+        .and_then(|d| d.with_section_title("Pay as you go"))
         {
             details.push(detail);
         }
         if let Some(detail) = ProviderDisplayDetail::new(
             "paygo-remaining",
             "Remaining",
-            format!("{} credits", format::number((paygo_l - paygo_u).max(0) as f64, 0)),
+            format!(
+                "{} credits",
+                format::number((paygo_l - paygo_u).max(0) as f64, 0)
+            ),
         )
         .and_then(|d| d.with_section_title("Pay as you go"))
         {
