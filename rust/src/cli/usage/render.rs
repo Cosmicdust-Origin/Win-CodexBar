@@ -11,7 +11,7 @@ use crate::core::{
     RateWindow, UsagePace, UsageSnapshot, instantiate_provider,
 };
 use crate::spend_contract::CostProvenance;
-use crate::status::{ProviderStatus as StatusInfo, StatusIndicator};
+use crate::status::ProviderStatus as StatusInfo;
 
 pub fn render_text_error(provider_id: ProviderId, error_msg: &str, use_color: bool) -> String {
     let header = if use_color {
@@ -113,7 +113,7 @@ pub fn render_json_result(
 
     if let Some(s) = status {
         json_result["status"] = serde_json::json!({
-            "level": s.indicator.as_raw(),
+            "level": s.indicator.cli_level(),
             "description": s.summary(),
         });
     }
@@ -254,12 +254,11 @@ pub fn render_status_indicator(status: Option<&StatusInfo>, use_color: bool) -> 
         return String::new();
     };
 
-    let (symbol, color) = match status.indicator {
-        StatusIndicator::Operational => ("●", "\x1b[32m"),
-        StatusIndicator::Minor | StatusIndicator::Maintenance => ("◐", "\x1b[33m"),
-        StatusIndicator::Major => ("◑", "\x1b[33m"),
-        StatusIndicator::Critical => ("○", "\x1b[31m"),
-        StatusIndicator::Unknown => ("?", "\x1b[90m"),
+    let (symbol, color) = match status.indicator.cli_level() {
+        "operational" => ("●", "\x1b[32m"), // Green
+        "degraded" => ("◐", "\x1b[33m"),    // Yellow
+        "major" => ("○", "\x1b[31m"),       // Red
+        _ => ("?", "\x1b[90m"),             // Gray
     };
 
     if use_color {
@@ -271,8 +270,7 @@ pub fn render_status_indicator(status: Option<&StatusInfo>, use_color: bool) -> 
 
 pub fn append_status_line(lines: &mut Vec<String>, status: Option<&StatusInfo>) {
     if let Some(s) = status
-        && s.indicator.has_issue()
-        && s.indicator != StatusIndicator::Unknown
+        && !matches!(s.indicator.cli_level(), "operational" | "unknown")
     {
         lines.push(format!("  Status: {}", s.summary()));
     }

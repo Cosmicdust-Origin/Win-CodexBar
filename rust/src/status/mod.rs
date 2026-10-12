@@ -67,6 +67,20 @@ impl StatusIndicator {
         }
     }
 
+    /// The CLI JSON `status.level` vocabulary, unchanged from before the
+    /// poller so scripts keep parsing it: raw `major` and `critical` both
+    /// read `major`, `maintenance` reads `unknown`. Raw `minor` used to fall
+    /// through to `unknown` (a bug); it now reads `degraded`, the old
+    /// vocabulary's word for a partial outage.
+    pub fn cli_level(self) -> &'static str {
+        match self {
+            Self::Operational => "operational",
+            Self::Minor => "degraded",
+            Self::Major | Self::Critical => "major",
+            Self::Maintenance | Self::Unknown => "unknown",
+        }
+    }
+
     /// Upstream CLI `cliLabel` (English only).
     pub fn cli_label(self) -> &'static str {
         match self {

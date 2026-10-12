@@ -70,8 +70,54 @@ fn claude_swap_json_payload_keeps_provider_status_distinct() {
     let payload =
         super::claude_swap::claude_swap_json_payload(&sample_swap_account(), Some(&status));
     assert_eq!(payload["account"]["status"], "ok");
-    assert_eq!(payload["status"]["level"], "minor");
+    assert_eq!(payload["status"]["level"], "degraded");
     assert_eq!(payload["status"]["description"], "Degraded Performance");
+}
+
+/// The CLI keeps its pre-poller `status.level` values, symbols and status
+/// line for every feed indicator; only raw `minor` changed, from `unknown`.
+#[test]
+fn cli_status_output_keeps_the_legacy_level_vocabulary() {
+    use render::{append_status_line, render_status_indicator};
+    let cases = [
+        (StatusIndicator::Operational, "operational", " ●", false),
+        (StatusIndicator::Minor, "degraded", " ◐", true),
+        (StatusIndicator::Major, "major", " ○", true),
+        (StatusIndicator::Critical, "major", " ○", true),
+        (StatusIndicator::Maintenance, "unknown", " ?", false),
+        (StatusIndicator::Unknown, "unknown", " ?", false),
+    ];
+    for (indicator, level, symbol, has_line) in cases {
+        let status = StatusInfo {
+            indicator,
+            description: Some("Feed text".to_string()),
+            updated_at: None,
+        };
+        let json = render_json_result(
+            ProviderId::Claude,
+            fetch_result(UsageSnapshot::new(RateWindow::new(10.0))),
+            Some(&status),
+            None,
+        );
+        assert_eq!(json["status"]["level"], level, "{indicator:?}");
+        assert_eq!(json["status"]["description"], "Feed text", "{indicator:?}");
+        let swap =
+            super::claude_swap::claude_swap_json_payload(&sample_swap_account(), Some(&status));
+        assert_eq!(swap["status"]["level"], level, "{indicator:?}");
+        assert_eq!(
+            render_status_indicator(Some(&status), false),
+            symbol,
+            "{indicator:?}"
+        );
+        let mut lines = Vec::new();
+        append_status_line(&mut lines, Some(&status));
+        let expected: Vec<String> = if has_line {
+            vec!["  Status: Feed text".to_string()]
+        } else {
+            Vec::new()
+        };
+        assert_eq!(lines, expected, "{indicator:?}");
+    }
 }
 
 #[test]

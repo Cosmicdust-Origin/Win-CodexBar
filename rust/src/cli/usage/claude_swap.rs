@@ -98,7 +98,7 @@ pub(super) fn claude_swap_json_payload(
     });
     if let Some(status) = status {
         payload["status"] = serde_json::json!({
-            "level": status.indicator.as_raw(),
+            "level": status.indicator.cli_level(),
             "description": status.summary(),
         });
     }
@@ -290,7 +290,7 @@ fn claude_swap_error_payload(error: &str, status: Option<&StatusInfo>) -> serde_
     });
     if let Some(status) = status {
         payload["status"] = serde_json::json!({
-            "level": status.indicator.as_raw(),
+            "level": status.indicator.cli_level(),
             "description": status.summary(),
         });
     }
