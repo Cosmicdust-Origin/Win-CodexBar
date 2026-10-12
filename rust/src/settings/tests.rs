@@ -98,6 +98,15 @@ fn workbuddy_cookie_source_defaults_to_automatic_session_import() {
 }
 
 #[test]
+fn xapi_cookie_source_defaults_to_automatic_session_import() {
+    // X API cookie source falls back to `.auto`.
+    let mut settings = Settings::default();
+    assert_eq!(settings.cookie_source(ProviderId::Xapi), "auto");
+    settings.set_cookie_source(ProviderId::Xapi, "off");
+    assert_eq!(settings.cookie_source(ProviderId::Xapi), "off");
+}
+
+#[test]
 fn preferred_currency_defaults_validates_and_round_trips() {
     let legacy: Settings = serde_json::from_str(r#"{"enabled_providers": []}"#)
         .expect("legacy settings without a preferred currency remain valid");
