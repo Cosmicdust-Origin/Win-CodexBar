@@ -1,6 +1,8 @@
 //! Pure tray presentation policy shared by the native tray surfaces.
 
 use crate::commands::{ProviderUsageSnapshot, RateWindowSnapshot};
+use chrono::{DateTime, Utc};
+use codexbar::core::{IconLane, ProviderId, UsagePace};
 use codexbar::settings::{Language, MetricPreference, Settings, TrayIconMode};
 use codexbar::tray::{
     TrayPaceColor, render_bar_icon_rgba_with_pace, render_percent_icon_rgba_with_pace,
@@ -57,6 +59,16 @@ impl<'a> TrayPresentationPlan<'a> {
         snapshots: &'a [ProviderUsageSnapshot],
         rates_cache: Option<&'a crate::commands::CurrencyRateCache>,
     ) -> Self {
+        Self::resolve_at(settings, snapshots, rates_cache, Utc::now())
+    }
+
+    /// [`Self::resolve`] with the pace tint scored at `now`.
+    pub(crate) fn resolve_at(
+        settings: &'a Settings,
+        snapshots: &'a [ProviderUsageSnapshot],
+        rates_cache: Option<&'a crate::commands::CurrencyRateCache>,
+        now: DateTime<Utc>,
+    ) -> Self {
         let ordered = ordered_snapshot_refs(settings, snapshots);
         let healthy = ordered
             .into_iter()
@@ -66,7 +78,7 @@ impl<'a> TrayPresentationPlan<'a> {
         // The retired Display mode "minimal" is folded into this flag once on load.
         let prefer_highest = settings.menu_bar_shows_highest_usage;
         let selected = pick_tray_provider(&healthy, prefer_highest);
-        let icon_pace = tray_pace_color(settings, selected);
+        let icon_pace = tray_pace_color(settings, selected, now);
 
         let (icon, status_rows) = match settings.tray_icon_mode {
             TrayIconMode::Stacked => {
@@ -219,20 +231,73 @@ fn resolve_single_provider_icon_plan(
 /// Pace tint for the provider that drives a single-provider tray icon.
 ///
 /// Opt-in through `menu_bar_color_pace`; on-track and unknown stages keep the
-/// normal usage-level colour. A pace scored from a window without its own
-/// length gets no tint, as upstream `UsageStore.weeklyPace` gives the menu
-/// bar no pace for it (Copilot's reset-date-only windows, for example).
+/// normal usage-level colour. The pace comes from the menu bar pace window
+/// (upstream `menuBarPaceWindow`, StatusItemController+Animation.swift
+/// :1207-1225): the lane the provider declares, or else the window the icon
+/// draws for the selected metric.
 fn tray_pace_color(
     settings: &Settings,
     selected: Option<&ProviderUsageSnapshot>,
+    now: DateTime<Utc>,
 ) -> Option<TrayPaceColor> {
     if !settings.menu_bar_color_pace {
         return None;
     }
-    selected
-        .and_then(|snapshot| snapshot.pace.as_ref())
-        .filter(|pace| pace.window_has_length)
-        .and_then(|pace| TrayPaceColor::from_stage(&pace.stage))
+    let snapshot = selected?;
+    let window = menu_bar_pace_window(snapshot, settings)?;
+    let pace = menu_bar_pace(snapshot, &window, settings.weekly_progress_work_days, now)?;
+    TrayPaceColor::from_stage(crate::commands::pace::stage_str(pace.stage))
+}
+
+/// Window the menu bar pace is scored on. A provider-declared lane wins over
+/// the selected metric; a missing declared lane gives no pace.
+fn menu_bar_pace_window(
+    snapshot: &ProviderUsageSnapshot,
+    settings: &Settings,
+) -> Option<RateWindowSnapshot> {
+    let declared = ProviderId::from_cli_name(&snapshot.provider_id)
+        .and_then(|id| codexbar::core::instantiate_provider(id).menu_bar_pace_lane());
+    match declared {
+        Some(IconLane::Primary) => Some(snapshot.primary.clone()),
+        Some(IconLane::Secondary) => snapshot.secondary.clone(),
+        None => Some(crate::usage_metric::selected_usage_icon_windows(snapshot, settings).0),
+    }
+}
+
+/// Generic branch of upstream `UsageStore.weeklyPace`
+/// (UsageStore+HistoricalPace.swift:8-64): the fetch must allow pace and the
+/// window must have quota left and its own length (no 7-day fallback). A
+/// monthly sentinel resolves to the real calendar cycle first
+/// (`paceWindowForElapsedEligibility`, :118-124), and a pace expecting less
+/// than 3% use is dropped.
+fn menu_bar_pace(
+    snapshot: &ProviderUsageSnapshot,
+    window: &RateWindowSnapshot,
+    work_days: Option<u8>,
+    now: DateTime<Utc>,
+) -> Option<UsagePace> {
+    const MINIMUM_EXPECTED_PERCENT: f64 = 3.0;
+    if !snapshot.pace_authoritative || window.is_informational {
+        return None;
+    }
+    window.window_minutes?;
+    let rate_window = window.to_rate_window();
+    if rate_window.remaining_percent() <= 0.0 {
+        return None;
+    }
+    let pace_window = match ProviderId::from_cli_name(&snapshot.provider_id) {
+        Some(id) => id
+            .pace_capability()
+            .resolved_reset_window_for_pace(&rate_window),
+        None => rate_window,
+    };
+    let pace = UsagePace::weekly(
+        &pace_window,
+        Some(now),
+        crate::commands::pace::WEEKLY_FALLBACK_MINUTES,
+        work_days,
+    )?;
+    (pace.expected_used_percent >= MINIMUM_EXPECTED_PERCENT).then_some(pace)
 }
 
 fn fallback_percents(

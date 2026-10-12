@@ -1083,6 +1083,14 @@ pub trait Provider: Send + Sync {
         None
     }
 
+    /// Lane the menu bar pace is scored on, whatever metric the menu bar
+    /// shows (upstream `menuBarPaceWindow`,
+    /// StatusItemController+Animation.swift). `None` scores the window the
+    /// tray icon draws.
+    fn menu_bar_pace_lane(&self) -> Option<super::IconLane> {
+        None
+    }
+
     /// Label for the primary lane in the menu bar metric picker when the
     /// lane is not a session window (upstream `menuBarLayoutPrimaryLabel`).
     /// `None` keeps the generic session label.

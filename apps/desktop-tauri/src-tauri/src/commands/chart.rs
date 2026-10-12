@@ -8,7 +8,7 @@
 use crate::commands::bridge::RateWindowSnapshot;
 use crate::state::AppState;
 use chrono::{DateTime, Utc};
-use codexbar::core::{OpenAIDashboardCacheStore, RateWindow};
+use codexbar::core::OpenAIDashboardCacheStore;
 use codexbar::cost_reporting_period::{CostReportingPeriod, CostTimeZone};
 use codexbar::cost_scanner::{
     CostScanner, CostSummary, TodayUsage, get_daily_cost_history, get_daily_token_history,
@@ -221,7 +221,9 @@ fn build_provider_chart_data_with_cancel(
             ..ProviderChartData::empty(provider_id)
         };
     }
-    let live_window = weekly_window.as_ref().map(rate_window_from_snapshot);
+    let live_window = weekly_window
+        .as_ref()
+        .map(RateWindowSnapshot::to_rate_window);
     let build_snapshot = || {
         codexbar::providers::chart::build_chart_snapshot(
             &provider_id,
@@ -464,20 +466,6 @@ fn local_usage_summary_from_cost_summary(
         incomplete_request_count: period_summary
             .and_then(|s| non_zero_u32(s.incomplete_request_count)),
     })
-}
-
-fn rate_window_from_snapshot(snapshot: &RateWindowSnapshot) -> RateWindow {
-    let resets_at = snapshot
-        .resets_at
-        .as_deref()
-        .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
-        .map(|value| value.with_timezone(&Utc));
-    RateWindow::with_details(
-        snapshot.used_percent,
-        snapshot.window_minutes,
-        resets_at,
-        snapshot.reset_description.clone(),
-    )
 }
 
 fn active_chart_scans() -> &'static Mutex<HashMap<String, Arc<AtomicBool>>> {
