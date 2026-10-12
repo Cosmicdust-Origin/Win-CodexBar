@@ -647,14 +647,15 @@ impl Quota {
 
     /// A window whose next regen tick replaces the pace line.
     ///
-    /// The window length is left out on purpose: the card derives a pace line
-    /// from `window_minutes` + `resets_at`, and measured against the next tick
-    /// time that line would be meaningless. Upstream shows the regen line
-    /// instead of pace.
+    /// The window keeps the payload length, as upstream synthetic.js does, so
+    /// the tray can still score its pace. The card hides the pace line for a
+    /// regenerating window (`with_regenerating_reset`) and shows the regen
+    /// line instead, as upstream `syntheticRollingRegenDetail` and
+    /// `syntheticRegenDetail` do.
     fn regen_window(&self, next_regen_percent: f64, ticks_to_full: f64) -> RateWindow {
         RateWindow::with_details(
             self.used_percent,
-            None,
+            self.window_minutes,
             self.resets_at,
             Some(regen_detail(
                 self.used_percent,

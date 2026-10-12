@@ -267,6 +267,15 @@ mod tests {
 
         assert_eq!(snap.primary.pace, None);
         assert_eq!(snap.secondary.as_ref().unwrap().pace, None);
+        // The tray scores its own pace, so it needs the flag too.
+        assert!(!snap.pace_authoritative);
+        assert!(
+            snapshot(
+                UsageSnapshot::new(resetting_in(now, 60.0, Some(300), 150)),
+                true
+            )
+            .pace_authoritative
+        );
     }
 
     #[test]
@@ -386,18 +395,17 @@ mod tests {
         // Extras keep plain lane pace, as on the Mac: a 14-day reset does not
         // fit the 7-day fallback, so the seat-credit window shows none.
         assert_eq!(snap.extra_rate_windows[0].window.pace, None);
-        // The provider-level pace (tray colour) needs a window length, as
-        // upstream `UsageStore.weeklyPace` does, so it stays unset here.
+        // The provider-level pace (the Settings detail) scores the length-less
+        // window against the 7-day fallback, which a 14-day reset overruns.
         assert!(snap.pace.is_none());
     }
 
     /// Within the 7-day fallback, a length-less Copilot window still yields
-    /// a provider-level pace (the Settings detail shows it), but upstream
-    /// `UsageStore.weeklyPace` gives the menu bar none for a window without
-    /// `windowMinutes`, so it is marked as having no length for the tray.
-    /// The card lane keeps its reset-window pace.
+    /// a provider-level pace (the Settings detail shows it). The card lane
+    /// keeps its reset-window pace. The tray scores its own pace and skips
+    /// the window (`tray_presentation::menu_bar_pace`).
     #[test]
-    fn copilot_provider_pace_is_marked_lengthless_for_the_tray() {
+    fn copilot_lengthless_window_keeps_provider_and_lane_pace() {
         let now = february_now();
         let usage = UsageSnapshot::new(RateWindow::with_details(
             60.0,
@@ -408,29 +416,11 @@ mod tests {
 
         let snap = snapshot_at(ProviderId::Copilot, usage);
 
-        let pace = snap.pace.as_ref().expect("provider-level pace");
-        assert!(!pace.window_has_length);
+        assert!(snap.pace.is_some());
         assert!(lane_pace(&snap.primary).reset_window);
-        let json = serde_json::to_value(pace).unwrap();
-        assert!(json.get("windowHasLength").is_none());
-    }
-
-    #[test]
-    fn provider_pace_from_a_window_with_a_length_keeps_the_tray_tint() {
-        let now = february_now();
-        let usage = UsageSnapshot::new(RateWindow::with_details(
-            60.0,
-            Some(10_080),
-            Some(now + Duration::days(3)),
-            None,
-        ));
-
-        let snap = snapshot_at(ProviderId::Claude, usage);
-
-        assert!(snap.pace.as_ref().expect("pace").window_has_length);
-        let cached: PaceSnapshot =
-            serde_json::from_str(r#"{"stage":"behind","deltaPercent":-8.0}"#).unwrap();
-        assert!(cached.window_has_length);
+        assert!(snap.pace_authoritative);
+        let json = serde_json::to_value(&snap).unwrap();
+        assert!(json.get("paceAuthoritative").is_none());
     }
 
     /// Cursor's plan bars carry the billing-cycle length; the API bar is the

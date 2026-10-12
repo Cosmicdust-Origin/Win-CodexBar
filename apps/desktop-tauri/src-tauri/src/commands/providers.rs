@@ -1722,6 +1722,7 @@ mod reset_backfill_tests {
             error: None,
             error_state: codexbar::core::ProviderStateKind::Ready,
             pace: None,
+            pace_authoritative: true,
             account_organization: None,
             tray_status_label: None,
             fetch_duration_ms: None,

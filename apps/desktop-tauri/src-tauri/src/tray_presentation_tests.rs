@@ -74,6 +74,7 @@ fn fake_snapshot_with(
         error: None,
         error_state: ProviderStateKind::Ready,
         pace: None,
+        pace_authoritative: true,
         account_organization: None,
         open_ai_api_usage: None,
         tray_status_label: None,
@@ -724,142 +725,204 @@ fn f5_headline_returns_primary_when_all_informational() {
     assert!(headline.is_informational);
 }
 
-#[test]
-fn tray_pace_color_is_opt_in_and_follows_canonical_stage() {
-    let pace = |stage: &str, delta_percent: f64| crate::commands::PaceSnapshot {
-        stage: stage.to_string(),
-        delta_percent,
-        will_last_to_reset: true,
-        eta_seconds: None,
-        expected_used_percent: 40.0,
-        actual_used_percent: 32.0,
-        monthly_limit_block: None,
-        window_has_length: true,
-    };
-    let with_pace = |pace: Option<crate::commands::PaceSnapshot>| {
-        let mut snapshot = fake_snapshot("codex", "Codex", 50.0);
-        snapshot.pace = pace;
-        vec![snapshot]
-    };
-    let default_settings = Settings::default();
-    let colored_settings = Settings {
-        menu_bar_color_pace: true,
-        ..Settings::default()
-    };
-    let colored_percent_settings = Settings {
-        menu_bar_color_pace: true,
-        menu_bar_icon_style: codexbar::settings::MenuBarIconStyle::Percent,
-        ..Settings::default()
-    };
-    let render = |settings: &Settings, snapshots: &[ProviderUsageSnapshot]| {
-        TrayPresentationPlan::resolve(settings, snapshots, None).render_icon()
-    };
-
-    let unpaced = with_pace(None);
-    let behind_snapshots = with_pace(Some(pace("behind", -8.0)));
-    let ahead_snapshots = with_pace(Some(pace("ahead", 8.0)));
-    let on_track_snapshots = with_pace(Some(pace("on_track", 1.0)));
-
-    let normal = render(&default_settings, &unpaced);
-    let disabled = render(&default_settings, &behind_snapshots);
-    let behind = render(&colored_settings, &behind_snapshots);
-    let ahead = render(&colored_settings, &ahead_snapshots);
-    let on_track = render(&colored_settings, &on_track_snapshots);
-
-    assert_eq!(normal, disabled);
-    assert_eq!(normal, on_track);
-    assert_ne!(normal, behind);
-    assert_ne!(behind, ahead);
-
-    let percent_normal = render(
-        &Settings {
-            menu_bar_icon_style: codexbar::settings::MenuBarIconStyle::Percent,
-            ..Settings::default()
-        },
-        &unpaced,
-    );
-    let percent_behind = render(&colored_percent_settings, &behind_snapshots);
-    assert_ne!(percent_normal, percent_behind);
+fn pace_now() -> chrono::DateTime<chrono::Utc> {
+    "2026-10-12T12:00:00Z".parse().expect("fixed now")
 }
 
-/// Upstream `UsageStore.weeklyPace`: no menu-bar pace for a window without
-/// its own length (Copilot's reset-date-only windows). The rendered RGBA with
-/// the tint enabled must equal the untinted icon.
+/// A `minutes`-long window that resets `reset_in` minutes after `pace_now`.
+fn paced_window(used: f64, minutes: Option<u32>, reset_in: i64) -> RateWindowSnapshot {
+    let mut window = fake_snapshot("claude", "Claude", used).primary;
+    window.window_minutes = minutes;
+    window.resets_at = Some((pace_now() + chrono::Duration::minutes(reset_in)).to_rfc3339());
+    window
+}
+
+fn paced_snapshot(id: &str, primary: RateWindowSnapshot) -> ProviderUsageSnapshot {
+    let mut snapshot = fake_snapshot(id, id, primary.used_percent);
+    snapshot.primary = primary;
+    snapshot
+}
+
+/// Work days stay off: work-day progress follows the machine time zone.
+fn tint_settings() -> Settings {
+    Settings {
+        menu_bar_color_pace: true,
+        weekly_progress_work_days: None,
+        ..Settings::default()
+    }
+}
+
+fn tint(settings: &Settings, snapshots: &[ProviderUsageSnapshot]) -> Option<TrayPaceColor> {
+    TrayPresentationPlan::resolve_at(settings, snapshots, None, pace_now()).icon_pace
+}
+
+fn render_at(settings: &Settings, snapshots: &[ProviderUsageSnapshot]) -> (Vec<u8>, u32, u32) {
+    TrayPresentationPlan::resolve_at(settings, snapshots, None, pace_now()).render_icon()
+}
+
+/// Half way through a five-hour window the expected use is 50%.
 #[test]
-fn tray_pace_tint_skips_pace_from_a_window_without_a_length() {
-    let pace = |window_has_length: bool| crate::commands::PaceSnapshot {
-        stage: "far_ahead".to_string(),
-        delta_percent: 20.0,
-        will_last_to_reset: false,
-        eta_seconds: None,
-        expected_used_percent: 30.0,
-        actual_used_percent: 50.0,
-        monthly_limit_block: None,
-        window_has_length,
+fn tray_pace_tint_is_opt_in_and_follows_the_drawn_window_stage() {
+    let behind = vec![paced_snapshot("claude", paced_window(30.0, Some(300), 150))];
+    let ahead = vec![paced_snapshot("claude", paced_window(70.0, Some(300), 150))];
+    let on_track = vec![paced_snapshot("claude", paced_window(51.0, Some(300), 150))];
+    let colored = tint_settings();
+    let plain = Settings {
+        menu_bar_color_pace: false,
+        ..tint_settings()
     };
-    let with_pace = |pace: Option<crate::commands::PaceSnapshot>| {
-        let mut snapshot = fake_snapshot("copilot", "Copilot", 50.0);
-        snapshot.pace = pace;
-        vec![snapshot]
-    };
+
+    assert_eq!(tint(&colored, &behind), Some(TrayPaceColor::Behind));
+    assert_eq!(tint(&colored, &ahead), Some(TrayPaceColor::Ahead));
+    assert_eq!(tint(&colored, &on_track), None);
+    assert_eq!(tint(&plain, &ahead), None);
+
     for style in [
-        codexbar::settings::MenuBarIconStyle::default(),
+        codexbar::settings::MenuBarIconStyle::Bars,
         codexbar::settings::MenuBarIconStyle::Percent,
     ] {
         let colored = Settings {
-            menu_bar_color_pace: true,
             menu_bar_icon_style: style,
-            ..Settings::default()
+            ..tint_settings()
         };
-        let render = |snapshots: &[ProviderUsageSnapshot]| {
-            TrayPresentationPlan::resolve(&colored, snapshots, None).render_icon()
+        let plain = Settings {
+            menu_bar_color_pace: false,
+            ..colored.clone()
         };
-        let unpaced = render(&with_pace(None));
-        let lengthless = render(&with_pace(Some(pace(false))));
-        let with_length = render(&with_pace(Some(pace(true))));
-
-        assert_eq!(unpaced, lengthless);
-        assert_ne!(unpaced, with_length);
+        let plain_behind = render_at(&plain, &behind);
+        let tinted_behind = render_at(&colored, &behind);
+        // An on-track 51% icon differs from a 30% one only by usage, so
+        // compare tinted and untinted icons for the same usage.
+        assert_eq!(render_at(&plain, &on_track), render_at(&colored, &on_track));
+        assert_ne!(plain_behind, tinted_behind);
+        assert_ne!(
+            render_at(&colored, &ahead),
+            render_at(&plain, &ahead),
+            "{style:?} ahead"
+        );
     }
+}
+
+/// Upstream `menuBarPaceWindow` paces the selected metric window
+/// (`percentWindow`), not the session lane.
+#[test]
+fn tray_pace_tint_follows_the_selected_metric_lane() {
+    let mut snapshot = paced_snapshot("claude", paced_window(30.0, Some(300), 150));
+    snapshot.secondary = Some(paced_window(70.0, Some(10_080), 5_040));
+    let snapshots = vec![snapshot];
+
+    let mut weekly = tint_settings();
+    weekly.set_provider_metric(ProviderId::Claude, MetricPreference::Weekly);
+    assert_eq!(tint(&weekly, &snapshots), Some(TrayPaceColor::Ahead));
+
+    let mut session = tint_settings();
+    session.set_provider_metric(ProviderId::Claude, MetricPreference::Session);
+    assert_eq!(tint(&session, &snapshots), Some(TrayPaceColor::Behind));
+
+    // Claude's Automatic metric draws the fuller lane, the weekly one here.
+    assert_eq!(
+        tint(&tint_settings(), &snapshots),
+        Some(TrayPaceColor::Ahead)
+    );
+}
+
+/// Upstream `menuBarPaceWindow` paces Codex on its weekly lane whatever
+/// metric the menu bar shows; no weekly lane means no pace.
+#[test]
+fn codex_tray_pace_tint_uses_its_weekly_lane() {
+    let mut snapshot = paced_snapshot("codex", paced_window(30.0, Some(300), 150));
+    snapshot.secondary = Some(paced_window(70.0, Some(10_080), 5_040));
+    let mut session = tint_settings();
+    session.set_provider_metric(ProviderId::Codex, MetricPreference::Session);
+    assert_eq!(tint(&session, &[snapshot]), Some(TrayPaceColor::Ahead));
+
+    let session_only = paced_snapshot("codex", paced_window(70.0, Some(300), 150));
+    assert_eq!(tint(&session, &[session_only]), None);
+}
+
+/// Upstream `UsageStore.weeklyPace` (UsageStore+HistoricalPace.swift:8-64):
+/// no pace without a length, without pace authority, with no quota left, or
+/// when it expects less than 3% use.
+#[test]
+fn tray_pace_tint_follows_the_mac_weekly_pace_guards() {
+    let colored = tint_settings();
+
+    let lengthless = vec![paced_snapshot("copilot", paced_window(70.0, None, 150))];
+    assert_eq!(tint(&colored, &lengthless), None);
+
+    let mut estimated = paced_snapshot("claude", paced_window(70.0, Some(300), 150));
+    estimated.pace_authoritative = false;
+    assert_eq!(tint(&colored, &[estimated]), None);
+
+    let exhausted = vec![paced_snapshot(
+        "claude",
+        paced_window(100.0, Some(300), 150),
+    )];
+    assert_eq!(tint(&colored, &exhausted), None);
+
+    // 5 of 300 minutes gone: 1.7% expected. 10 gone: 3.3% expected.
+    let too_early = vec![paced_snapshot("claude", paced_window(40.0, Some(300), 295))];
+    assert_eq!(tint(&colored, &too_early), None);
+    let early = vec![paced_snapshot("claude", paced_window(40.0, Some(300), 290))];
+    assert_eq!(tint(&colored, &early), Some(TrayPaceColor::Ahead));
+}
+
+/// A provider-declared icon lane (Doubao's Agent Plan) is the drawn window,
+/// so it drives the tint.
+#[test]
+fn tray_pace_tint_uses_the_icon_fallback_window() {
+    let mut snapshot = paced_snapshot("doubao", paced_window(0.0, None, 150));
+    snapshot.primary.is_informational = true;
+    snapshot
+        .extra_rate_windows
+        .push(crate::commands::NamedRateWindowSnapshot {
+            id: "doubao-agent-plan".to_string(),
+            title: "Agent Plan".to_string(),
+            window: paced_window(70.0, Some(300), 150),
+            fallback_lane: false,
+            icon_fallback: Some(codexbar::core::IconLane::Primary),
+        });
+    assert_eq!(
+        tint(&tint_settings(), &[snapshot]),
+        Some(TrayPaceColor::Ahead)
+    );
+}
+
+/// The Mac menu bar paces a regenerating window that has a length; only the
+/// card swaps its pace for the regen line.
+#[test]
+fn tray_pace_tint_scores_a_regenerating_window_with_a_length() {
+    let mut window = paced_window(70.0, Some(300), 150);
+    window.reset_regenerates = true;
+    let snapshots = vec![paced_snapshot("synthetic", window)];
+    assert_eq!(
+        tint(&tint_settings(), &snapshots),
+        Some(TrayPaceColor::Ahead)
+    );
 }
 
 #[test]
 fn stacked_tray_icon_keeps_usage_colours_when_pace_tint_is_enabled() {
-    let mut codex = fake_snapshot("codex", "Codex", 50.0);
-    codex.pace = Some(crate::commands::PaceSnapshot {
-        stage: "far_ahead".to_string(),
-        delta_percent: 20.0,
-        will_last_to_reset: false,
-        eta_seconds: None,
-        expected_used_percent: 30.0,
-        actual_used_percent: 50.0,
-        monthly_limit_block: None,
-        window_has_length: true,
-    });
-    let claude = fake_snapshot("claude", "Claude", 20.0);
-    let snapshots = vec![codex.clone(), claude.clone()];
-    let unpaced = vec![
-        ProviderUsageSnapshot {
-            pace: None,
-            ..codex
-        },
-        claude,
-    ];
+    let mut codex = paced_snapshot("codex", paced_window(50.0, Some(300), 150));
+    codex.secondary = Some(paced_window(90.0, Some(10_080), 5_040));
+    let claude = paced_snapshot("claude", paced_window(80.0, Some(300), 150));
+    let snapshots = vec![codex, claude];
+    // Both providers are ahead of pace, so the single icon would tint.
+    assert_eq!(
+        tint(&tint_settings(), &snapshots),
+        Some(TrayPaceColor::Ahead)
+    );
     let stacked = |color_pace: bool| Settings {
         tray_icon_mode: TrayIconMode::Stacked,
         menu_bar_color_pace: color_pace,
-        ..Settings::default()
+        ..tint_settings()
     };
 
     let stacked_settings = stacked(true);
-    let plan = TrayPresentationPlan::resolve(&stacked_settings, &snapshots, None);
+    let plan = TrayPresentationPlan::resolve_at(&stacked_settings, &snapshots, None, pace_now());
     assert!(matches!(plan.icon, TrayIconPlan::Stacked { .. }));
     assert_eq!(plan.icon_pace, None);
-    let unpaced_settings = stacked(false);
-    assert_eq!(
-        plan.render_icon(),
-        TrayPresentationPlan::resolve(&unpaced_settings, &unpaced, None).render_icon()
-    );
+    assert_eq!(plan.render_icon(), render_at(&stacked(false), &snapshots));
 }
 
 #[test]

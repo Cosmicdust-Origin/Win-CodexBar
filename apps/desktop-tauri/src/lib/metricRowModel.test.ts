@@ -291,6 +291,31 @@ describe("metricRowPresentation pace", () => {
     expect(row.metaText).toBe("23% in reserve · Lasts until reset");
   });
 
+  // Upstream MenuCardView+ModelHelpers.swift:179-186 and
+  // MenuCardView.swift:1407-1415: a regenerating window keeps its length but
+  // shows the regen line instead of pace. Workday ticks stay (:1433-1437).
+  it("hides pace on a regenerating window that keeps its length", () => {
+    const session = rateWindow({ windowMinutes: 300, resetRegenerates: true, pace: pace() });
+    const sessionRow = metricRowPresentation(input({ snap: session }), en);
+    expect(sessionRow.metaText).toBeNull();
+    expect(sessionRow.bar.pacePercent).toBeNull();
+    expect(sessionRow.bar.paceDeficit).toBe(false);
+
+    const week = weekly({ resetRegenerates: true });
+    const weekRow = metricRowPresentation(
+      input({ lane: "secondary", snap: week, weeklyProgressWorkDays: 5, usageThresholds: null }),
+      en,
+    );
+    expect(weekRow.metaText).toBeNull();
+    expect(weekRow.bar.pacePercent).toBeNull();
+    expect(weekRow.bar.markers).toEqual([
+      { percent: 20, kind: "workday" },
+      { percent: 40, kind: "workday" },
+      { percent: 60, kind: "workday" },
+      { percent: 80, kind: "workday" },
+    ]);
+  });
+
   describe("reset-window pace (upstream ProviderPaceCapability)", () => {
     // Copilot premium requests: no window length, 60% used half way through
     // a 28-day cycle, scored by the bridge against the resolved month.

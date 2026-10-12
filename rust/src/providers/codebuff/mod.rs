@@ -299,6 +299,9 @@ fn weekly_window(value: &Value) -> Option<RateWindow> {
         return None;
     }
     let mut window = RateWindow::new((used / limit * 100.0).clamp(0.0, 100.0));
+    // Upstream `CodebuffUsageSnapshot.makeWeeklyWindow` gives the weekly lane
+    // a 7-day length, so pace can score it.
+    window.window_minutes = Some(7 * 24 * 60);
     if let Some(reset) =
         string_at(value, &["weeklyResetsAt", "resetsAt", "resetAt"]).and_then(parse_datetime)
     {
@@ -369,5 +372,26 @@ mod tests {
             snapshot.login_method.as_deref(),
             Some("Team · 60 remaining")
         );
+    }
+
+    #[test]
+    fn weekly_lane_is_seven_days_and_credits_lane_has_no_length() {
+        // Upstream `CodebuffUsageSnapshot.makeWeeklyWindow` sets
+        // `windowMinutes: 7 * 24 * 60`; the credits window keeps nil.
+        let usage = json!({ "usage": 25, "quota": 100 });
+        let subscription = json!({
+            "rateLimit": {
+                "weeklyUsed": 10,
+                "weeklyLimit": 50,
+                "weeklyResetsAt": "2026-10-19T00:00:00Z"
+            }
+        });
+
+        let snapshot = CodebuffProvider::snapshot_from_values(&usage, Some(&subscription));
+
+        assert_eq!(snapshot.primary.window_minutes, None);
+        let weekly = snapshot.secondary.expect("weekly lane");
+        assert_eq!(weekly.window_minutes, Some(10_080));
+        assert_eq!(weekly.used_percent, 20.0);
     }
 }

@@ -234,6 +234,10 @@ function visiblePace(input: MetricRowInput): { pace: WindowPaceSnapshot; kind: P
   const { snap } = input;
   const pace = snap.pace;
   if (!input.paceEnabled || !pace || !(snap.usedPercent < 100)) return null;
+  // A regenerating window shows its regen line instead of pace, as upstream
+  // MenuCardView+ModelHelpers.swift:179-186 and MenuCardView.swift:1407-1415
+  // do. The window keeps its length, so workday ticks and the tray still use it.
+  if (snap.resetRegenerates) return null;
   if (!Number.isFinite(pace.expectedUsedPercent) || !Number.isFinite(pace.actualUsedPercent)) return null;
   const kind = paceKind(input.lane, snap.windowMinutes, pace.resetWindow === true);
   if (!kind) return null;

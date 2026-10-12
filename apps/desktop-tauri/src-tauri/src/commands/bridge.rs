@@ -83,6 +83,22 @@ impl RateWindowSnapshot {
         }
     }
 
+    /// The core window this snapshot was built from, as far as pace needs it:
+    /// usage, length, reset time and reset description.
+    pub(crate) fn to_rate_window(&self) -> RateWindow {
+        let resets_at = self
+            .resets_at
+            .as_deref()
+            .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+            .map(|value| value.with_timezone(&chrono::Utc));
+        RateWindow::with_details(
+            self.used_percent,
+            self.window_minutes,
+            resets_at,
+            self.reset_description.clone(),
+        )
+    }
+
     /// Enrich with raw reserve info derived from pace analysis.
     /// delta_percent = actual - expected; negative means ahead (in reserve).
     /// Only meaningful for longer windows (weekly); skip if reserve rounds to 0.
@@ -208,18 +224,6 @@ pub struct PaceSnapshot {
     /// Block of the window this pace comes from (upstream hides its pace).
     #[serde(default)]
     pub monthly_limit_block: Option<MonthlyLimitBlockSnapshot>,
-    /// Whether the window this pace comes from carries its own length.
-    /// Upstream `UsageStore.weeklyPace` (UsageStore+HistoricalPace.swift)
-    /// gives the menu bar no pace for a generic window without
-    /// `windowMinutes`, rather than scoring it against the 7-day fallback,
-    /// so the tray pace tint skips it. Card lanes keep their own pace.
-    /// Tray-only; not sent to the frontend.
-    #[serde(default = "default_window_has_length", skip_serializing)]
-    pub window_has_length: bool,
-}
-
-fn default_window_has_length() -> bool {
-    true
 }
 
 /// One burndown chart point (RFC 3339 capture time + remaining percent).
@@ -353,6 +357,11 @@ pub struct ProviderUsageSnapshot {
     pub error_state: codexbar::core::ProviderStateKind,
     #[serde(default)]
     pub pace: Option<PaceSnapshot>,
+    /// Whether the fetch allows pace (upstream `allowsPace(dataConfidence:)`).
+    /// The tray scores its pace tint at presentation time, so it needs this
+    /// beside the windows. Tray-only; not sent to the frontend.
+    #[serde(default = "default_pace_authoritative", skip_serializing)]
+    pub pace_authoritative: bool,
     #[serde(default)]
     pub account_organization: Option<String>,
     #[serde(default)]
@@ -378,6 +387,10 @@ fn default_display_name() -> String {
 
 fn default_source_label() -> String {
     "seed".to_string()
+}
+
+fn default_pace_authoritative() -> bool {
+    true
 }
 
 fn default_error_state() -> codexbar::core::ProviderStateKind {
@@ -475,8 +488,6 @@ impl ProviderUsageSnapshot {
             expected_used_percent: p.expected_used_percent,
             actual_used_percent: p.actual_used_percent,
             monthly_limit_block: MonthlyLimitBlockSnapshot::for_pace(usage, &blocked),
-            window_has_length: primary_pace_window
-                .is_some_and(|window| window.window_minutes.is_some()),
         });
 
         // Pace of the secondary lane, which also derives the row's reserve.
@@ -685,6 +696,7 @@ impl ProviderUsageSnapshot {
             error: None,
             error_state: codexbar::core::ProviderStateKind::Ready,
             pace,
+            pace_authoritative: allows_pace,
             account_organization: usage.account_organization.clone(),
             tray_status_label: None,
             fetch_duration_ms: None,
@@ -744,6 +756,7 @@ impl ProviderUsageSnapshot {
             error: Some(error),
             error_state: state_kind,
             pace: None,
+            pace_authoritative: true,
             account_organization: None,
             tray_status_label: None,
             fetch_duration_ms: None,
