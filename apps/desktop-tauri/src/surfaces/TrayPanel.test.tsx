@@ -647,6 +647,38 @@ describe("TrayPanel provider grid", () => {
     expect(note()).toBeNull();
   });
 
+  it("targets the first enabled provider for the overview status line, as on macOS", async () => {
+    const codexIncident = [
+      {
+        providerId: "codex",
+        status: { indicator: "major", description: "Codex is down", updatedAt: null },
+      },
+    ];
+    // Overview: macOS targets the first enabled provider (Claude here), not
+    // the first provider that already has a snapshot.
+    const overview = renderTrayPanel([provider("codex", "Codex", 45)], {
+      enabledProviders: ["claude", "codex"],
+      providerOrder: ["claude", "codex"],
+    });
+    await waitFor(() => {
+      expect(overview.container.querySelector(".tray-panel-reveal--ready")).not.toBeNull();
+    });
+    act(() => {
+      emitEvent("provider-statuses-updated", codexIncident);
+    });
+    expect(overview.container.querySelector(".menu-surface__footer-note")).toBeNull();
+
+    act(() => {
+      emitEvent("provider-statuses-updated", [
+        ...codexIncident,
+        { providerId: "claude", status: { indicator: "minor", description: null, updatedAt: null } },
+      ]);
+    });
+    expect(overview.container.querySelector(".menu-surface__footer-note")).toHaveTextContent(
+      /^Partial outage$/,
+    );
+  });
+
   it("offers the only provider's rows without selecting its tab", async () => {
     tauriMocks.getProviderDetail.mockImplementation((id: string) =>
       Promise.resolve(providerLinks(id)),

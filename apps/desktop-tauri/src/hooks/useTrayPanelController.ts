@@ -202,9 +202,11 @@ export function useTrayPanelController(state: BootstrapState) {
     };
   }, [actionProviderId]);
   const serviceStatuses = useProviderStatuses();
+  // macOS `MenuDescriptor.statusLine`: the selected provider, else the first
+  // enabled one, whether or not it has a usage snapshot yet.
   const statusLine = serviceStatusLine(
     serviceStatuses,
-    actionProviderId ?? sorted[0]?.providerId ?? null,
+    selectedProviderId ?? denseProviderSlots[0]?.id ?? null,
     t,
   );
   const links =
