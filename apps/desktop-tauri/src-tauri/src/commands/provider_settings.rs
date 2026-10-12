@@ -893,6 +893,13 @@ pub fn cookie_source_options_for(provider_id: &str, lang: Language) -> Vec<Cooki
             cookie_option(lang, "manual", None),
             cookie_option(lang, "off", None),
         ],
+        // X API cookie source: automatic browser import,
+        // a pasted header, or off.
+        "xapi" => vec![
+            cookie_option(lang, "auto", None),
+            cookie_option(lang, "manual", None),
+            cookie_option(lang, "off", None),
+        ],
         _ => Vec::new(),
     }
 }
