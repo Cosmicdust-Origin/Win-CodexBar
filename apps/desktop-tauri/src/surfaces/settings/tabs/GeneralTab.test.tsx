@@ -46,6 +46,7 @@ const settings: SettingsSnapshot = {
   refreshIntervalSecs: 300,
     adaptiveRefresh: false,
   refreshAllProvidersOnMenuOpen: false,
+  statusChecksEnabled: true,
   lowPowerMode: false,
   startAtLogin: false,
   startMinimized: false,
@@ -250,6 +251,35 @@ describe("GeneralTab language picker", () => {
     });
 
     expect(set).toHaveBeenCalledWith({ lowPowerModePreference: "automatic" });
+  });
+
+  it("shows Check provider status on by default and saves turning it off", () => {
+    const set = vi.fn();
+    render(<GeneralTab settings={settings} set={set} saving={false} />);
+
+    const toggle = screen.getByRole("checkbox", { name: "CheckProviderStatus" });
+    expect(toggle).toBeChecked();
+    expect(screen.getByText("CheckProviderStatusHelper")).toBeInTheDocument();
+    fireEvent.click(toggle);
+
+    expect(set).toHaveBeenCalledWith({ statusChecksEnabled: false });
+  });
+
+  it("shows Check provider status off when saved off and saves turning it on", () => {
+    const set = vi.fn();
+    render(
+      <GeneralTab
+        settings={{ ...settings, statusChecksEnabled: false }}
+        set={set}
+        saving={false}
+      />,
+    );
+
+    const toggle = screen.getByRole("checkbox", { name: "CheckProviderStatus" });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+
+    expect(set).toHaveBeenCalledWith({ statusChecksEnabled: true });
   });
 
   it("updates the default notification sound set", () => {
