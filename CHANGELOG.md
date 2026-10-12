@@ -13,6 +13,7 @@
 - Offer Refresh login beside Switch only for Claude and Codex accounts that need sign-in. Repair the selected saved login without switching to another account.
 - Use expanded, collapsible Claude and Codex account sections with Add account below the rows; keep the floating bar's usage footprint when authentication expires.
 - Let the tray panel be moved and resized again: drag the strip along its top to move it (the spot is remembered; double-click returns it next to the tray), resize from any edge or corner, and stop it from closing when a resize starts on its outer frame. Its remembered size is now kept in logical pixels, so it fits monitors with different scaling (a size saved by an earlier version is reset to the automatic size once).
+- Add Check provider status (Settings > General, on by default as on the Mac). Provider refreshes also read the public status pages of Claude, OpenAI (Codex and OpenAI API), GitHub (Copilot), Cursor, Factory, Augment, Hugging Face and Zoom, and the Google Workspace feed (Gemini and Antigravity). Incidents show as a coloured dot in the Providers sidebar, a line in the tray panel menu and lines in the tray tooltip. In the CLI `--json` output, `status.level` keeps its values, except that a minor incident now reads `degraded` instead of `unknown`.
 
 ## [Windows] 0.70.0 - 2026-10-03
 

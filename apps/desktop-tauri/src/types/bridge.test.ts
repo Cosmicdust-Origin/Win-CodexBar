@@ -73,6 +73,7 @@ describe("Language type", () => {
     adaptiveRefresh: false,
       refreshAllProvidersOnMenuOpen: false,
   lowPowerMode: false,
+  statusChecksEnabled: true,
       startAtLogin: false,
       startMinimized: false,
       showNotifications: true,

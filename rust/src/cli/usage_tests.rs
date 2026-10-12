@@ -7,7 +7,7 @@ use crate::core::{
     TokenAccountSupport, UsageSnapshot,
 };
 use crate::providers::claude::claude_swap::ClaudeSwapAccount;
-use crate::status::{ProviderStatus as StatusInfo, StatusLevel};
+use crate::status::{ProviderStatus as StatusInfo, StatusIndicator};
 use chrono::Utc;
 use fetch_helpers::find_token_account;
 use render::{render_json_result, render_text_with_status};
@@ -63,15 +63,61 @@ fn claude_swap_json_payload_is_allow_listed() {
 #[test]
 fn claude_swap_json_payload_keeps_provider_status_distinct() {
     let status = StatusInfo {
-        level: StatusLevel::Degraded,
-        description: "Degraded Performance".to_string(),
-        ..Default::default()
+        indicator: StatusIndicator::Minor,
+        description: Some("Degraded Performance".to_string()),
+        updated_at: None,
     };
     let payload =
         super::claude_swap::claude_swap_json_payload(&sample_swap_account(), Some(&status));
     assert_eq!(payload["account"]["status"], "ok");
     assert_eq!(payload["status"]["level"], "degraded");
     assert_eq!(payload["status"]["description"], "Degraded Performance");
+}
+
+/// The CLI keeps its pre-poller `status.level` values, symbols and status
+/// line for every feed indicator; only raw `minor` changed, from `unknown`.
+#[test]
+fn cli_status_output_keeps_the_legacy_level_vocabulary() {
+    use render::{append_status_line, render_status_indicator};
+    let cases = [
+        (StatusIndicator::Operational, "operational", " ●", false),
+        (StatusIndicator::Minor, "degraded", " ◐", true),
+        (StatusIndicator::Major, "major", " ○", true),
+        (StatusIndicator::Critical, "major", " ○", true),
+        (StatusIndicator::Maintenance, "unknown", " ?", false),
+        (StatusIndicator::Unknown, "unknown", " ?", false),
+    ];
+    for (indicator, level, symbol, has_line) in cases {
+        let status = StatusInfo {
+            indicator,
+            description: Some("Feed text".to_string()),
+            updated_at: None,
+        };
+        let json = render_json_result(
+            ProviderId::Claude,
+            fetch_result(UsageSnapshot::new(RateWindow::new(10.0))),
+            Some(&status),
+            None,
+        );
+        assert_eq!(json["status"]["level"], level, "{indicator:?}");
+        assert_eq!(json["status"]["description"], "Feed text", "{indicator:?}");
+        let swap =
+            super::claude_swap::claude_swap_json_payload(&sample_swap_account(), Some(&status));
+        assert_eq!(swap["status"]["level"], level, "{indicator:?}");
+        assert_eq!(
+            render_status_indicator(Some(&status), false),
+            symbol,
+            "{indicator:?}"
+        );
+        let mut lines = Vec::new();
+        append_status_line(&mut lines, Some(&status));
+        let expected: Vec<String> = if has_line {
+            vec!["  Status: Feed text".to_string()]
+        } else {
+            Vec::new()
+        };
+        assert_eq!(lines, expected, "{indicator:?}");
+    }
 }
 
 #[test]
@@ -83,9 +129,9 @@ fn claude_swap_brief_renderer_keeps_one_line_per_provider() {
     second.slot = 3;
     second.label = "personal@example.com".to_string();
     let status = StatusInfo {
-        level: StatusLevel::Operational,
-        description: "All Systems Operational".to_string(),
-        ..Default::default()
+        indicator: StatusIndicator::Operational,
+        description: Some("All Systems Operational".to_string()),
+        updated_at: None,
     };
 
     let text = super::claude_swap::render_claude_swap_brief(&[first, second], Some(&status), false);

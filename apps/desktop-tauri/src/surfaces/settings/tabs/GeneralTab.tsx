@@ -389,6 +389,17 @@ export default function GeneralTab({
             })}
           />
         </Field>
+        <Field
+          label={t("CheckProviderStatus")}
+          description={t("CheckProviderStatusHelper")}
+        >
+          <Toggle
+            variant="switch"
+            checked={settings.statusChecksEnabled}
+            disabled={saving}
+            onChange={(v) => set({ statusChecksEnabled: v })}
+          />
+        </Field>
       </SettingsGroup>
 
       <PreferencesTransferSection onOpenSwitcherShortcuts={() => setSwitcherOpen(true)} />

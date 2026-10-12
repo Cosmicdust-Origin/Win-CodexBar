@@ -7,6 +7,7 @@ import type {
   SettingsUpdate,
 } from "../../types/bridge";
 import { useLocale } from "../../hooks/useLocale";
+import { useProviderStatuses } from "../../hooks/useProviderStatuses";
 import { reorderProviders } from "../../lib/tauri";
 import codexbarIcon from "../../assets/codexbar-icon.png";
 import {
@@ -163,9 +164,13 @@ export function SettingsSidebar({
   const sorted = settings.providersSortedAlphabetically;
   const enabled = useMemo(() => new Set(settings.enabledProviders), [settings.enabledProviders]);
   const enabledCount = ordered.filter((p) => enabled.has(p.id)).length;
+  const serviceStatuses = useProviderStatuses();
 
   const rows: ProviderSidebarRow[] = useMemo(() => {
     const snapshotMap = new Map(snapshots.map((s) => [s.providerId, s]));
+    const serviceMap = new Map(
+      serviceStatuses.map((e) => [e.providerId, e.status?.indicator ?? "unknown"] as const),
+    );
     const shown = filterProvidersByQuery(
       sorted ? sortProvidersAlphabetically(ordered, enabled) : ordered,
       searchText,
@@ -177,9 +182,10 @@ export function SettingsSidebar({
         displayName: p.displayName,
         enabled: isOn,
         status: deriveProviderStatus(isOn, snapshotMap.get(p.id) ?? null),
+        service: isOn ? serviceMap.get(p.id) : undefined,
       };
     });
-  }, [enabled, ordered, searchText, snapshots, sorted]);
+  }, [enabled, ordered, searchText, serviceStatuses, snapshots, sorted]);
 
   const toggleEnabled = (id: string, on: boolean) => {
     set({ enabledProviders: nextEnabledProviders(ordered, enabled, id, on) });

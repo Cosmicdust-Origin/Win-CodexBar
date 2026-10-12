@@ -553,6 +553,15 @@ RefreshIntervalLabel = Yenileme aralığı
 RefreshIntervalHelper = Otomatik sağlayıcı yenilemeleri arasındaki saniye (0 = elle).
 RefreshAllProvidersOnMenuOpen = Menü açıldığında yenile
 RefreshAllProvidersOnMenuOpenHelper = Tepsi menüsü her açıldığında etkin sağlayıcıları yenilemeye zorla.
+CheckProviderStatus = Sağlayıcı durumunu denetle
+CheckProviderStatusHelper = OpenAI/Claude durum sayfalarını ve Google Workspace'i (Gemini/Antigravity) sorgular, olayları simge ve menüde gösterir.
+ServiceStatusOperational = Çalışır durumda
+ServiceStatusPartialOutage = Kısmi kesinti
+ServiceStatusMajorOutage = Büyük kesinti
+ServiceStatusCriticalIssue = Kritik sorun
+ServiceStatusMaintenance = Bakım
+ServiceStatusUnknown = Durum bilinmiyor
+ProviderServiceStatusHelp = Provider service status: { "{}" }
 LowPowerMode = Düşük Güç Modu
 LowPowerModeHelper = Otomatik arka plan yenilemesini 30 dakikada birle sınırla. Elle yenileme anında gerçekleşir.
 LowPowerModeOff = Kapalı

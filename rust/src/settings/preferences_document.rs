@@ -73,6 +73,7 @@ const ALLOWED_PREFERENCES: &[(&str, Validator)] = &[
     ("refresh_interval_secs", refresh_interval_secs),
     ("adaptive_refresh", typed::<bool>),
     ("refresh_all_providers_on_menu_open", typed::<bool>),
+    ("status_checks_enabled", typed::<bool>),
     (
         "low_power_mode_preference",
         typed::<super::LowPowerModePreference>,

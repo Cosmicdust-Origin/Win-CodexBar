@@ -59,6 +59,7 @@ pub async fn import_preferences(
     let previous_period = settings.cost_reporting_period;
     let previous_cost_tracking = settings.cost_usage_enabled;
     let previous_enabled = settings.get_enabled_provider_ids();
+    let previous_status_checks = settings.status_checks_enabled;
     let applied = document
         .apply_to(&mut settings)
         .map_err(|error| error.to_string())?;
@@ -89,6 +90,9 @@ pub async fn import_preferences(
     crate::floatbar::notify_settings_changed(&app);
     crate::floatbar::apply_state(&app, &settings);
     crate::tray_bridge::rebuild_tray_menu(&app);
+    if providers_changed || settings.status_checks_enabled != previous_status_checks {
+        crate::status_poller::settings_changed(&app, &settings, !providers_changed);
+    }
     crate::tray_bridge::refresh_tray_presentation(&app);
     events::emit_settings_changed(&app);
 

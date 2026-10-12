@@ -553,6 +553,15 @@ RefreshIntervalLabel = Refresh interval
 RefreshIntervalHelper = Seconds between automatic provider refreshes (0 = manual).
 RefreshAllProvidersOnMenuOpen = Refresh when the menu opens
 RefreshAllProvidersOnMenuOpenHelper = Force-refresh enabled providers whenever the tray menu opens.
+CheckProviderStatus = Check provider status
+CheckProviderStatusHelper = Polls OpenAI/Claude status pages and Google Workspace for Gemini/Antigravity, surfacing incidents in the icon and menu.
+ServiceStatusOperational = Operational
+ServiceStatusPartialOutage = Partial outage
+ServiceStatusMajorOutage = Major outage
+ServiceStatusCriticalIssue = Critical issue
+ServiceStatusMaintenance = Maintenance
+ServiceStatusUnknown = Status unknown
+ProviderServiceStatusHelp = Provider service status: { "{}" }
 LowPowerMode = Low Power Mode
 LowPowerModeHelper = When on, limit automatic background refresh to once every 30 minutes. Manual refresh stays immediate. Automatic follows Windows Battery Saver.
 LowPowerModeOff = Off
