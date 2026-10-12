@@ -91,6 +91,7 @@ See the full history in [CHANGELOG.md](CHANGELOG.md).
 | Ollama | Cookies / API Key | Usage, Cloud Models, Pace windows |
 | Azure OpenAI | API Key | Deployment |
 | T3 Chat | Cookies / cURL | Base, Overage |
+| TinyApi | Browser cookies / manual Cookie header | Available credits |
 | TypeSafe | Browser cookies / manual Cookie header | Billing-cycle spend, balance, expiring credits |
 | OpenRouter | API Key | Credits |
 | JetBrains AI | Local Config | Usage |
