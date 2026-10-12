@@ -111,6 +111,7 @@ pub enum ProviderId {
     MuseAI,
     WorkBuddy,
     Cosmic,
+    Aerostack,
 }
 
 impl ProviderId {
@@ -214,6 +215,7 @@ impl ProviderId {
             ProviderId::MuseAI,
             ProviderId::WorkBuddy,
             ProviderId::Cosmic,
+            ProviderId::Aerostack,
         ]
     }
 
@@ -317,6 +319,7 @@ impl ProviderId {
             ProviderId::Replicate => "replicate",
             ProviderId::AtlasCloud => "atlascloud",
             ProviderId::Cosmic => "cosmic",
+            ProviderId::Aerostack => "aerostack",
         }
     }
 
@@ -422,6 +425,7 @@ impl ProviderId {
             ProviderId::Replicate => "Replicate",
             ProviderId::AtlasCloud => "Atlas Cloud",
             ProviderId::Cosmic => "Cosmic AI",
+            ProviderId::Aerostack => "Aerostack",
         }
     }
 
@@ -532,6 +536,7 @@ impl ProviderId {
             ProviderId::Notion => Some("app.notion.com"),
             ProviderId::Xai => None,
             ProviderId::Cosmic => None,
+            ProviderId::Aerostack => None,
         }
     }
 
@@ -669,6 +674,7 @@ impl ProviderId {
             "museai" | "muse (muse.ai)" => Some(ProviderId::MuseAI),
             "workbuddy" => Some(ProviderId::WorkBuddy),
             "cosmic" | "cosmic ai" => Some(ProviderId::Cosmic),
+            "aerostack" => Some(ProviderId::Aerostack),
             _ => None,
         }
     }
@@ -1387,6 +1393,7 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::MuseAI => "#0668E1",
         ProviderId::WorkBuddy => "#0DC8A6",
         ProviderId::Cosmic => "#6366F1",
+        ProviderId::Aerostack => "#6366F1",
     }
 }
 
@@ -1401,7 +1408,7 @@ mod tests {
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 97);
+        assert_eq!(all.len(), 98);
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Pi));
@@ -1478,6 +1485,7 @@ mod tests {
         assert!(all.contains(&ProviderId::LithosAI));
         assert!(all.contains(&ProviderId::MuseAI));
         assert!(all.contains(&ProviderId::WorkBuddy));
+        assert!(all.contains(&ProviderId::Aerostack));
     }
 
     #[test]

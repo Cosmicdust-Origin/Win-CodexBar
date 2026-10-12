@@ -449,7 +449,8 @@ impl TokenAccountSupport {
             | ProviderId::LithosAI
             | ProviderId::MuseAI
             | ProviderId::WorkBuddy
-            | ProviderId::Cosmic => None,
+            | ProviderId::Cosmic
+            | ProviderId::Aerostack => None,
         }
     }
 
