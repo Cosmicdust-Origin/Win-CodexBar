@@ -85,22 +85,24 @@ impl Provider for CosmicProvider {
         match status {
             401 => {
                 return Err(ProviderError::Other(
-                    "Cosmic AI returned HTTP 401.".to_string(),
+                    "Cosmic AI Personal Access Token is invalid or expired. Check your settings."
+                        .to_string(),
                 ));
             }
             403 => {
                 return Err(ProviderError::Other(
-                    "Cosmic AI returned HTTP 403.".to_string(),
+                    "Cosmic AI Personal Access Token does not have permission to access this project. Check your settings.".to_string(),
                 ));
             }
             429 => {
                 return Err(ProviderError::Other(
-                    "Cosmic AI returned HTTP 429.".to_string(),
+                    "Cosmic AI returned HTTP 429 (rate limited). Try again in a few minutes."
+                        .to_string(),
                 ));
             }
             500..=599 => {
                 return Err(ProviderError::Other(format!(
-                    "Cosmic AI returned HTTP {}.",
+                    "Cosmic AI service is unavailable (HTTP {}).",
                     status
                 )));
             }
@@ -287,28 +289,28 @@ fn parse_cosmic_response(root: &Value) -> Result<ProviderFetchResult, ProviderEr
         return Err(fail());
     }
 
-    // Calculate percentages for primary and secondary windows
-    let primary_percent = if let (Some(used), Some(limit)) = (input_used, input_limit) {
+    // Calculate percentages for primary window (only if we have both used and a valid numeric limit > 0)
+    // Matches upstream: return window only if used !== undefined && limit !== undefined && limit > 0
+    let primary = if let (Some(used), Some(limit)) = (input_used, input_limit) {
         if limit > 0.0 {
-            ((used / limit) * 100.0).clamp(0.0, 100.0)
+            RateWindow::new(((used / limit) * 100.0).clamp(0.0, 100.0))
         } else {
-            0.0
+            RateWindow::new(0.0)
         }
     } else {
-        0.0
+        RateWindow::new(0.0)
     };
-    let primary = RateWindow::new(primary_percent);
 
-    let secondary_percent = if let (Some(used), Some(limit)) = (output_used, output_limit) {
+    // Calculate percentages for secondary window (only if we have both used and a valid numeric limit > 0)
+    let secondary = if let (Some(used), Some(limit)) = (output_used, output_limit) {
         if limit > 0.0 {
-            ((used / limit) * 100.0).clamp(0.0, 100.0)
+            Some(RateWindow::new(((used / limit) * 100.0).clamp(0.0, 100.0)))
         } else {
-            0.0
+            None
         }
     } else {
-        0.0
+        None
     };
-    let secondary = Some(RateWindow::new(secondary_percent));
 
     let mut snapshot = UsageSnapshot::new(primary).with_secondary_label("Output tokens");
 
