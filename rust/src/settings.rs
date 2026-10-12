@@ -1209,7 +1209,8 @@ impl Settings {
                 | ProviderId::Langdock
                 | ProviderId::LithosAI
                 | ProviderId::MuseAI
-                | ProviderId::WorkBuddy => "auto",
+                | ProviderId::WorkBuddy
+                | ProviderId::Xapi => "auto",
                 _ => DEFAULT_COOKIE_SOURCE,
             })
     }
