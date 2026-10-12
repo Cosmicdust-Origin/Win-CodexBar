@@ -315,4 +315,127 @@ mod tests {
         assert_eq!(percent_of(1.0, 100.0), 1.0);
         assert_eq!(percent_of(50.0, 0.0), 0.0);
     }
+
+    #[test]
+    fn test_parse_with_paygo() {
+        let json = r#"{
+            "account": {
+                "plan_usage": 50,
+                "plan_limit": 100,
+                "paygo_usage": 10,
+                "paygo_limit": 50,
+                "current_plan": "Pro"
+            },
+            "key": {
+                "usage": 25,
+                "limit": 200
+            }
+        }"#;
+        let data: Value = serde_json::from_str(json).unwrap();
+        let result = parse_usage(&data).unwrap();
+
+        assert!(result.primary.is_some());
+        assert!(result.secondary.is_some());
+        assert_eq!(result.plan, Some("Pro".to_string()));
+    }
+
+    #[test]
+    fn test_parse_rejects_missing_account() {
+        let json = r#"{
+            "key": {
+                "usage": 25,
+                "limit": 200
+            }
+        }"#;
+        let data: Value = serde_json::from_str(json).unwrap();
+        let result = parse_usage(&data);
+
+        assert!(result.is_err());
+        assert!(matches!(result, Err(ProviderError::Parse(_))));
+    }
+
+    #[test]
+    fn test_parse_rejects_missing_key() {
+        let json = r#"{
+            "account": {
+                "plan_usage": 50,
+                "plan_limit": 100
+            }
+        }"#;
+        let data: Value = serde_json::from_str(json).unwrap();
+        let result = parse_usage(&data);
+
+        assert!(result.is_err());
+        assert!(matches!(result, Err(ProviderError::Parse(_))));
+    }
+
+    #[test]
+    fn test_parse_rejects_non_object() {
+        let data: Value = serde_json::json!([1, 2, 3]);
+        let result = parse_usage(&data);
+
+        assert!(result.is_err());
+        assert!(matches!(result, Err(ProviderError::Parse(_))));
+    }
+
+    #[test]
+    fn test_parse_rejects_invalid_plan_usage() {
+        let json = r#"{
+            "account": {
+                "plan_usage": "fifty",
+                "plan_limit": 100
+            },
+            "key": {
+                "usage": 25,
+                "limit": 200
+            }
+        }"#;
+        let data: Value = serde_json::from_str(json).unwrap();
+        let result = parse_usage(&data);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_empty_plan_name() {
+        let json = r#"{
+            "account": {
+                "plan_usage": 50,
+                "plan_limit": 100,
+                "current_plan": "   "
+            },
+            "key": {
+                "usage": 25,
+                "limit": 200
+            }
+        }"#;
+        let data: Value = serde_json::from_str(json).unwrap();
+        let result = parse_usage(&data).unwrap();
+
+        // Trimmed empty string is rejected
+        assert!(result.plan.is_none());
+    }
+
+    #[test]
+    fn test_parse_oversized_plan_name() {
+        let json = format!(
+            r#"{{
+            "account": {{
+                "plan_usage": 50,
+                "plan_limit": 100,
+                "current_plan": "{}"
+            }},
+            "key": {{
+                "usage": 25,
+                "limit": 200
+            }}
+        }}"#,
+            "x".repeat(121)
+        );
+        let data: Value = serde_json::from_str(&json).unwrap();
+        let result = parse_usage(&data).unwrap();
+
+        // Plan name > 120 chars is rejected
+        assert!(result.plan.is_none());
+    }
 }
