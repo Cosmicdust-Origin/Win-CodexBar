@@ -339,7 +339,7 @@ fn parse_credits(
 
     // Build the usage snapshot with balance as informational
     let usage = UsageSnapshot::new(
-        RateWindow::informational(format!("Balance: {balance_text}")).hidden_on_card(),
+        RateWindow::informational(balance_text.clone()),
     )
     .with_login_method("Browser session");
 
