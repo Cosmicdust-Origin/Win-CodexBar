@@ -150,13 +150,21 @@ pub(crate) fn usage_item_descriptors(
     };
 
     if let Some(snapshot) = snapshot {
-        let session = locale::get_text(lang, LocaleKey::ProviderSessionLabel);
-        push(
-            "primary",
-            snapshot.primary_label.as_deref().unwrap_or(&session),
-            true,
-        );
-        if snapshot.secondary.is_some() {
+        // A card-hidden window is never drawn as a row, so a visibility
+        // toggle for it would control nothing.
+        if !snapshot.primary.hidden_on_card {
+            let session = locale::get_text(lang, LocaleKey::ProviderSessionLabel);
+            push(
+                "primary",
+                snapshot.primary_label.as_deref().unwrap_or(&session),
+                true,
+            );
+        }
+        if snapshot
+            .secondary
+            .as_ref()
+            .is_some_and(|w| !w.hidden_on_card)
+        {
             let weekly = locale::get_text(lang, LocaleKey::ProviderWeeklyLabel);
             push(
                 "secondary",
@@ -164,11 +172,19 @@ pub(crate) fn usage_item_descriptors(
                 true,
             );
         }
-        if snapshot.model_specific.is_some() {
+        if snapshot
+            .model_specific
+            .as_ref()
+            .is_some_and(|w| !w.hidden_on_card)
+        {
             let model = locale::get_text(lang, LocaleKey::DetailWindowModelSpecific);
             push("model-specific", &model, true);
         }
-        if snapshot.tertiary.is_some() {
+        if snapshot
+            .tertiary
+            .as_ref()
+            .is_some_and(|w| !w.hidden_on_card)
+        {
             let tertiary = locale::get_text(lang, LocaleKey::DetailWindowTertiary);
             push(
                 "tertiary",
@@ -176,7 +192,11 @@ pub(crate) fn usage_item_descriptors(
                 true,
             );
         }
-        for extra in &snapshot.extra_rate_windows {
+        for extra in snapshot
+            .extra_rate_windows
+            .iter()
+            .filter(|extra| !extra.window.hidden_on_card)
+        {
             push(&format!("extra-{}", extra.id), &extra.title, true);
         }
     }
