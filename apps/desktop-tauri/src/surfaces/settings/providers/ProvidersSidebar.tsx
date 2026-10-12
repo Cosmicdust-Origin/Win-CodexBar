@@ -12,6 +12,7 @@ import { useLocale } from "../../../hooks/useLocale";
 import type { LocaleKey } from "../../../i18n/keys";
 import { ProviderIcon } from "../../../components/providers/ProviderIcon";
 import type { ServiceStatusIndicator } from "../../../types/bridge";
+import { SERVICE_STATUS_TO_KEY } from "../../../lib/serviceStatus";
 
 /** Last-fetch state mapped from a ProviderUsageSnapshot / settings pair. */
 export type ProviderSidebarStatus =
@@ -54,16 +55,6 @@ const STATUS_TO_KEY: Record<ProviderSidebarStatus, LocaleKey> = {
   error: "ProviderStatusError",
   disabled: "ProviderStatusDisabled",
   loading: "ProviderStatusLoading",
-};
-
-/** macOS `ProviderStatusIndicator.label` (`UsageStoreSupport.swift:4-15`). */
-export const SERVICE_STATUS_TO_KEY: Record<ServiceStatusIndicator, LocaleKey> = {
-  none: "ServiceStatusOperational",
-  minor: "ServiceStatusPartialOutage",
-  major: "ServiceStatusMajorOutage",
-  critical: "ServiceStatusCriticalIssue",
-  maintenance: "ServiceStatusMaintenance",
-  unknown: "ServiceStatusUnknown",
 };
 
 interface MenuState {

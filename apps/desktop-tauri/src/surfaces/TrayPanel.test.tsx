@@ -36,6 +36,7 @@ const tauriMocks = vi.hoisted(() => ({
   getProviderDetail: vi.fn(),
   openProviderDashboard: vi.fn(),
   openProviderStatusPage: vi.fn(),
+  getProviderStatuses: vi.fn(),
   getProviderChartData: vi.fn(),
   getCurrentSurfaceState: vi.fn(),
   getLocaleStrings: vi.fn(),
@@ -287,6 +288,7 @@ describe("TrayPanel provider grid", () => {
     });
     tauriMocks.openProviderDashboard.mockResolvedValue(undefined);
     tauriMocks.openProviderStatusPage.mockResolvedValue(undefined);
+    tauriMocks.getProviderStatuses.mockResolvedValue([]);
     tauriMocks.openSettingsWindow.mockResolvedValue(undefined);
     tauriMocks.refreshProviders.mockResolvedValue(undefined);
     tauriMocks.refreshProvidersIfStale.mockResolvedValue(undefined);
@@ -340,6 +342,8 @@ describe("TrayPanel provider grid", () => {
         PanelShowAllProviders: "Show all providers",
         PanelShowFewerProviders: "Show fewer providers",
         PanelUsedSuffix: "used",
+        ServiceStatusPartialOutage: "Partial outage",
+        UpdatedMinutesAgo: "{} minutes ago",
       }),
     );
     eventMocks.listen.mockImplementation(
@@ -588,6 +592,59 @@ describe("TrayPanel provider grid", () => {
     expect(tauriMocks.openProviderDashboard).toHaveBeenLastCalledWith("codex");
     fireEvent.click(screen.getByRole("button", { name: "Status Page" }));
     expect(tauriMocks.openProviderStatusPage).toHaveBeenLastCalledWith("codex");
+  });
+
+  it("shows the target provider's incident as a status line above the app rows", async () => {
+    const { container } = renderTrayPanel([
+      provider("claude", "Claude", 35),
+      provider("codex", "Codex", 45),
+    ]);
+    await waitFor(() => {
+      expect(container.querySelector(".tray-panel-reveal--ready")).not.toBeNull();
+    });
+    const note = () => container.querySelector(".menu-surface__footer-note");
+    expect(note()).toBeNull();
+
+    act(() => {
+      emitEvent("provider-statuses-updated", [
+        {
+          providerId: "codex",
+          status: {
+            indicator: "major",
+            description: "  Elevated error rates ",
+            updatedAt: Date.now() - 5 * 60_000 - 1_000,
+          },
+        },
+        { providerId: "claude", status: { indicator: "none", description: null, updatedAt: null } },
+      ]);
+    });
+    // Overview: the first provider in order (Codex) is the target, as on macOS.
+    expect(note()).toHaveTextContent("Elevated error rates — 5 minutes ago");
+    const footer = container.querySelector(".menu-surface__footer")!;
+    expect(Array.from(footer.children, (el) => el.className)).toEqual([
+      "menu-surface__footer-sep",
+      "menu-surface__footer-note",
+      "menu-surface__footer-sep",
+      "menu-surface__footer-row menu-surface__footer-row--refresh",
+      "menu-surface__footer-row",
+      "menu-surface__footer-row",
+      "menu-surface__footer-row",
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Claude$/ }));
+    expect(note()).toBeNull();
+
+    act(() => {
+      emitEvent("provider-statuses-updated", [
+        { providerId: "claude", status: { indicator: "minor", description: null, updatedAt: null } },
+      ]);
+    });
+    expect(note()).toHaveTextContent(/^Partial outage$/);
+
+    act(() => {
+      emitEvent("provider-statuses-updated", []);
+    });
+    expect(note()).toBeNull();
   });
 
   it("offers the only provider's rows without selecting its tab", async () => {

@@ -65,6 +65,9 @@ interface MenuSurfaceProps {
   summary?: ReactNode;
   banner?: ReactNode;
   footerGroups?: MenuFooterRow[][];
+  /** Secondary text closing the provider-action group, like the macOS
+   *  service-status line (`MenuDescriptor.swift:611-612`). */
+  statusLine?: string | null;
   /** Inline style applied to the root `menu-surface` element (e.g. CSS
    *  `zoom` for the tray flyout). */
   style?: CSSProperties;
@@ -79,6 +82,7 @@ export default function MenuSurface({
   summary,
   banner,
   footerGroups = [],
+  statusLine = null,
   style,
   children,
 }: MenuSurfaceProps) {
@@ -91,7 +95,15 @@ export default function MenuSurface({
       <div className="menu-surface__body">{children}</div>
       {groups.length > 0 && (
         <nav className="menu-surface__footer" aria-label={t("PanelMenu")}>
-          {groups.map((group) => [
+          {groups.map((group, index) => [
+            ...(statusLine !== null && index === groups.length - 1
+              ? [
+                  index === 0 && <div key="sep-status" className="menu-surface__footer-sep" />,
+                  <p key="status" className="menu-surface__footer-note">
+                    {statusLine}
+                  </p>,
+                ]
+              : []),
             <div key={`sep-${group[0].id}`} className="menu-surface__footer-sep" />,
             ...group.map((row) => {
               const icon = ROW_ICONS[row.id];

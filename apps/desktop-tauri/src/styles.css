@@ -3699,6 +3699,13 @@ html:has(.menu-surface--tray) {
   color: var(--mac-text-3);
   cursor: default;
 }
+.menu-surface__footer-note {
+  margin: 0;
+  padding: 2px var(--mac-row-pl);
+  color: var(--mac-text-2);
+  font: var(--mac-text-menu);
+  overflow-wrap: anywhere;
+}
 .menu-surface__footer-icon {
   display: inline-flex;
   flex-shrink: 0;

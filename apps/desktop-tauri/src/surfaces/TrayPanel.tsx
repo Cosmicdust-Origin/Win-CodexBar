@@ -38,6 +38,7 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
     visibleProviders,
     requestLayout,
     footerGroups,
+    statusLine,
     updateState,
     checkNow,
     download,
@@ -111,7 +112,8 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
   if (sorted.length === 0) {
     return (
       <div className={revealClassName} data-theme="light">
-        <MenuSurface banner={banner} footerGroups={footerGroups} style={surfaceStyle}>
+        <MenuSurface banner={banner} footerGroups={footerGroups}
+          statusLine={statusLine} style={surfaceStyle}>
           {stayAwakeStatus}
           {settings.agentSessionsEnabled && <AgentSessions />}
           <MenuEmpty
@@ -125,7 +127,8 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
 
   return (
     <div className={revealClassName} data-theme="light">
-      <MenuSurface banner={banner} footerGroups={footerGroups} style={surfaceStyle}>
+      <MenuSurface banner={banner} footerGroups={footerGroups}
+          statusLine={statusLine} style={surfaceStyle}>
         {stayAwakeStatus}
         {settings.agentSessionsEnabled && <AgentSessions />}
         <ProviderGrid
