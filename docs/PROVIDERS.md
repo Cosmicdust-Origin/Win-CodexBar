@@ -344,6 +344,31 @@ portal in Settings → Providers → IBM Bob, as token accounts, or with
 - 401 and 403 report that the key was rejected; response bodies are never
   echoed in errors.
 
+### X API prepaid credits
+
+X API is disabled by default and reads prepaid credit balances from the X
+(Twitter) API console. Sign in to console.x.com in your browser, and CodexBar
+will read the `auth_token` and `ct0` cookies from that session.
+
+- **Automatic:** CodexBar tries each detected browser (Chrome, Edge, Brave,
+  Firefox) holding both cookies. If a browser session expires (401), it moves
+  to the next browser. No session means sign in to console.x.com.
+- **Manual:** Paste the Cookie header from a console.x.com request (with
+  `auth_token` and `ct0`). Manual mode does not fall back to browser sessions.
+- **Off:** Cookies are disabled.
+
+The primary lane shows the balance (paid + free credits). Details rows show:
+- Balance (total: paid + free)
+- Purchased credits
+- Free credits
+
+Balance is a prepaid meter (no quota percentage); costs are always zero (no
+usage tracking available). The provider reports identity as "Browser session".
+Cost resets are never inferred. Session rotation on 401 is implemented: sessions
+are tried in browser order, stale sessions are skipped, and a missing session
+after all attempts triggers "sign in to console.x.com". Errors never echo
+response bodies.
+
 ## Listing what is enabled
 
 ```powershell

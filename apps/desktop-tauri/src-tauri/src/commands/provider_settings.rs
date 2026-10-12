@@ -255,6 +255,7 @@ fn cookie_source_provider(provider_id: &str) -> Option<codexbar::core::ProviderI
         "museai" => ProviderId::MuseAI,
         "lithosai" => ProviderId::LithosAI,
         "langdock" => ProviderId::Langdock,
+        "xapi" => ProviderId::Xapi,
         _ => return None,
     })
 }
