@@ -668,7 +668,7 @@ impl ProviderId {
             "lithosai" => Some(ProviderId::LithosAI),
             "museai" | "muse (muse.ai)" => Some(ProviderId::MuseAI),
             "workbuddy" => Some(ProviderId::WorkBuddy),
-            "cosmic" => Some(ProviderId::Cosmic),
+            "cosmic" | "cosmic ai" => Some(ProviderId::Cosmic),
             _ => None,
         }
     }
@@ -1401,7 +1401,7 @@ mod tests {
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 97);
+        assert_eq!(all.len(), 98);
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Pi));

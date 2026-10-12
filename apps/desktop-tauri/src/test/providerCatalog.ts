@@ -49,6 +49,7 @@ export const TEST_PROVIDER_CATALOG: Array<[string, string]> = [
   ["mimo", "Xiaomi MiMo"],
   ["doubao", "Doubao"],
   ["commandcode", "Command Code"],
+  ["cosmic", "Cosmic AI"],
   ["stepfun", "StepFun"],
   ["venice", "Venice"],
   ["vercel", "Vercel AI Gateway"],

@@ -436,29 +436,29 @@ mod tests {
 
     #[test]
     fn test_parse_limit_string_with_k_suffix() {
-        assert_eq!(parse_limit_string("300k"), Ok(Some(300000.0)));
-        assert_eq!(parse_limit_string("300K"), Ok(Some(300000.0)));
+        assert!(matches!(parse_limit_string("300k"), Ok(Some(300000.0))));
+        assert!(matches!(parse_limit_string("300K"), Ok(Some(300000.0))));
     }
 
     #[test]
     fn test_parse_limit_string_with_m_suffix() {
-        assert_eq!(parse_limit_string("1.5M"), Ok(Some(1500000.0)));
-        assert_eq!(parse_limit_string("1.5m"), Ok(Some(1500000.0)));
+        assert!(matches!(parse_limit_string("1.5M"), Ok(Some(1500000.0))));
+        assert!(matches!(parse_limit_string("1.5m"), Ok(Some(1500000.0))));
     }
 
     #[test]
     fn test_parse_limit_string_plain_number() {
-        assert_eq!(parse_limit_string("1000"), Ok(Some(1000.0)));
+        assert!(matches!(parse_limit_string("1000"), Ok(Some(1000.0))));
     }
 
     #[test]
     fn test_parse_limit_string_empty() {
-        assert_eq!(parse_limit_string(""), Ok(None));
+        assert!(matches!(parse_limit_string(""), Ok(None)));
     }
 
     #[test]
     fn test_parse_limit_string_unlimited() {
         // "Unlimited" is not a valid numeric format, returns None
-        assert_eq!(parse_limit_string("unlimited"), Ok(None));
+        assert!(matches!(parse_limit_string("unlimited"), Ok(None)));
     }
 }
