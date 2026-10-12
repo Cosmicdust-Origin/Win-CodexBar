@@ -7,7 +7,7 @@ use crate::core::{
     TokenAccountSupport, UsageSnapshot,
 };
 use crate::providers::claude::claude_swap::ClaudeSwapAccount;
-use crate::status::{ProviderStatus as StatusInfo, StatusLevel};
+use crate::status::{ProviderStatus as StatusInfo, StatusIndicator};
 use chrono::Utc;
 use fetch_helpers::find_token_account;
 use render::{render_json_result, render_text_with_status};
@@ -63,14 +63,14 @@ fn claude_swap_json_payload_is_allow_listed() {
 #[test]
 fn claude_swap_json_payload_keeps_provider_status_distinct() {
     let status = StatusInfo {
-        level: StatusLevel::Degraded,
-        description: "Degraded Performance".to_string(),
-        ..Default::default()
+        indicator: StatusIndicator::Minor,
+        description: Some("Degraded Performance".to_string()),
+        updated_at: None,
     };
     let payload =
         super::claude_swap::claude_swap_json_payload(&sample_swap_account(), Some(&status));
     assert_eq!(payload["account"]["status"], "ok");
-    assert_eq!(payload["status"]["level"], "degraded");
+    assert_eq!(payload["status"]["level"], "minor");
     assert_eq!(payload["status"]["description"], "Degraded Performance");
 }
 
@@ -83,9 +83,9 @@ fn claude_swap_brief_renderer_keeps_one_line_per_provider() {
     second.slot = 3;
     second.label = "personal@example.com".to_string();
     let status = StatusInfo {
-        level: StatusLevel::Operational,
-        description: "All Systems Operational".to_string(),
-        ..Default::default()
+        indicator: StatusIndicator::Operational,
+        description: Some("All Systems Operational".to_string()),
+        updated_at: None,
     };
 
     let text = super::claude_swap::render_claude_swap_brief(&[first, second], Some(&status), false);

@@ -11,7 +11,7 @@ use crate::core::{
     RateWindow, UsagePace, UsageSnapshot, instantiate_provider,
 };
 use crate::spend_contract::CostProvenance;
-use crate::status::{ProviderStatus as StatusInfo, StatusLevel};
+use crate::status::{ProviderStatus as StatusInfo, StatusIndicator};
 
 pub fn render_text_error(provider_id: ProviderId, error_msg: &str, use_color: bool) -> String {
     let header = if use_color {
@@ -113,8 +113,8 @@ pub fn render_json_result(
 
     if let Some(s) = status {
         json_result["status"] = serde_json::json!({
-            "level": format!("{:?}", s.level).to_lowercase(),
-            "description": s.description,
+            "level": s.indicator.as_raw(),
+            "description": s.summary(),
         });
     }
 
@@ -254,12 +254,12 @@ pub fn render_status_indicator(status: Option<&StatusInfo>, use_color: bool) -> 
         return String::new();
     };
 
-    let (symbol, color) = match status.level {
-        StatusLevel::Operational => ("●", "\x1b[32m"), // Green
-        StatusLevel::Degraded => ("◐", "\x1b[33m"),    // Yellow
-        StatusLevel::Partial => ("◑", "\x1b[33m"),     // Yellow
-        StatusLevel::Major => ("○", "\x1b[31m"),       // Red
-        StatusLevel::Unknown => ("?", "\x1b[90m"),     // Gray
+    let (symbol, color) = match status.indicator {
+        StatusIndicator::Operational => ("●", "\x1b[32m"),
+        StatusIndicator::Minor | StatusIndicator::Maintenance => ("◐", "\x1b[33m"),
+        StatusIndicator::Major => ("◑", "\x1b[33m"),
+        StatusIndicator::Critical => ("○", "\x1b[31m"),
+        StatusIndicator::Unknown => ("?", "\x1b[90m"),
     };
 
     if use_color {
@@ -271,10 +271,10 @@ pub fn render_status_indicator(status: Option<&StatusInfo>, use_color: bool) -> 
 
 pub fn append_status_line(lines: &mut Vec<String>, status: Option<&StatusInfo>) {
     if let Some(s) = status
-        && s.level != StatusLevel::Operational
-        && s.level != StatusLevel::Unknown
+        && s.indicator.has_issue()
+        && s.indicator != StatusIndicator::Unknown
     {
-        lines.push(format!("  Status: {}", s.description));
+        lines.push(format!("  Status: {}", s.summary()));
     }
 }
 
