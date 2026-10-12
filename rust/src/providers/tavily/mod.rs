@@ -7,7 +7,6 @@
 
 use async_trait::async_trait;
 use reqwest::{Client, StatusCode};
-use serde::Deserialize;
 use serde_json::Value;
 
 use super::format;
@@ -22,27 +21,6 @@ const CREDENTIAL_TARGET: &str = "codexbar-tavily";
 pub const API_KEY_ENV: &str = "TAVILY_API_KEY";
 const MAX_RESPONSE_BYTES: usize = 256 * 1024;
 const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
-
-#[derive(Debug, Deserialize)]
-struct UsageResponse {
-    account: Option<AccountInfo>,
-    key: Option<KeyInfo>,
-}
-
-#[derive(Debug, Deserialize)]
-struct AccountInfo {
-    plan_usage: Option<i64>,
-    plan_limit: Option<i64>,
-    paygo_usage: Option<i64>,
-    paygo_limit: Option<i64>,
-    current_plan: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct KeyInfo {
-    usage: Option<i64>,
-    limit: Option<i64>,
-}
 
 pub struct TavilyProvider {
     metadata: ProviderMetadata,
@@ -106,8 +84,7 @@ impl TavilyProvider {
             .await
             .map_err(|_| ProviderError::Parse("Failed to read Tavily response.".into()))?;
 
-        let data: Value = serde_json::from_slice(&body)
-            .map_err(|_| ProviderError::Parse("Tavily response is not valid JSON.".into()))?;
+        let data: Value = serde_json::from_slice(&body).map_err(|_| unrecognized())?;
 
         let parsed = parse_usage(&data)?;
         let usage = parsed.usage;
@@ -155,205 +132,135 @@ struct ParsedUsage {
     details: Vec<ProviderDisplayDetail>,
 }
 
-fn parse_usage(payload: &Value) -> Result<ParsedUsage, ProviderError> {
-    let data = payload
-        .as_object()
-        .ok_or_else(|| ProviderError::Parse("Tavily response is not an object.".into()))?;
+const UNRECOGNIZED: &str = "Tavily returned an unrecognized credit usage response.";
 
+fn unrecognized() -> ProviderError {
+    ProviderError::Other(UNRECOGNIZED.into())
+}
+
+/// Upstream `count`: a non-negative safe integer.
+fn count(value: Option<&Value>) -> Result<u64, ProviderError> {
+    const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+    let Some(Value::Number(n)) = value else {
+        return Err(unrecognized());
+    };
+    if let Some(v) = n.as_u64() {
+        return if v <= MAX_SAFE_INTEGER {
+            Ok(v)
+        } else {
+            Err(unrecognized())
+        };
+    }
+    match n.as_f64() {
+        // JSON like `5.0` is still a safe integer to JavaScript.
+        Some(f) if f.fract() == 0.0 && (0.0..=MAX_SAFE_INTEGER as f64).contains(&f) => {
+            // `+ 0.0` turns -0 into 0.
+            format!("{:.0}", f + 0.0)
+                .parse()
+                .map_err(|_| unrecognized())
+        }
+        _ => Err(unrecognized()),
+    }
+}
+
+fn credits(value: u64) -> String {
+    format!("{} credits", format::number(value as f64, 0))
+}
+
+/// One titled section: Used, Limit ("Unlimited" when `cap` is None), and
+/// Remaining only for a finite cap.
+fn section(
+    details: &mut Vec<ProviderDisplayDetail>,
+    id: &str,
+    title: &str,
+    usage: u64,
+    cap: Option<u64>,
+) {
+    let mut rows = vec![
+        ("used", "Used", credits(usage)),
+        (
+            "limit",
+            "Limit",
+            cap.map_or_else(|| "Unlimited".to_string(), credits),
+        ),
+    ];
+    if let Some(cap) = cap {
+        rows.push(("remaining", "Remaining", credits(cap.saturating_sub(usage))));
+    }
+    for (suffix, label, value) in rows {
+        if let Some(detail) = ProviderDisplayDetail::new(format!("{id}-{suffix}"), label, value)
+            .and_then(|d| d.with_section_title(title))
+        {
+            details.push(detail);
+        }
+    }
+}
+
+fn parse_usage(payload: &Value) -> Result<ParsedUsage, ProviderError> {
+    let data = payload.as_object().ok_or_else(unrecognized)?;
     let account = data
         .get("account")
-        .and_then(|v| v.as_object())
-        .ok_or_else(|| ProviderError::Parse("Tavily response missing account data.".into()))?;
-
+        .and_then(Value::as_object)
+        .ok_or_else(unrecognized)?;
     let key = data
         .get("key")
-        .and_then(|v| v.as_object())
-        .ok_or_else(|| ProviderError::Parse("Tavily response missing key data.".into()))?;
+        .and_then(Value::as_object)
+        .ok_or_else(unrecognized)?;
 
-    // Extract account plan info
-    let plan_usage = account
-        .get("plan_usage")
-        .and_then(|v| v.as_i64())
-        .ok_or_else(|| ProviderError::Parse("Invalid plan_usage value.".into()))?;
-
-    let plan_limit = account
-        .get("plan_limit")
-        .and_then(|v| v.as_i64())
-        .ok_or_else(|| ProviderError::Parse("Invalid plan_limit value.".into()))?;
-
-    // Extract API key info
-    let key_usage = key
-        .get("usage")
-        .and_then(|v| v.as_i64())
-        .ok_or_else(|| ProviderError::Parse("Invalid key usage value.".into()))?;
-
-    let key_limit = key.get("limit").and_then(|v| v.as_i64());
-
-    // Extract PAYG info (optional)
-    let paygo_usage = account.get("paygo_usage").and_then(|v| v.as_i64());
-    let paygo_limit = account.get("paygo_limit").and_then(|v| v.as_i64());
-
-    // Validate that if either PAYG field exists, both must be valid numbers
-    if (paygo_usage.is_some() || paygo_limit.is_some())
-        && !(paygo_usage.is_some() && paygo_limit.is_some())
-    {
-        return Err(ProviderError::Parse(
-            "Tavily pay-as-you-go usage and limit must both be present together.".into(),
-        ));
-    }
-
-    // Extract plan name (optional)
-    let plan = account
-        .get("current_plan")
-        .and_then(|v| v.as_str())
-        .and_then(|s| {
-            let trimmed = s.trim();
-            if trimmed.is_empty() || trimmed.len() > 120 {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        });
-
-    // Build primary (account plan) window
-    let primary = if plan_limit > 0 {
-        RateWindow::new(percent_of(plan_usage as f64, plan_limit as f64))
-    } else {
-        return Err(ProviderError::Parse("Plan limit must be positive.".into()));
+    let used = count(account.get("plan_usage"))?;
+    let limit = count(account.get("plan_limit"))?;
+    let key_used = count(key.get("usage"))?;
+    let key_limit = match key.get("limit") {
+        Some(Value::Null) => None,
+        other => Some(count(other)?),
     };
 
-    // Build secondary (API key) window - null limit means unlimited
-    let secondary = if let Some(limit) = key_limit {
-        if limit > 0 {
-            Some(RateWindow::new(percent_of(key_usage as f64, limit as f64)))
-        } else {
-            None
-        }
-    } else {
-        // Null key limit = unlimited, no quota window displayed
-        None
-    };
-
-    // Build usage snapshot
-    let mut usage = UsageSnapshot::new(primary);
-    if let Some(secondary) = secondary {
-        usage = usage
-            .with_secondary(secondary)
-            .with_secondary_label("API key");
-    }
-    if let Some(plan_name) = plan {
-        usage = usage.with_login_method(plan_name);
-    }
-
-    // Build display details (used for Settings panel expandable section)
     let mut details = Vec::new();
-
-    // Account plan section
-    if let Some(detail) = ProviderDisplayDetail::new(
-        "account-plan-used",
-        "Used",
-        format!("{} credits", format::number(plan_usage as f64, 0)),
-    )
-    .and_then(|d| d.with_section_title("Account plan"))
-    {
-        details.push(detail);
-    }
-    if let Some(detail) = ProviderDisplayDetail::new(
-        "account-plan-limit",
-        "Limit",
-        format!("{} credits", format::number(plan_limit as f64, 0)),
-    )
-    .and_then(|d| d.with_section_title("Account plan"))
-    {
-        details.push(detail);
-    }
-    if let Some(detail) = ProviderDisplayDetail::new(
-        "account-plan-remaining",
-        "Remaining",
-        format!(
-            "{} credits",
-            format::number((plan_limit - plan_usage).max(0) as f64, 0)
-        ),
-    )
-    .and_then(|d| d.with_section_title("Account plan"))
-    {
-        details.push(detail);
+    section(
+        &mut details,
+        "account-plan",
+        "Account plan",
+        used,
+        Some(limit),
+    );
+    section(&mut details, "api-key", "API key", key_used, key_limit);
+    if account.contains_key("paygo_usage") || account.contains_key("paygo_limit") {
+        let paygo_used = count(account.get("paygo_usage"))?;
+        let paygo_limit = count(account.get("paygo_limit"))?;
+        section(
+            &mut details,
+            "paygo",
+            "Pay as you go",
+            paygo_used,
+            Some(paygo_limit),
+        );
     }
 
-    // API key section
-    if let Some(detail) = ProviderDisplayDetail::new(
-        "api-key-used",
-        "Used",
-        format!("{} credits", format::number(key_usage as f64, 0)),
-    )
-    .and_then(|d| d.with_section_title("API key"))
-    {
-        details.push(detail);
-    }
-    if let Some(limit) = key_limit {
-        if let Some(detail) = ProviderDisplayDetail::new(
-            "api-key-limit",
-            "Limit",
-            format!("{} credits", format::number(limit as f64, 0)),
-        )
-        .and_then(|d| d.with_section_title("API key"))
+    // JavaScript `plan.length` counts UTF-16 units of the untrimmed string.
+    let login_method = match account.get("current_plan") {
+        None => "API key".to_string(),
+        Some(Value::String(plan))
+            if !plan.trim().is_empty() && plan.encode_utf16().count() <= 120 =>
         {
-            details.push(detail);
+            plan.trim().to_string()
         }
-        if let Some(detail) = ProviderDisplayDetail::new(
-            "api-key-remaining",
-            "Remaining",
-            format!(
-                "{} credits",
-                format::number((limit - key_usage).max(0) as f64, 0)
-            ),
-        )
-        .and_then(|d| d.with_section_title("API key"))
-        {
-            details.push(detail);
-        }
+        Some(_) => return Err(unrecognized()),
+    };
+
+    // Upstream omits a window whose limit is zero; the card then draws no bar.
+    let primary = if limit > 0 {
+        RateWindow::new(percent_of(used as f64, limit as f64))
     } else {
-        // Unlimited key
-        if let Some(detail) =
-            ProviderDisplayDetail::new("api-key-limit", "Limit", "Unlimited".to_string())
-                .and_then(|d| d.with_section_title("API key"))
-        {
-            details.push(detail);
-        }
-    }
-
-    // Pay-as-you-go section (if present)
-    if let (Some(paygo_u), Some(paygo_l)) = (paygo_usage, paygo_limit) {
-        if let Some(detail) = ProviderDisplayDetail::new(
-            "paygo-used",
-            "Used",
-            format!("{} credits", format::number(paygo_u as f64, 0)),
-        )
-        .and_then(|d| d.with_section_title("Pay as you go"))
-        {
-            details.push(detail);
-        }
-        if let Some(detail) = ProviderDisplayDetail::new(
-            "paygo-limit",
-            "Limit",
-            format!("{} credits", format::number(paygo_l as f64, 0)),
-        )
-        .and_then(|d| d.with_section_title("Pay as you go"))
-        {
-            details.push(detail);
-        }
-        if let Some(detail) = ProviderDisplayDetail::new(
-            "paygo-remaining",
-            "Remaining",
-            format!(
-                "{} credits",
-                format::number((paygo_l - paygo_u).max(0) as f64, 0)
-            ),
-        )
-        .and_then(|d| d.with_section_title("Pay as you go"))
-        {
-            details.push(detail);
-        }
+        RateWindow::informational("Account plan").hidden_on_card()
+    };
+    let mut usage = UsageSnapshot::new(primary).with_login_method(login_method);
+    if let Some(key_limit) = key_limit.filter(|limit| *limit > 0) {
+        usage = usage
+            .with_secondary(RateWindow::new(percent_of(
+                key_used as f64,
+                key_limit as f64,
+            )))
+            .with_secondary_label("API key");
     }
 
     Ok(ParsedUsage { usage, details })
@@ -370,228 +277,165 @@ fn percent_of(used: f64, limit: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
-    #[test]
-    fn test_parse_valid_usage() {
-        let json = r#"{
-            "account": {
-                "plan_usage": 50,
-                "plan_limit": 100,
-                "current_plan": "Pro"
-            },
-            "key": {
-                "usage": 25,
-                "limit": 200
-            }
-        }"#;
-        let data: Value = serde_json::from_str(json).unwrap();
-        let result = parse_usage(&data).unwrap();
+    fn rows(result: &ParsedUsage) -> Vec<(String, String, String)> {
+        result
+            .details
+            .iter()
+            .map(|d| {
+                (
+                    d.section_title().unwrap_or_default().to_string(),
+                    d.title().to_string(),
+                    d.value().to_string(),
+                )
+            })
+            .collect()
+    }
 
-        assert_eq!(result.usage.primary.used_percent, 50.0);
-        assert!(result.usage.secondary.is_some());
-        assert_eq!(result.usage.secondary_label, Some("API key".to_string()));
-        assert_eq!(result.usage.login_method, Some("Pro".to_string()));
-        assert!(!result.details.is_empty());
+    fn row(section: &str, label: &str, value: &str) -> (String, String, String) {
+        (section.to_string(), label.to_string(), value.to_string())
+    }
+
+    fn payload(account: Value, key: Value) -> Value {
+        json!({ "account": account, "key": key })
+    }
+
+    fn assert_unrecognized(result: Result<ParsedUsage, ProviderError>) {
+        match result {
+            Err(ProviderError::Other(message)) => assert_eq!(message, UNRECOGNIZED),
+            other => panic!("expected unrecognized response, got {other:?}"),
+        }
     }
 
     #[test]
-    fn test_parse_unlimited_key() {
-        let json = r#"{
-            "account": {
-                "plan_usage": 50,
-                "plan_limit": 100,
-                "current_plan": null
-            },
-            "key": {
-                "usage": 25,
-                "limit": null
-            }
-        }"#;
-        let data: Value = serde_json::from_str(json).unwrap();
-        let result = parse_usage(&data).unwrap();
+    fn full_payload_matches_upstream_sections() {
+        let result = parse_usage(&payload(
+            json!({ "plan_usage": 1200, "plan_limit": 4000, "paygo_usage": 10, "paygo_limit": 50, "current_plan": " Pro " }),
+            json!({ "usage": 800, "limit": 2000 }),
+        ))
+        .unwrap();
 
-        assert_eq!(result.usage.primary.used_percent, 50.0);
-        assert!(result.usage.secondary.is_none());
-        assert!(result.usage.login_method.is_none());
-        assert!(!result.details.is_empty());
-        // Should have api-key-limit detail with "Unlimited" label
-        let api_key_detail = result.details.iter().find(|d| d.id() == "api-key-limit");
-        assert!(api_key_detail.is_some());
-        assert!(api_key_detail.unwrap().value().contains("Unlimited"));
-    }
-
-    #[test]
-    fn test_percent_of() {
-        assert_eq!(percent_of(50.0, 100.0), 50.0);
-        assert_eq!(percent_of(0.0, 100.0), 0.0);
-        assert_eq!(percent_of(100.0, 100.0), 100.0);
-        assert_eq!(percent_of(1.0, 100.0), 1.0);
-        assert_eq!(percent_of(50.0, 0.0), 0.0);
-    }
-
-    #[test]
-    fn test_parse_with_paygo() {
-        let json = r#"{
-            "account": {
-                "plan_usage": 50,
-                "plan_limit": 100,
-                "paygo_usage": 10,
-                "paygo_limit": 50,
-                "current_plan": "Pro"
-            },
-            "key": {
-                "usage": 25,
-                "limit": 200
-            }
-        }"#;
-        let data: Value = serde_json::from_str(json).unwrap();
-        let result = parse_usage(&data).unwrap();
-
-        assert_eq!(result.usage.primary.used_percent, 50.0);
-        assert!(result.usage.secondary.is_some());
-        assert_eq!(result.usage.login_method, Some("Pro".to_string()));
-        // Should have details for account-plan (3 rows), api-key (3 rows), and paygo (3 rows) = 9 total
-        assert_eq!(result.details.len(), 9);
-        let paygo_detail = result.details.iter().find(|d| d.id() == "paygo-used");
-        assert!(paygo_detail.is_some());
-    }
-
-    #[test]
-    fn test_parse_rejects_partial_paygo() {
-        let json = r#"{
-            "account": {
-                "plan_usage": 50,
-                "plan_limit": 100,
-                "paygo_usage": 10
-            },
-            "key": {
-                "usage": 25,
-                "limit": 200
-            }
-        }"#;
-        let data: Value = serde_json::from_str(json).unwrap();
-        let result = parse_usage(&data);
-
-        assert!(result.is_err());
-        assert!(matches!(result, Err(ProviderError::Parse(_))));
-    }
-
-    #[test]
-    fn test_parse_rejects_missing_account() {
-        let json = r#"{
-            "key": {
-                "usage": 25,
-                "limit": 200
-            }
-        }"#;
-        let data: Value = serde_json::from_str(json).unwrap();
-        let result = parse_usage(&data);
-
-        assert!(result.is_err());
-        assert!(matches!(result, Err(ProviderError::Parse(_))));
-    }
-
-    #[test]
-    fn test_parse_rejects_missing_key() {
-        let json = r#"{
-            "account": {
-                "plan_usage": 50,
-                "plan_limit": 100
-            }
-        }"#;
-        let data: Value = serde_json::from_str(json).unwrap();
-        let result = parse_usage(&data);
-
-        assert!(result.is_err());
-        assert!(matches!(result, Err(ProviderError::Parse(_))));
-    }
-
-    #[test]
-    fn test_parse_rejects_non_object() {
-        let data: Value = serde_json::json!([1, 2, 3]);
-        let result = parse_usage(&data);
-
-        assert!(result.is_err());
-        assert!(matches!(result, Err(ProviderError::Parse(_))));
-    }
-
-    #[test]
-    fn test_parse_rejects_invalid_plan_usage() {
-        let json = r#"{
-            "account": {
-                "plan_usage": "fifty",
-                "plan_limit": 100
-            },
-            "key": {
-                "usage": 25,
-                "limit": 200
-            }
-        }"#;
-        let data: Value = serde_json::from_str(json).unwrap();
-        let result = parse_usage(&data);
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_parse_empty_plan_name() {
-        let json = r#"{
-            "account": {
-                "plan_usage": 50,
-                "plan_limit": 100,
-                "current_plan": "   "
-            },
-            "key": {
-                "usage": 25,
-                "limit": 200
-            }
-        }"#;
-        let data: Value = serde_json::from_str(json).unwrap();
-        let result = parse_usage(&data).unwrap();
-
-        // Trimmed empty string is rejected
-        assert!(result.usage.login_method.is_none());
-    }
-
-    #[test]
-    fn test_parse_oversized_plan_name() {
-        let json = format!(
-            r#"{{
-            "account": {{
-                "plan_usage": 50,
-                "plan_limit": 100,
-                "current_plan": "{}"
-            }},
-            "key": {{
-                "usage": 25,
-                "limit": 200
-            }}
-        }}"#,
-            "x".repeat(121)
+        assert_eq!(result.usage.primary.used_percent, 30.0);
+        assert!(!result.usage.primary.hidden_on_card);
+        assert_eq!(
+            result.usage.secondary.as_ref().map(|w| w.used_percent),
+            Some(40.0)
         );
-        let data: Value = serde_json::from_str(&json).unwrap();
-        let result = parse_usage(&data).unwrap();
-
-        // Plan name > 120 chars is rejected
-        assert!(result.usage.login_method.is_none());
+        assert_eq!(result.usage.secondary_label.as_deref(), Some("API key"));
+        assert_eq!(result.usage.login_method.as_deref(), Some("Pro"));
+        assert_eq!(
+            rows(&result),
+            [
+                row("Account plan", "Used", "1,200 credits"),
+                row("Account plan", "Limit", "4,000 credits"),
+                row("Account plan", "Remaining", "2,800 credits"),
+                row("API key", "Used", "800 credits"),
+                row("API key", "Limit", "2,000 credits"),
+                row("API key", "Remaining", "1,200 credits"),
+                row("Pay as you go", "Used", "10 credits"),
+                row("Pay as you go", "Limit", "50 credits"),
+                row("Pay as you go", "Remaining", "40 credits"),
+            ]
+        );
     }
 
     #[test]
-    fn test_parse_rejects_zero_plan_limit() {
-        let json = r#"{
-            "account": {
-                "plan_usage": 50,
-                "plan_limit": 0
-            },
-            "key": {
-                "usage": 25,
-                "limit": 200
-            }
-        }"#;
-        let data: Value = serde_json::from_str(json).unwrap();
-        let result = parse_usage(&data);
+    fn unlimited_key_has_no_secondary_and_no_remaining_row() {
+        let result = parse_usage(&payload(
+            json!({ "plan_usage": 5, "plan_limit": 10 }),
+            json!({ "usage": 3, "limit": null }),
+        ))
+        .unwrap();
 
-        assert!(result.is_err());
-        assert!(matches!(result, Err(ProviderError::Parse(_))));
+        assert!(result.usage.secondary.is_none());
+        assert_eq!(result.usage.login_method.as_deref(), Some("API key"));
+        assert_eq!(
+            rows(&result)[3..],
+            [
+                row("API key", "Used", "3 credits"),
+                row("API key", "Limit", "Unlimited")
+            ]
+        );
+    }
+
+    #[test]
+    fn zero_limits_keep_the_sections_but_draw_no_bars() {
+        let result = parse_usage(&payload(
+            json!({ "plan_usage": 7, "plan_limit": 0 }),
+            json!({ "usage": 2, "limit": 0 }),
+        ))
+        .unwrap();
+
+        assert!(result.usage.primary.hidden_on_card);
+        assert!(result.usage.primary.is_informational);
+        assert!(result.usage.secondary.is_none());
+        assert_eq!(
+            rows(&result)[2],
+            row("Account plan", "Remaining", "0 credits")
+        );
+    }
+
+    #[test]
+    fn rejects_shapes_upstream_rejects() {
+        let ok_account = json!({ "plan_usage": 1, "plan_limit": 2 });
+        let ok_key = json!({ "usage": 1, "limit": 2 });
+        assert_unrecognized(parse_usage(&json!([1, 2])));
+        assert_unrecognized(parse_usage(&json!({ "key": ok_key })));
+        assert_unrecognized(parse_usage(&json!({ "account": ok_account })));
+        assert_unrecognized(parse_usage(&payload(
+            json!({ "plan_usage": -1, "plan_limit": 2 }),
+            ok_key.clone(),
+        )));
+        assert_unrecognized(parse_usage(&payload(
+            json!({ "plan_usage": 1.5, "plan_limit": 2 }),
+            ok_key.clone(),
+        )));
+        assert_unrecognized(parse_usage(&payload(
+            json!({ "plan_usage": "1", "plan_limit": 2 }),
+            ok_key.clone(),
+        )));
+        assert_unrecognized(parse_usage(&payload(
+            ok_account.clone(),
+            json!({ "usage": 1 }),
+        )));
+        assert_unrecognized(parse_usage(&payload(
+            ok_account.clone(),
+            json!({ "usage": 1, "limit": "2" }),
+        )));
+        assert_unrecognized(parse_usage(&payload(
+            json!({ "plan_usage": 1, "plan_limit": 2, "paygo_usage": 1 }),
+            ok_key.clone(),
+        )));
+    }
+
+    #[test]
+    fn plan_name_must_be_a_short_non_blank_string_when_present() {
+        let key = json!({ "usage": 1, "limit": 2 });
+        let with_plan = |plan: Value| {
+            parse_usage(&payload(
+                json!({ "plan_usage": 1, "plan_limit": 2, "current_plan": plan }),
+                key.clone(),
+            ))
+        };
+        assert_unrecognized(with_plan(json!(null)));
+        assert_unrecognized(with_plan(json!("   ")));
+        assert_unrecognized(with_plan(json!(5)));
+        assert_unrecognized(with_plan(json!("x".repeat(121))));
+        assert_eq!(
+            with_plan(json!("x".repeat(120)))
+                .unwrap()
+                .usage
+                .login_method
+                .map(|m| m.len()),
+            Some(120)
+        );
+    }
+
+    #[test]
+    fn percent_is_clamped() {
+        assert_eq!(percent_of(50.0, 100.0), 50.0);
+        assert_eq!(percent_of(150.0, 100.0), 100.0);
+        assert_eq!(percent_of(50.0, 0.0), 0.0);
     }
 }
