@@ -110,27 +110,23 @@ impl ExaProvider {
             .unwrap_or(now);
 
         // Round current time down to whole seconds
-        let end_time = now
-            .with_nanosecond(0)
-            .unwrap_or(now);
+        let end_time = now.with_nanosecond(0).unwrap_or(now);
 
         let start_date = month_start.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
         let end_date = end_time.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
 
         // Build URL with encoded key ID and query parameters
-        let encoded_key_id = key_id.chars().map(|c| {
-            match c {
+        let encoded_key_id = key_id
+            .chars()
+            .map(|c| match c {
                 'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '~' | '.' => c.to_string(),
                 _ => format!("%{:02X}", c as u8),
-            }
-        }).collect::<String>();
-        
+            })
+            .collect::<String>();
+
         let url = format!(
             "{}/{}/usage?start_date={}&end_date={}",
-            USAGE_URL_BASE,
-            encoded_key_id,
-            start_date,
-            end_date
+            USAGE_URL_BASE, encoded_key_id, start_date, end_date
         );
 
         let response = self
@@ -146,7 +142,8 @@ impl ExaProvider {
             StatusCode::OK => {}
             StatusCode::UNAUTHORIZED => {
                 return Err(ProviderError::Other(
-                    "Exa rejected the service key. Ordinary search API keys are not supported.".into(),
+                    "Exa rejected the service key. Ordinary search API keys are not supported."
+                        .into(),
                 ));
             }
             StatusCode::FORBIDDEN => {
@@ -155,9 +152,7 @@ impl ExaProvider {
                 ));
             }
             StatusCode::TOO_MANY_REQUESTS => {
-                return Err(ProviderError::Other(
-                    "Exa rate limit exceeded.".into(),
-                ));
+                return Err(ProviderError::Other("Exa rate limit exceeded.".into()));
             }
             status if status.is_server_error() => {
                 return Err(ProviderError::Other(format!(

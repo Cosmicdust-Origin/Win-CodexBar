@@ -73,7 +73,9 @@ pub fn validate_provider_workspace_value(
             .map_err(|err| err.to_string()),
         ProviderId::Exa => {
             if trimmed.is_empty() || trimmed == "." || trimmed == ".." {
-                return Err("Exa API key ID cannot be empty or a path normalization value".to_string());
+                return Err(
+                    "Exa API key ID cannot be empty or a path normalization value".to_string(),
+                );
             }
             Ok(trimmed.to_string())
         }
