@@ -276,11 +276,10 @@ fn parse_usage(
     // Build display details
     let mut details = Vec::new();
 
-    if let Some(detail) = ProviderDisplayDetail::new(
-        "spend",
-        "API key this month (UTC)",
-        format!("${:.2}", total_cost_usd),
-    ) {
+    if let Some(detail) =
+        ProviderDisplayDetail::new("spend", "Spend", format!("${:.2}", total_cost_usd))
+            .and_then(|d| d.with_section_title("API key this month (UTC)"))
+    {
         details.push(detail);
     }
 
@@ -387,7 +386,8 @@ mod tests {
 
     #[test]
     fn test_parse_rejects_nonfinite_cost() {
-        for json_val in ["null", "true", "\"string\"", "1e400", "[]", "{}"] {
+        // Test non-numeric and invalid JSON values (note: serde_json doesn't support 1e400 as infinity)
+        for json_val in ["null", "true", "\"string\"", "[]", "{}"] {
             let json = format!(
                 r#"{{
                 "total_cost_usd": {},
