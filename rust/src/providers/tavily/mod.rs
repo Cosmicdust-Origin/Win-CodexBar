@@ -11,8 +11,8 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::core::{
-    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
-    RateWindow, SourceMode, UsageSnapshot,
+    FetchContext, Provider, ProviderDisplayDetail, ProviderError, ProviderFetchResult, ProviderId,
+    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
 };
 use crate::providers::read_bounded_response;
 
@@ -125,8 +125,12 @@ impl TavilyProvider {
             .map_err(|_| ProviderError::Parse("Tavily response is not valid JSON.".into()))?;
 
         let parsed = parse_usage(&data)?;
-        let usage = parsed.into_result();
-        Ok(ProviderFetchResult::new(usage, "oauth"))
+        let usage = parsed.usage;
+        let mut result = ProviderFetchResult::new(usage, "api");
+        for detail in parsed.details {
+            result = result.with_display_detail(Some(detail));
+        }
+        Ok(result)
     }
 }
 
@@ -162,22 +166,8 @@ impl Provider for TavilyProvider {
 
 #[derive(Debug, Clone)]
 struct ParsedUsage {
-    primary: Option<RateWindow>,
-    secondary: Option<RateWindow>,
-    plan: Option<String>,
-}
-
-impl ParsedUsage {
-    fn into_result(self) -> UsageSnapshot {
-        let mut result = UsageSnapshot::new(self.primary.unwrap_or_else(|| RateWindow::new(0.0)));
-        if let Some(secondary) = self.secondary {
-            result = result.with_secondary(secondary);
-        }
-        if let Some(plan) = self.plan {
-            result = result.with_login_method(plan);
-        }
-        result
-    }
+    usage: UsageSnapshot,
+    details: Vec<ProviderDisplayDetail>,
 }
 
 fn parse_usage(payload: &Value) -> Result<ParsedUsage, ProviderError> {
@@ -214,7 +204,20 @@ fn parse_usage(payload: &Value) -> Result<ParsedUsage, ProviderError> {
 
     let key_limit = key.get("limit").and_then(|v| v.as_i64());
 
-    // Extract plan name
+    // Extract PAYG info (optional)
+    let paygo_usage = account.get("paygo_usage").and_then(|v| v.as_i64());
+    let paygo_limit = account.get("paygo_limit").and_then(|v| v.as_i64());
+
+    // Validate that if either PAYG field exists, both must be valid numbers
+    if (paygo_usage.is_some() || paygo_limit.is_some())
+        && !(paygo_usage.is_some() && paygo_limit.is_some())
+    {
+        return Err(ProviderError::Parse(
+            "Tavily pay-as-you-go usage and limit must both be present together.".into(),
+        ));
+    }
+
+    // Extract plan name (optional)
     let plan = account
         .get("current_plan")
         .and_then(|v| v.as_str())
@@ -229,28 +232,78 @@ fn parse_usage(payload: &Value) -> Result<ParsedUsage, ProviderError> {
 
     // Build primary (account plan) window
     let primary = if plan_limit > 0 {
-        Some(RateWindow::new(percent_of(
-            plan_usage as f64,
-            plan_limit as f64,
-        )))
+        RateWindow::new(percent_of(plan_usage as f64, plan_limit as f64))
     } else {
-        None
+        return Err(ProviderError::Parse("Plan limit must be positive.".into()));
     };
 
-    // Build secondary (API key) window
-    let secondary = key_limit.and_then(|limit| {
+    // Build secondary (API key) window - null limit means unlimited
+    let secondary = if let Some(limit) = key_limit {
         if limit > 0 {
             Some(RateWindow::new(percent_of(key_usage as f64, limit as f64)))
         } else {
             None
         }
-    });
+    } else {
+        // Null key limit = unlimited, no quota window displayed
+        None
+    };
 
-    Ok(ParsedUsage {
-        primary,
-        secondary,
-        plan,
-    })
+    // Build usage snapshot
+    let mut usage = UsageSnapshot::new(primary);
+    if let Some(secondary) = secondary {
+        usage = usage
+            .with_secondary(secondary)
+            .with_secondary_label("API key");
+    }
+    if let Some(plan_name) = plan {
+        usage = usage.with_login_method(plan_name);
+    }
+
+    // Build display details (used for Settings panel expandable section)
+    let mut details = Vec::new();
+
+    // Account plan detail
+    if let Some(detail) = ProviderDisplayDetail::new(
+        "account-plan",
+        "Account plan",
+        format!("{} / {}", plan_usage, plan_limit),
+    )
+    .and_then(|d| d.with_secondary_value(format!("Remaining: {}", plan_limit - plan_usage)))
+    {
+        details.push(detail);
+    }
+
+    // API key detail
+    if let Some(limit) = key_limit {
+        let detail =
+            ProviderDisplayDetail::new("api-key", "API key", format!("{} / {}", key_usage, limit))
+                .and_then(|d| d.with_secondary_value(format!("Remaining: {}", limit - key_usage)));
+        if let Some(d) = detail {
+            details.push(d);
+        }
+    } else {
+        // Unlimited key
+        if let Some(detail) =
+            ProviderDisplayDetail::new("api-key", "API key", format!("{} / Unlimited", key_usage))
+        {
+            details.push(detail);
+        }
+    }
+
+    // Pay-as-you-go detail (if present)
+    if let (Some(paygo_u), Some(paygo_l)) = (paygo_usage, paygo_limit)
+        && let Some(detail) = ProviderDisplayDetail::new(
+            "paygo",
+            "Pay as you go",
+            format!("{} / {}", paygo_u, paygo_l),
+        )
+        .and_then(|d| d.with_secondary_value(format!("Remaining: {}", paygo_l - paygo_u)))
+    {
+        details.push(detail);
+    }
+
+    Ok(ParsedUsage { usage, details })
 }
 
 fn percent_of(used: f64, limit: f64) -> f64 {
@@ -281,9 +334,11 @@ mod tests {
         let data: Value = serde_json::from_str(json).unwrap();
         let result = parse_usage(&data).unwrap();
 
-        assert!(result.primary.is_some());
-        assert!(result.secondary.is_some());
-        assert_eq!(result.plan, Some("Pro".to_string()));
+        assert_eq!(result.usage.primary.used_percent, 50.0);
+        assert!(result.usage.secondary.is_some());
+        assert_eq!(result.usage.secondary_label, Some("API key".to_string()));
+        assert_eq!(result.usage.login_method, Some("Pro".to_string()));
+        assert!(!result.details.is_empty());
     }
 
     #[test]
@@ -302,9 +357,14 @@ mod tests {
         let data: Value = serde_json::from_str(json).unwrap();
         let result = parse_usage(&data).unwrap();
 
-        assert!(result.primary.is_some());
-        assert!(result.secondary.is_none());
-        assert!(result.plan.is_none());
+        assert_eq!(result.usage.primary.used_percent, 50.0);
+        assert!(result.usage.secondary.is_none());
+        assert!(result.usage.login_method.is_none());
+        assert!(!result.details.is_empty());
+        // Should have account-plan and api-key details with "Unlimited" label
+        let api_key_detail = result.details.iter().find(|d| d.id() == "api-key");
+        assert!(api_key_detail.is_some());
+        assert!(api_key_detail.unwrap().value().contains("Unlimited"));
     }
 
     #[test]
@@ -334,9 +394,33 @@ mod tests {
         let data: Value = serde_json::from_str(json).unwrap();
         let result = parse_usage(&data).unwrap();
 
-        assert!(result.primary.is_some());
-        assert!(result.secondary.is_some());
-        assert_eq!(result.plan, Some("Pro".to_string()));
+        assert_eq!(result.usage.primary.used_percent, 50.0);
+        assert!(result.usage.secondary.is_some());
+        assert_eq!(result.usage.login_method, Some("Pro".to_string()));
+        // Should have details for account-plan, api-key, and paygo
+        assert_eq!(result.details.len(), 3);
+        let paygo_detail = result.details.iter().find(|d| d.id() == "paygo");
+        assert!(paygo_detail.is_some());
+    }
+
+    #[test]
+    fn test_parse_rejects_partial_paygo() {
+        let json = r#"{
+            "account": {
+                "plan_usage": 50,
+                "plan_limit": 100,
+                "paygo_usage": 10
+            },
+            "key": {
+                "usage": 25,
+                "limit": 200
+            }
+        }"#;
+        let data: Value = serde_json::from_str(json).unwrap();
+        let result = parse_usage(&data);
+
+        assert!(result.is_err());
+        assert!(matches!(result, Err(ProviderError::Parse(_))));
     }
 
     #[test]
@@ -413,7 +497,7 @@ mod tests {
         let result = parse_usage(&data).unwrap();
 
         // Trimmed empty string is rejected
-        assert!(result.plan.is_none());
+        assert!(result.usage.login_method.is_none());
     }
 
     #[test]
@@ -436,6 +520,25 @@ mod tests {
         let result = parse_usage(&data).unwrap();
 
         // Plan name > 120 chars is rejected
-        assert!(result.plan.is_none());
+        assert!(result.usage.login_method.is_none());
+    }
+
+    #[test]
+    fn test_parse_rejects_zero_plan_limit() {
+        let json = r#"{
+            "account": {
+                "plan_usage": 50,
+                "plan_limit": 0
+            },
+            "key": {
+                "usage": 25,
+                "limit": 200
+            }
+        }"#;
+        let data: Value = serde_json::from_str(json).unwrap();
+        let result = parse_usage(&data);
+
+        assert!(result.is_err());
+        assert!(matches!(result, Err(ProviderError::Parse(_))));
     }
 }
