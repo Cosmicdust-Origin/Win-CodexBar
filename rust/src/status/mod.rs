@@ -106,7 +106,7 @@ impl ProviderStatus {
 }
 
 /// Where a provider publishes its service status.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum StatusSource {
     /// A statuspage.io-compatible page; `api/v2/status.json` is appended.
     Statuspage(&'static str),

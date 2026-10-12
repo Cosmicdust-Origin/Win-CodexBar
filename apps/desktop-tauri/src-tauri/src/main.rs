@@ -14,6 +14,7 @@ mod proof_harness;
 mod shell;
 mod shortcut_bridge;
 mod state;
+mod status_poller;
 mod stay_awake;
 mod surface;
 mod surface_target;
@@ -201,6 +202,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::get_bootstrap_state,
             commands::get_provider_catalog,
+            status_poller::get_provider_statuses,
             commands::get_settings_snapshot,
             commands::get_currency_rates,
             stay_awake::get_stay_awake_status,

@@ -634,6 +634,7 @@ async fn do_refresh_providers_with_policy(
             return Ok(ProviderRefreshOutcome::Skipped { reason });
         }
     };
+    crate::status_poller::spawn_poll(app, &inputs.settings, &refresh_ids);
 
     // Ensure cache only contains currently enabled providers for this generation.
     if scope == RefreshScope::AllEnabled

@@ -414,6 +414,7 @@ pub fn update_tray_icon_and_tooltip(
     let _ = tray.set_icon(Some(icon));
 
     let tooltip = build_tooltip(snapshots, settings.ui_language, settings.hide_personal_info);
+    let tooltip = crate::status_poller::with_incident_lines(app, &settings, tooltip);
     let _ = tray.set_tooltip(Some(tooltip));
 }
 
