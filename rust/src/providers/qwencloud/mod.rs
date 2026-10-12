@@ -16,8 +16,8 @@ use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
 use crate::core::{
-    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
-    RateWindow, SourceMode, UsageSnapshot,
+    FetchContext, Provider, ProviderDisplayDetail, ProviderError, ProviderFetchResult, ProviderId,
+    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
 };
 use crate::providers::browser_cookie_header;
 
@@ -131,7 +131,10 @@ impl QwenCloudProvider {
         }
     }
 
-    async fn fetch_via_web(&self, ctx: &FetchContext) -> Result<UsageSnapshot, ProviderError> {
+    async fn fetch_via_web(
+        &self,
+        ctx: &FetchContext,
+    ) -> Result<(UsageSnapshot, Option<TeamSnapshot>), ProviderError> {
         let cookie_header = Self::resolve_cookie_header(ctx)?;
         let client = crate::core::credentialed_http_client_builder()
             .timeout(std::time::Duration::from_secs(ctx.web_timeout.max(1)))
@@ -148,7 +151,7 @@ impl QwenCloudProvider {
             .fetch_team(&client, &sec_token, &cookie_header, ctx)
             .await
         {
-            Ok(Some(team_usage)) => return Ok(team_usage),
+            Ok(Some((team_usage, team_snapshot))) => return Ok((team_usage, Some(team_snapshot))),
             Ok(None) => {
                 // No active team plan, fall through to individual
             }
@@ -205,7 +208,7 @@ impl QwenCloudProvider {
             subscription_body.as_deref(),
             quota_config_body.as_deref(),
         )?;
-        self.snapshot_to_usage(snapshot)
+        Ok((self.snapshot_to_usage(snapshot)?, None))
     }
 
     fn resolve_cookie_header(ctx: &FetchContext) -> Result<String, ProviderError> {
@@ -362,7 +365,7 @@ impl QwenCloudProvider {
         sec_token: &str,
         cookie_header: &str,
         ctx: &FetchContext,
-    ) -> Result<Option<UsageSnapshot>, ProviderError> {
+    ) -> Result<Option<(UsageSnapshot, TeamSnapshot)>, ProviderError> {
         // First, try to discover billing selector via LoadHumanInfo
         let human_info = self
             .call_team_rpc(
@@ -410,8 +413,8 @@ impl QwenCloudProvider {
         // Parse team snapshot from response
         match parse_team_response(&summary)? {
             Some(team_snapshot) => {
-                let usage = self.team_snapshot_to_usage(team_snapshot)?;
-                Ok(Some(usage))
+                let usage = self.team_snapshot_to_usage(&team_snapshot)?;
+                Ok(Some((usage, team_snapshot)))
             }
             None => Ok(None),
         }
@@ -500,7 +503,7 @@ impl QwenCloudProvider {
 
     fn team_snapshot_to_usage(
         &self,
-        snapshot: TeamSnapshot,
+        snapshot: &TeamSnapshot,
     ) -> Result<UsageSnapshot, ProviderError> {
         let used_percent = snapshot
             .total_credits
@@ -517,8 +520,8 @@ impl QwenCloudProvider {
         let mut usage = UsageSnapshot::new(primary);
 
         // Add plan name as login method
-        if let Some(plan) = snapshot.plan_name.filter(|p| !p.trim().is_empty()) {
-            usage = usage.with_login_method(plan);
+        if let Some(plan) = snapshot.plan_name.as_ref().filter(|p| !p.trim().is_empty()) {
+            usage = usage.with_login_method(plan.clone());
         }
 
         Ok(usage)
@@ -657,8 +660,47 @@ impl Provider for QwenCloudProvider {
     async fn fetch_usage(&self, ctx: &FetchContext) -> Result<ProviderFetchResult, ProviderError> {
         match ctx.source_mode {
             SourceMode::Auto | SourceMode::Web => {
-                let usage = self.fetch_via_web(ctx).await?;
-                Ok(ProviderFetchResult::new(usage, "web"))
+                let (usage, team_snapshot) = self.fetch_via_web(ctx).await?;
+                let mut result = ProviderFetchResult::new(usage, "web");
+
+                // Add team-specific detail rows
+                if let Some(snapshot) = team_snapshot {
+                    if let (Some(used), Some(total)) =
+                        (snapshot.used_credits, snapshot.total_credits)
+                    {
+                        let used_str = format_quota(used);
+                        let total_str = format_quota(total);
+                        let detail = ProviderDisplayDetail::new(
+                            "team-credits",
+                            "Credits",
+                            format!("{} / {} credits used", used_str, total_str),
+                        );
+                        result = result.with_display_detail(detail);
+
+                        let remaining = total - used;
+                        let remaining_str = format_quota(remaining);
+                        let detail = ProviderDisplayDetail::new(
+                            "team-remaining",
+                            "Remaining",
+                            format!("{} credits", remaining_str),
+                        );
+                        result = result.with_display_detail(detail);
+                    }
+
+                    // Add seats row if available
+                    if let (Some(assigned), Some(total)) =
+                        (snapshot.assigned_seats, snapshot.total_seats)
+                    {
+                        let detail = ProviderDisplayDetail::new(
+                            "team-seats",
+                            "Seats",
+                            format!("{} / {}", assigned, total),
+                        );
+                        result = result.with_display_detail(detail);
+                    }
+                }
+
+                Ok(result)
             }
             SourceMode::Cli | SourceMode::OAuth => {
                 Err(ProviderError::UnsupportedSource(ctx.source_mode))
@@ -1948,7 +1990,7 @@ mod tests {
         assert_eq!(team_snapshot.total_seats, Some(1));
 
         let usage = QwenCloudProvider::new()
-            .team_snapshot_to_usage(team_snapshot)
+            .team_snapshot_to_usage(&team_snapshot)
             .unwrap();
         assert!(
             (usage.primary.used_percent - 74.50424308016).abs() < 0.00000001,
