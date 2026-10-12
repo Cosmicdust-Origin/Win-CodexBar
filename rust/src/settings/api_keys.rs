@@ -677,6 +677,15 @@ pub fn get_api_key_providers() -> Vec<ProviderConfigInfo> {
             dashboard_url: Some("https://crossmodel.ai"),
         },
         ProviderConfigInfo {
+            id: ProviderId::Sofya,
+            name: "Sofya",
+            requires_api_key: true,
+            api_key_env_var: Some("SOFYA_API_KEY"),
+            api_key_help: Some("Saved in CodexBar's local config file. Or set SOFYA_API_KEY."),
+            config_file_path: None,
+            dashboard_url: Some("https://sofya.co/dashboard"),
+        },
+        ProviderConfigInfo {
             id: ProviderId::Sub2Api,
             name: "sub2api",
             requires_api_key: true,

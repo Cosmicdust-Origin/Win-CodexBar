@@ -67,6 +67,7 @@ import qoder from "./icons/ProviderIcon-qoder.svg?raw";
 import raycast from "./icons/ProviderIcon-raycast.svg?raw";
 import replicate from "./icons/ProviderIcon-replicate.svg?raw";
 import sakana from "./icons/ProviderIcon-sakana.svg?raw";
+import sofya from "./icons/ProviderIcon-sofya.svg?raw";
 import stepfun from "./icons/ProviderIcon-stepfun.svg?raw";
 import sub2api from "./icons/ProviderIcon-sub2api.svg?raw";
 import synthetic from "./icons/ProviderIcon-synthetic.svg?raw";
@@ -168,6 +169,7 @@ const RAW: Record<string, string> = {
   raycast: tint(raycast),
   replicate: tint(replicate),
   sakana: tint(sakana),
+  sofya: tint(sofya),
   stepfun: tint(stepfun),
   sub2api: tint(sub2api),
   synthetic: tint(synthetic),
@@ -261,6 +263,7 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   replicate:   { id: "replicate",   brandColor: "#000000", fallbackLetter: "R", svgPath: RAW.replicate },
   codebuddy:   { id: "codebuddy",   brandColor: "#0052d9", fallbackLetter: "C" },
   sakana:      { id: "sakana",      brandColor: "#2975db", fallbackLetter: "S", svgPath: RAW.sakana },
+  sofya:       { id: "sofya",       brandColor: "#b0b820", fallbackLetter: "S", svgPath: RAW.sofya },
   stepfun:     { id: "stepfun",     brandColor: "#2196f2", fallbackLetter: "S", svgPath: RAW.stepfun },
   sub2api:     { id: "sub2api",     brandColor: "#14b8a6", fallbackLetter: "S", svgPath: RAW.sub2api },
   venice:      { id: "venice",      brandColor: "#3c8fdd", fallbackLetter: "V", svgPath: RAW.venice },

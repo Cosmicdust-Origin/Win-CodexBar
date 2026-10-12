@@ -28,10 +28,10 @@ use crate::providers::{
     MistralProvider, MuseProvider, NanoGPTProvider, NeuralwattProvider, NotionProvider,
     NousProvider, OllamaProvider, OpenAIApiProvider, OpenCodeGoProvider, OpenCodeProvider,
     OpenRouterProvider, PerplexityProvider, PiProvider, PoeProvider, QoderProvider,
-    QwenCloudProvider, RaycastProvider, ReplicateProvider, SakanaProvider, StepFunProvider,
-    Sub2ApiProvider, T3ChatProvider, TypeSafeProvider, V0Provider, VeniceProvider, VercelProvider,
-    VertexAIProvider, WarpProvider, WayfinderProvider, WindsurfProvider, XKiroProvider,
-    XaiProvider, ZaiProvider, ZedProvider, ZenMuxProvider, ZoomMateProvider,
+    QwenCloudProvider, RaycastProvider, ReplicateProvider, SakanaProvider, SofyaProvider,
+    StepFunProvider, Sub2ApiProvider, T3ChatProvider, TypeSafeProvider, V0Provider, VeniceProvider,
+    VercelProvider, VertexAIProvider, WarpProvider, WayfinderProvider, WindsurfProvider,
+    XKiroProvider, XaiProvider, ZaiProvider, ZedProvider, ZenMuxProvider, ZoomMateProvider,
 };
 
 /// Instantiate the concrete [`Provider`] implementation for a given [`ProviderId`].
@@ -112,6 +112,7 @@ pub fn instantiate(id: ProviderId) -> Box<dyn Provider> {
         ProviderId::Qoder => Box::new(QoderProvider::new()),
         ProviderId::CodeBuddy => Box::new(CodeBuddyProvider::new()),
         ProviderId::Sakana => Box::new(SakanaProvider::new()),
+        ProviderId::Sofya => Box::new(SofyaProvider::new()),
         ProviderId::Sub2Api => Box::new(Sub2ApiProvider::new()),
         ProviderId::Wayfinder => Box::new(WayfinderProvider::new()),
         ProviderId::ZenMux => Box::new(ZenMuxProvider::new()),
@@ -219,6 +220,7 @@ pub fn pace_capability(id: ProviderId) -> ProviderPaceCapability {
         | ProviderId::Qoder
         | ProviderId::CodeBuddy
         | ProviderId::Sakana
+        | ProviderId::Sofya
         | ProviderId::Sub2Api
         | ProviderId::Wayfinder
         | ProviderId::ZenMux

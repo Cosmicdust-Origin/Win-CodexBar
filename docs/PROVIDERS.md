@@ -305,6 +305,21 @@ Synthetic (or `SYNTHETIC_API_KEY`); the CLI also accepts `synthetic.new`.
 - 401 and 403 report "Invalid Synthetic API credentials."; response bodies are
   never echoed in errors.
 
+### Sofya
+
+Sofya reads `GET https://sofya.co/v1/auth/me` with bearer authentication.
+Configure the API key in Settings → Providers → Sofya (or `SOFYA_API_KEY`).
+
+- The "Account credits" section shows "Available credits" (`credits`),
+  "Plan credits" and "Purchased credits" when present, with up to six decimals.
+  At least one must be present; negative or non-numeric values fail closed.
+- `is_free_tier` sets the login label: "Free tier", "Pay as you go", or "API"
+  when absent. A free-tier account with `credits_reset_at` also shows
+  "Monthly reset" in UTC. The reset timestamp must include a time zone and is
+  validated even when it is not shown.
+- Every non-200 status reports "Sofya returned HTTP <status>."; other account
+  fields (email, API key, usernames) are never read or displayed.
+
 ### ClawRouter
 
 ClawRouter reports the monthly budget, spend and routed-provider usage of one
