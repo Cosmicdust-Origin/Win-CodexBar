@@ -305,6 +305,18 @@ Synthetic (or `SYNTHETIC_API_KEY`); the CLI also accepts `synthetic.new`.
 - 401 and 403 report "Invalid Synthetic API credentials."; response bodies are
   never echoed in errors.
 
+### Linkup
+
+Linkup reads `GET https://api.linkup.so/v1/credits/balance` with bearer
+authentication. Configure the API key in Settings → Providers → Linkup (or
+`LINKUP_API_KEY`).
+
+- The "Account balance" section shows one "Credit balance" row in USD. Zero
+  and negative balances are shown as reported.
+- Every non-200 status reports "Linkup returned HTTP <status>."; a body that is
+  not an object with a finite numeric `balance` reports "Linkup returned an
+  unrecognized credit balance.". Response bodies are never echoed in errors.
+
 ### ClawRouter
 
 ClawRouter reports the monthly budget, spend and routed-provider usage of one

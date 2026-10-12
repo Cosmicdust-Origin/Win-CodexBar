@@ -42,6 +42,7 @@ import jetbrains from "./icons/ProviderIcon-jetbrains.svg?raw";
 import kilo from "./icons/ProviderIcon-kilo.svg?raw";
 import kimi from "./icons/ProviderIcon-kimi.svg?raw";
 import langdock from "./icons/ProviderIcon-langdock.svg?raw";
+import linkup from "./icons/ProviderIcon-linkup.svg?raw";
 import kiro from "./icons/ProviderIcon-kiro.svg?raw";
 import lithosai from "./icons/ProviderIcon-lithosai.svg?raw";
 import llmman from "./icons/ProviderIcon-llmman.svg?raw";
@@ -143,6 +144,7 @@ const RAW: Record<string, string> = {
   kilo: tint(kilo),
   kimi: tint(kimi),
   langdock: tint(langdock),
+  linkup: tint(linkup),
   kiro: tint(kiro),
   lithosai: tint(lithosai),
   llmman: tint(llmman),
@@ -269,6 +271,7 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   clawrouter:  { id: "clawrouter",  brandColor: "#596EF6", fallbackLetter: "C", svgPath: RAW.clawrouter },
   ibmbob:      { id: "ibmbob",      brandColor: "#0E61FA", fallbackLetter: "B", svgPath: RAW.ibmbob },
   langdock:    { id: "langdock",    brandColor: "#5A4AE7", fallbackLetter: "L", svgPath: RAW.langdock },
+  linkup:      { id: "linkup",      brandColor: "#202020", fallbackLetter: "L", svgPath: RAW.linkup },
   lithosai:    { id: "lithosai",    brandColor: "#6B7280", fallbackLetter: "L", svgPath: RAW.lithosai },
   museai:      { id: "museai",      brandColor: "#0668E1", fallbackLetter: "M", svgPath: RAW.museai },
   workbuddy:   { id: "workbuddy",   brandColor: "#0DC8A6", fallbackLetter: "W", svgPath: RAW.workbuddy },

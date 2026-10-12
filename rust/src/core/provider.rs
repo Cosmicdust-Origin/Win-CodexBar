@@ -108,6 +108,7 @@ pub enum ProviderId {
     IBMBob,
     Langdock,
     LithosAI,
+    Linkup,
     MuseAI,
     WorkBuddy,
 }
@@ -210,6 +211,7 @@ impl ProviderId {
             ProviderId::IBMBob,
             ProviderId::Langdock,
             ProviderId::LithosAI,
+            ProviderId::Linkup,
             ProviderId::MuseAI,
             ProviderId::WorkBuddy,
         ]
@@ -273,6 +275,7 @@ impl ProviderId {
             ProviderId::IBMBob => "ibmbob",
             ProviderId::Langdock => "langdock",
             ProviderId::LithosAI => "lithosai",
+            ProviderId::Linkup => "linkup",
             ProviderId::MuseAI => "museai",
             ProviderId::WorkBuddy => "workbuddy",
             ProviderId::AiAnd => "aiand",
@@ -376,6 +379,7 @@ impl ProviderId {
             ProviderId::IBMBob => "IBM Bob",
             ProviderId::Langdock => "Langdock",
             ProviderId::LithosAI => "LithosAI",
+            ProviderId::Linkup => "Linkup",
             ProviderId::MuseAI => "Muse (muse.ai)",
             ProviderId::WorkBuddy => "WorkBuddy",
             ProviderId::AiAnd => "ai&",
@@ -495,6 +499,7 @@ impl ProviderId {
             ProviderId::IBMBob => None,
             ProviderId::Langdock => Some("langdock.com"),
             ProviderId::LithosAI => Some("console.lithosai.cloud"),
+            ProviderId::Linkup => None,
             ProviderId::MuseAI => Some("muse.ai"),
             ProviderId::WorkBuddy => Some("workbuddy.cn"),
             ProviderId::AiAnd => None,
@@ -661,6 +666,7 @@ impl ProviderId {
             "ibmbob" | "ibm-bob" | "ibm bob" | "bob" | "bobshell" => Some(ProviderId::IBMBob),
             "langdock" => Some(ProviderId::Langdock),
             "lithosai" => Some(ProviderId::LithosAI),
+            "linkup" => Some(ProviderId::Linkup),
             "museai" | "muse (muse.ai)" => Some(ProviderId::MuseAI),
             "workbuddy" => Some(ProviderId::WorkBuddy),
             _ => None,
@@ -1377,6 +1383,7 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::ClawRouter => "#596EF6",
         ProviderId::IBMBob => "#0E61FA",
         ProviderId::Langdock => "#5A4AE7",
+        ProviderId::Linkup => "#202020",
         ProviderId::LithosAI => "#6B7280",
         ProviderId::MuseAI => "#0668E1",
         ProviderId::WorkBuddy => "#0DC8A6",
@@ -1394,7 +1401,7 @@ mod tests {
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 96);
+        assert_eq!(all.len(), 97);
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Pi));
@@ -1468,6 +1475,7 @@ mod tests {
         assert!(all.contains(&ProviderId::ClawRouter));
         assert!(all.contains(&ProviderId::IBMBob));
         assert!(all.contains(&ProviderId::Langdock));
+        assert!(all.contains(&ProviderId::Linkup));
         assert!(all.contains(&ProviderId::LithosAI));
         assert!(all.contains(&ProviderId::MuseAI));
         assert!(all.contains(&ProviderId::WorkBuddy));

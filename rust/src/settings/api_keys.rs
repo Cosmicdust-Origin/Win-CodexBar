@@ -784,6 +784,15 @@ pub fn get_api_key_providers() -> Vec<ProviderConfigInfo> {
             config_file_path: None,
             dashboard_url: Some("https://bob.ibm.com"),
         },
+        ProviderConfigInfo {
+            id: ProviderId::Linkup,
+            name: "Linkup",
+            requires_api_key: true,
+            api_key_env_var: Some(crate::providers::linkup::API_KEY_ENV),
+            api_key_help: Some("Stored in the CodexBar config file. Or set LINKUP_API_KEY."),
+            config_file_path: None,
+            dashboard_url: Some("https://app.linkup.so/organization/billing"),
+        },
     ]
 }
 
