@@ -182,6 +182,36 @@ to `https://muse.ai/` with the session cookies and `Sec-Fetch-*` headers.
 - A 401, a 403 or a redirect to `auth.muse.ai` is reported as an expired
   session. Response bodies and cookies are never logged or echoed in errors.
 
+### TinyApi
+
+TinyApi reads available credit balance from the signed-in dashboard using
+`GET https://tinyapi.rest/api/user/credits` with session cookies or a manual
+Cookie header. The response returns a JSON object with a `data.totalAvailable`
+field containing the available credits as a number.
+
+- The cookie source in Settings → Providers → TinyApi picks the session and
+  defaults to Automatic. Automatic imports the `tinyapi.rest` cookies from the
+  browser you select (Chrome, Edge, Brave, Firefox); Manual accepts a pasted
+  Cookie header. Without an imported or pasted header, Automatic tries each
+  detected browser's `tinyapi.rest` cookies in turn, and Manual fails closed.
+  Off reads nothing.
+- Requests send the Cookie header and expect a JSON response with `success: true`
+  and `data.totalAvailable` as a finite non-negative number. HTTP 401 or 403
+  indicates an expired session; the provider skips to the next browser session
+  if Automatic has more candidates, and reports "TinyApi session expired. Sign
+  in again or paste a fresh Cookie header." if none remain. HTTP 429 is
+  rate-limited, and 500+ is unavailable. Other HTTP codes are reported with
+  their status code. Bodies over 256 KiB or without a valid balance report a
+  missing balance, and non-JSON bodies report invalid JSON. Response bodies and
+  cookies are never logged or echoed in errors.
+- The card shows a single "Available credits" detail row with the balance
+  formatted to up to two decimal places and the "credits" unit (e.g. "125.5
+  credits" or "100 credits"). The menu bar reads "Available credits: <value>"
+  from an informational window that is hidden on the card. Login method is
+  shown as "Browser session".
+- No multi-account support. A transport or timeout error while reading the
+  body keeps its cause instead of being reported as an invalid response.
+
 ### WorkBuddy credits
 
 WorkBuddy is Tencent's desktop AI work assistant, billed in credits. It is
@@ -304,6 +334,49 @@ Synthetic (or `SYNTHETIC_API_KEY`); the CLI also accepts `synthetic.new`.
 - The plan name (`plan`, `planName`, `tier`, ...) is shown as the plan.
 - 401 and 403 report "Invalid Synthetic API credentials."; response bodies are
   never echoed in errors.
+
+### Sail Research
+
+Sail Research reads `GET https://api.sailresearch.com/v2/usage/summary?range=30d`
+with bearer authentication. Configure the API key in Settings → Providers →
+Sail Research (or `SAIL_API_KEY`).
+
+- The "Organization billing" section shows the credit balance and the spend for
+  the effective range the API reports (for example "Last 30 days spend").
+  Amounts arrive as fractional cents and display as USD.
+- When `balance_unavailable` is true the balance row shows "Unavailable" and
+  the spend row is kept.
+- 401 reports "Sail Research returned HTTP 401."; 402 reports exhausted
+  credits; 403 reports missing organization access. A billing summary that is
+  unavailable, has no billing account, or fails validation is reported as an
+  error. Response bodies are never echoed in errors.
+
+### Linkup
+
+Linkup reads `GET https://api.linkup.so/v1/credits/balance` with bearer
+authentication. Configure the API key in Settings → Providers → Linkup (or
+`LINKUP_API_KEY`).
+
+- The "Account balance" section shows one "Credit balance" row in USD. Zero
+  and negative balances are shown as reported.
+- Every non-200 status reports "Linkup returned HTTP <status>."; a body that is
+  not an object with a finite numeric `balance` reports "Linkup returned an
+  unrecognized credit balance.". Response bodies are never echoed in errors.
+
+### Sofya
+
+Sofya reads `GET https://sofya.co/v1/auth/me` with bearer authentication.
+Configure the API key in Settings → Providers → Sofya (or `SOFYA_API_KEY`).
+
+- The "Account credits" section shows "Available credits" (`credits`),
+  "Plan credits" and "Purchased credits" when present, with up to six decimals.
+  At least one must be present; negative or non-numeric values fail closed.
+- `is_free_tier` sets the login label: "Free tier", "Pay as you go", or "API"
+  when absent. A free-tier account with `credits_reset_at` also shows
+  "Monthly reset" in UTC. The reset timestamp must include a time zone and is
+  validated even when it is not shown.
+- Every non-200 status reports "Sofya returned HTTP <status>."; other account
+  fields (email, API key, usernames) are never read or displayed.
 
 ### ClawRouter
 

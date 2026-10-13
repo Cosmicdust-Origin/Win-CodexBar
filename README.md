@@ -91,6 +91,7 @@ See the full history in [CHANGELOG.md](CHANGELOG.md).
 | Ollama | Cookies / API Key | Usage, Cloud Models, Pace windows |
 | Azure OpenAI | API Key | Deployment |
 | T3 Chat | Cookies / cURL | Base, Overage |
+| TinyApi | Browser cookies / manual Cookie header | Available credits |
 | TypeSafe | Browser cookies / manual Cookie header | Billing-cycle spend, balance, expiring credits |
 | OpenRouter | API Key | Credits |
 | JetBrains AI | Local Config | Usage |
@@ -129,6 +130,9 @@ See the full history in [CHANGELOG.md](CHANGELOG.md).
 | IBM Bob | API Key / token accounts | Monthly Bobcoins, per-team budgets |
 | xKiro | API Key | Daily free tokens |
 | Synthetic | API Key | Five-hour quota, Weekly tokens, Hourly search, Plan |
+| Sail Research | API Key | Organization credit balance, spend for the reported range (up to 30 days) |
+| Linkup | API Key | Account credit balance |
+| Sofya | API Key | Available, plan and purchased credits, Monthly reset (free tier) |
 | Langdock | Browser cookies / manual Cookie header | Session (5h), Weekly |
 | LithosAI | Browser cookies / manual Cookie header | Prepaid balance, UTC spend today and this month |
 | Muse (muse.ai) | Browser cookies / manual Cookie header | Weekly usage, tokens left, top-up tokens |
