@@ -44,6 +44,7 @@ import jetbrains from "./icons/ProviderIcon-jetbrains.svg?raw";
 import kilo from "./icons/ProviderIcon-kilo.svg?raw";
 import kimi from "./icons/ProviderIcon-kimi.svg?raw";
 import langdock from "./icons/ProviderIcon-langdock.svg?raw";
+import linkup from "./icons/ProviderIcon-linkup.svg?raw";
 import kiro from "./icons/ProviderIcon-kiro.svg?raw";
 import lithosai from "./icons/ProviderIcon-lithosai.svg?raw";
 import llmman from "./icons/ProviderIcon-llmman.svg?raw";
@@ -68,12 +69,15 @@ import perplexity from "./icons/ProviderIcon-perplexity.svg?raw";
 import qoder from "./icons/ProviderIcon-qoder.svg?raw";
 import raycast from "./icons/ProviderIcon-raycast.svg?raw";
 import replicate from "./icons/ProviderIcon-replicate.svg?raw";
+import sailresearch from "./icons/ProviderIcon-sailresearch.svg?raw";
 import sakana from "./icons/ProviderIcon-sakana.svg?raw";
+import sofya from "./icons/ProviderIcon-sofya.svg?raw";
 import stepfun from "./icons/ProviderIcon-stepfun.svg?raw";
 import sub2api from "./icons/ProviderIcon-sub2api.svg?raw";
 import synthetic from "./icons/ProviderIcon-synthetic.svg?raw";
 import clawrouter from "./icons/ProviderIcon-clawrouter.svg?raw";
 import t3chat from "./icons/ProviderIcon-t3chat.svg?raw";
+import tinyapi from "./icons/ProviderIcon-tinyapi.svg?raw";
 import venice from "./icons/ProviderIcon-venice.svg?raw";
 import vercel from "./icons/ProviderIcon-vercel.svg?raw";
 import vertexai from "./icons/ProviderIcon-vertexai.svg?raw";
@@ -147,6 +151,7 @@ const RAW: Record<string, string> = {
   kilo: tint(kilo),
   kimi: tint(kimi),
   langdock: tint(langdock),
+  linkup: tint(linkup),
   kiro: tint(kiro),
   lithosai: tint(lithosai),
   llmman: tint(llmman),
@@ -171,12 +176,15 @@ const RAW: Record<string, string> = {
   qoder: tint(qoder),
   raycast: tint(raycast),
   replicate: tint(replicate),
+  sailresearch: tint(sailresearch),
   sakana: tint(sakana),
+  sofya: tint(sofya),
   stepfun: tint(stepfun),
   sub2api: tint(sub2api),
   synthetic: tint(synthetic),
   clawrouter: tint(clawrouter),
   t3chat: tint(t3chat),
+  tinyapi: tint(tinyapi),
   venice: tint(venice),
   vercel: tint(vercel),
   vertexai: tint(vertexai),
@@ -243,6 +251,7 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   ollama:      { id: "ollama",      brandColor: "#888888", fallbackLetter: "○", svgPath: RAW.ollama },
   azureopenai: { id: "azureopenai", brandColor: "#0078d4", fallbackLetter: "A" },
   t3chat:      { id: "t3chat",      brandColor: "#f56647", fallbackLetter: "T", svgPath: RAW.t3chat },
+  tinyapi:     { id: "tinyapi",     brandColor: "#f97316", fallbackLetter: "T", svgPath: RAW.tinyapi },
   opencode:    { id: "opencode",    brandColor: "#3b82f6", fallbackLetter: "○", svgPath: RAW.opencode },
   opencodego:  { id: "opencodego",  brandColor: "#3b82f6", fallbackLetter: "○", svgPath: RAW.opencodego },
   openrouter:  { id: "openrouter",  brandColor: "#6467f2", fallbackLetter: "R", svgPath: RAW.openrouter },
@@ -265,8 +274,10 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   qoder:       { id: "qoder",       brandColor: "#10b981", fallbackLetter: "Q", svgPath: RAW.qoder },
   raycast:     { id: "raycast",     brandColor: "#FF6363", fallbackLetter: "R", svgPath: RAW.raycast },
   replicate:   { id: "replicate",   brandColor: "#000000", fallbackLetter: "R", svgPath: RAW.replicate },
+  sailresearch: { id: "sailresearch", brandColor: "#2C4681", fallbackLetter: "S", svgPath: RAW.sailresearch },
   codebuddy:   { id: "codebuddy",   brandColor: "#0052d9", fallbackLetter: "C" },
   sakana:      { id: "sakana",      brandColor: "#2975db", fallbackLetter: "S", svgPath: RAW.sakana },
+  sofya:       { id: "sofya",       brandColor: "#b0b820", fallbackLetter: "S", svgPath: RAW.sofya },
   stepfun:     { id: "stepfun",     brandColor: "#2196f2", fallbackLetter: "S", svgPath: RAW.stepfun },
   sub2api:     { id: "sub2api",     brandColor: "#14b8a6", fallbackLetter: "S", svgPath: RAW.sub2api },
   venice:      { id: "venice",      brandColor: "#3c8fdd", fallbackLetter: "V", svgPath: RAW.venice },
@@ -275,6 +286,7 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   clawrouter:  { id: "clawrouter",  brandColor: "#596EF6", fallbackLetter: "C", svgPath: RAW.clawrouter },
   ibmbob:      { id: "ibmbob",      brandColor: "#0E61FA", fallbackLetter: "B", svgPath: RAW.ibmbob },
   langdock:    { id: "langdock",    brandColor: "#5A4AE7", fallbackLetter: "L", svgPath: RAW.langdock },
+  linkup:      { id: "linkup",      brandColor: "#202020", fallbackLetter: "L", svgPath: RAW.linkup },
   lithosai:    { id: "lithosai",    brandColor: "#6B7280", fallbackLetter: "L", svgPath: RAW.lithosai },
   museai:      { id: "museai",      brandColor: "#0668E1", fallbackLetter: "M", svgPath: RAW.museai },
   workbuddy:   { id: "workbuddy",   brandColor: "#0DC8A6", fallbackLetter: "W", svgPath: RAW.workbuddy },
