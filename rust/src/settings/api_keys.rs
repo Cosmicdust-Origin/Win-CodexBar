@@ -833,6 +833,17 @@ pub fn get_api_key_providers() -> Vec<ProviderConfigInfo> {
             config_file_path: None,
             dashboard_url: Some("https://app.linkup.so/organization/billing"),
         },
+        ProviderConfigInfo {
+            id: ProviderId::Cosmic,
+            name: "Cosmic AI",
+            requires_api_key: true,
+            api_key_env_var: Some("COSMIC_TOKEN"),
+            api_key_help: Some(
+                "Get a Personal Access Token from Cosmic AI. Also set COSMIC_PROJECT_ID or the project ID in Settings.",
+            ),
+            config_file_path: None,
+            dashboard_url: Some("https://app.cosmicjs.com"),
+        },
     ]
 }
 

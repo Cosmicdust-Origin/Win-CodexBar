@@ -482,6 +482,39 @@ are tried in browser order, stale sessions are skipped, and a missing session
 after all attempts triggers "sign in to console.x.com". Errors never echo
 response bodies.
 
+### Cosmic AI
+
+Cosmic AI is disabled by default. In Settings → Providers → Cosmic AI, enter a
+**Personal Access Token** and the **Project ID** to monitor. Create a token in
+[Cosmic Account Settings → API Tokens](https://app.cosmicjs.com/account/api-tokens).
+Alternatively, set `COSMIC_TOKEN` and `COSMIC_PROJECT_ID`. The masked token and
+Project ID are saved in CodexBar's local config file (`apiKey` and `workspaceID`
+in the `cosmic` provider entry). Bucket read/write keys are not supported.
+
+The provider uses the read-only endpoint underlying the official `cosmic billing usage` command:
+
+```text
+GET https://dapi.cosmicjs.com/v3/projects/usage?project_id=<Project ID>
+Origin: https://app.cosmicjs.com
+```
+
+- The **Input tokens** and **Output tokens** meters pair `usage.ai.input_tokens`
+  / `output_tokens` with `plan_info.ai_tokens.max_input` / `max_output`.
+- Allowances can be decimal strings with `k` or `M` suffixes (as in the
+  official CLI), explicit `unlimited` allowances, or absent.
+- Detail rows show usage, allowance, remaining tokens, and any amount above the
+  allowance separately for each dimension.
+- Usage covers only the configured project; it is not summed across projects or
+  workspaces.
+- Missing counters remain unknown. A zero, absent, or nonnumeric allowance has
+  no percentage meter; any reported counters remain visible. An explicit
+  unlimited allowance stays labeled unlimited, and other unrecognized strings
+  leave the allowance unknown.
+- Invalid numeric counters fail parsing without including the response body in
+  the error.
+- 401, 403, and 429 report their status; response bodies are never echoed in
+  errors.
+
 ## Listing what is enabled
 
 ```powershell

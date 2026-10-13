@@ -1407,6 +1407,10 @@ locale_keys! {
     ExaApiKeyIdLabel,
     ExaApiKeyIdPlaceholder,
     ExaApiKeyIdHelp,
+    CosmicProjectIdTitle,
+    CosmicProjectIdLabel,
+    CosmicProjectIdPlaceholder,
+    CosmicProjectIdHelp,
 
     // Tray icon visibility (Windows 11 hidden-icons overflow)
     PromoteTrayIconLabel,

@@ -1593,3 +1593,7 @@ ProviderCodexBatterySaver = Економія заряду для веб-OpenAI
 ProviderCodexBatterySaverHelp = Обмежує фонові оновлення chatgpt.com, щоб зменшити витрату заряду й трафіку. Доповнення панелі можуть застарівати, доки ви не оновите їх вручну.
 ProviderOptionNotUsedOnWindows = Поки не використовується в Windows; вибір зберігається на майбутнє.
 ClaudeSwapExecutablePathHelp = Шлях до виконуваного файлу cswap (github.com/realiti4/claude-swap).
+CosmicProjectIdTitle = Cosmic AI Project
+CosmicProjectIdLabel = Project ID
+CosmicProjectIdPlaceholder = cos_...
+CosmicProjectIdHelp = Required. Usage covers this project only. Or set COSMIC_PROJECT_ID.

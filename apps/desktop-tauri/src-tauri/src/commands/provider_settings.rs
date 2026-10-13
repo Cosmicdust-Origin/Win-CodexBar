@@ -370,6 +370,7 @@ fn workspace_provider(provider_id: &str) -> Option<codexbar::core::ProviderId> {
         "gitkraken" => ProviderId::GitKraken,
         "muse" => ProviderId::Muse,
         "exa" => ProviderId::Exa,
+        "cosmic" => ProviderId::Cosmic,
         _ => return None,
     })
 }
@@ -505,6 +506,11 @@ mod tests {
     #[test]
     fn maps_exa_api_key_id_workspace_provider() {
         assert_eq!(workspace_provider("exa"), Some(ProviderId::Exa));
+    }
+
+    #[test]
+    fn maps_cosmic_project_provider() {
+        assert_eq!(workspace_provider("cosmic"), Some(ProviderId::Cosmic));
     }
 
     #[test]

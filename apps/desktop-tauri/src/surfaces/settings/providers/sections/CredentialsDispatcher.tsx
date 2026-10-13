@@ -38,6 +38,7 @@ export function CredentialsDispatcher({ providerId, t }: Props) {
     case "xai":
     case "gitkraken":
     case "exa":
+    case "cosmic":
       return <OpenAiExtras providerId={providerId} t={t} />;
     case "openrouter":
       return <OpenRouterManagementCreds t={t} />;

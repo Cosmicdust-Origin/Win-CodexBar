@@ -16,6 +16,7 @@ import coderabbit from "./icons/ProviderIcon-coderabbit.svg?raw";
 import codex from "./icons/ProviderIcon-codex.svg?raw";
 import commandcode from "./icons/ProviderIcon-commandcode.svg?raw";
 import copilot from "./icons/ProviderIcon-copilot.svg?raw";
+import cosmic from "./icons/ProviderIcon-cosmic.svg?raw";
 import crossmodel from "./icons/ProviderIcon-crossmodel.svg?raw";
 import cursor from "./icons/ProviderIcon-cursor.svg?raw";
 import deepgram from "./icons/ProviderIcon-deepgram.svg?raw";
@@ -124,6 +125,7 @@ const RAW: Record<string, string> = {
   codex: tint(codex),
   commandcode: tint(commandcode),
   copilot: tint(copilot),
+  cosmic: tint(cosmic),
   crossmodel: tint(crossmodel),
   cursor: tint(cursor),
   deepgram: tint(deepgram),
@@ -212,6 +214,7 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   coderabbit:  { id: "coderabbit",  brandColor: "#ff5c35", fallbackLetter: "C", svgPath: RAW.coderabbit },
   codex:       { id: "codex",       brandColor: "#49a3b0", fallbackLetter: "◆", svgPath: RAW.codex },
   copilot:     { id: "copilot",     brandColor: "#a855f7", fallbackLetter: "⬡", svgPath: RAW.copilot },
+  cosmic:      { id: "cosmic",      brandColor: "#6366F1", fallbackLetter: "◆", svgPath: RAW.cosmic },
   cursor:      { id: "cursor",      brandColor: "#f54e00", fallbackLetter: "▸", svgPath: RAW.cursor },
   deepgram:    { id: "deepgram",    brandColor: "#6467f2", fallbackLetter: "D", svgPath: RAW.deepgram },
   deepinfra:   { id: "deepinfra",   brandColor: "#2a3275", fallbackLetter: "D", svgPath: RAW.deepinfra },

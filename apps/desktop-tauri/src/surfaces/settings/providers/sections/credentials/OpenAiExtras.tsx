@@ -104,6 +104,7 @@ const WORKSPACE_EXTRA_IDS: Record<string, true> = {
   fireworks: true,
   gitkraken: true,
   exa: true,
+  cosmic: true,
 };
 
 function extraConfig(providerId: string, t: Props["t"]) {
@@ -191,6 +192,13 @@ function extraConfig(providerId: string, t: Props["t"]) {
         label: t("ExaApiKeyIdLabel"),
         placeholder: t("ExaApiKeyIdPlaceholder"),
         help: t("ExaApiKeyIdHelp"),
+      };
+    case "cosmic":
+      return {
+        title: t("CosmicProjectIdTitle"),
+        label: t("CosmicProjectIdLabel"),
+        placeholder: t("CosmicProjectIdPlaceholder"),
+        help: t("CosmicProjectIdHelp"),
       };
     default:
       return null;

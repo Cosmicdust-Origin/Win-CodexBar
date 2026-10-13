@@ -455,7 +455,8 @@ impl TokenAccountSupport {
             | ProviderId::TinyApi
             | ProviderId::Xapi
             | ProviderId::Tavily
-            | ProviderId::Exa => None,
+            | ProviderId::Exa
+            | ProviderId::Cosmic => None,
         }
     }
 

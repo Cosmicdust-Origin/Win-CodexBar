@@ -117,6 +117,7 @@ pub enum ProviderId {
     SailResearch,
     Tavily,
     Exa,
+    Cosmic,
 }
 
 impl ProviderId {
@@ -226,6 +227,7 @@ impl ProviderId {
             ProviderId::SailResearch,
             ProviderId::Tavily,
             ProviderId::Exa,
+            ProviderId::Cosmic,
         ]
     }
 
@@ -335,6 +337,7 @@ impl ProviderId {
             ProviderId::Replicate => "replicate",
             ProviderId::AtlasCloud => "atlascloud",
             ProviderId::Exa => "exa",
+            ProviderId::Cosmic => "cosmic",
         }
     }
 
@@ -446,6 +449,7 @@ impl ProviderId {
             ProviderId::Replicate => "Replicate",
             ProviderId::AtlasCloud => "Atlas Cloud",
             ProviderId::Exa => "Exa",
+            ProviderId::Cosmic => "Cosmic AI",
         }
     }
 
@@ -562,6 +566,7 @@ impl ProviderId {
             ProviderId::Xapi => Some("x.com"),
             ProviderId::Xai => None,
             ProviderId::Exa => None,
+            ProviderId::Cosmic => None,
         }
     }
 
@@ -705,6 +710,7 @@ impl ProviderId {
             "sailresearch" | "sail research" => Some(ProviderId::SailResearch),
             "tavily" => Some(ProviderId::Tavily),
             "exa" => Some(ProviderId::Exa),
+            "cosmic" | "cosmic ai" => Some(ProviderId::Cosmic),
             _ => None,
         }
     }
@@ -1430,6 +1436,7 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::SailResearch => "#2C4681",
         ProviderId::Tavily => "#0F766E",
         ProviderId::Exa => "#0143D9",
+        ProviderId::Cosmic => "#6366F1",
     }
 }
 
@@ -1444,7 +1451,7 @@ mod tests {
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 103);
+        assert_eq!(all.len(), 104);
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Pi));
