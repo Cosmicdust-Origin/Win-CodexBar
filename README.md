@@ -133,6 +133,7 @@ See the full history in [CHANGELOG.md](CHANGELOG.md).
 | Linkup | API Key | Account credit balance |
 | Sofya | API Key | Available, plan and purchased credits, Monthly reset (free tier) |
 | Tavily | API Key | Account plan usage, API key usage, Pay-as-you-go credits |
+| Exa | API Key + Scope | Selected API key monthly spend (UTC) |
 | Langdock | Browser cookies / manual Cookie header | Session (5h), Weekly |
 | LithosAI | Browser cookies / manual Cookie header | Prepaid balance, UTC spend today and this month |
 | Muse (muse.ai) | Browser cookies / manual Cookie header | Weekly usage, tokens left, top-up tokens |

@@ -70,6 +70,7 @@ const MAC_PARITY_ACCENTS: Array<[string, string]> = [
   ["chutes", "#3184ff"],
   ["deepgram", "#6467f2"],
   ["doubao", "#3370ff"],
+  ["exa", "#0143d9"],
   ["grok", "#10a37f"],
   ["groq", "#f56844"],
   ["helmcode", "#4934e1"],

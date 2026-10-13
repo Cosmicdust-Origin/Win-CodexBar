@@ -48,6 +48,7 @@ export const TEST_PROVIDER_CATALOG: Array<[string, string]> = [
   ["manus", "Manus"],
   ["mimo", "Xiaomi MiMo"],
   ["doubao", "Doubao"],
+  ["exa", "Exa"],
   ["commandcode", "Command Code"],
   ["stepfun", "StepFun"],
   ["venice", "Venice"],

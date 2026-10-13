@@ -1403,6 +1403,10 @@ locale_keys! {
     LLMManBaseUrlLabel,
     LLMManBaseUrlPlaceholder,
     LLMManBaseUrlHelp,
+    ExaApiTitle,
+    ExaApiKeyIdLabel,
+    ExaApiKeyIdPlaceholder,
+    ExaApiKeyIdHelp,
 
     // Tray icon visibility (Windows 11 hidden-icons overflow)
     PromoteTrayIconLabel,

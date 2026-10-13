@@ -116,6 +116,7 @@ pub enum ProviderId {
     WorkBuddy,
     SailResearch,
     Tavily,
+    Exa,
 }
 
 impl ProviderId {
@@ -224,6 +225,7 @@ impl ProviderId {
             ProviderId::WorkBuddy,
             ProviderId::SailResearch,
             ProviderId::Tavily,
+            ProviderId::Exa,
         ]
     }
 
@@ -332,6 +334,7 @@ impl ProviderId {
             ProviderId::Xapi => "xapi",
             ProviderId::Replicate => "replicate",
             ProviderId::AtlasCloud => "atlascloud",
+            ProviderId::Exa => "exa",
         }
     }
 
@@ -442,6 +445,7 @@ impl ProviderId {
             ProviderId::Xapi => "X API",
             ProviderId::Replicate => "Replicate",
             ProviderId::AtlasCloud => "Atlas Cloud",
+            ProviderId::Exa => "Exa",
         }
     }
 
@@ -557,6 +561,7 @@ impl ProviderId {
             ProviderId::Notion => Some("app.notion.com"),
             ProviderId::Xapi => Some("x.com"),
             ProviderId::Xai => None,
+            ProviderId::Exa => None,
         }
     }
 
@@ -699,6 +704,7 @@ impl ProviderId {
             "workbuddy" => Some(ProviderId::WorkBuddy),
             "sailresearch" | "sail research" => Some(ProviderId::SailResearch),
             "tavily" => Some(ProviderId::Tavily),
+            "exa" => Some(ProviderId::Exa),
             _ => None,
         }
     }
@@ -1423,6 +1429,7 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::WorkBuddy => "#0DC8A6",
         ProviderId::SailResearch => "#2C4681",
         ProviderId::Tavily => "#0F766E",
+        ProviderId::Exa => "#0143D9",
     }
 }
 
@@ -1437,7 +1444,7 @@ mod tests {
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 102);
+        assert_eq!(all.len(), 103);
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Pi));
@@ -1520,6 +1527,7 @@ mod tests {
         assert!(all.contains(&ProviderId::SailResearch));
         assert!(all.contains(&ProviderId::TinyApi));
         assert!(all.contains(&ProviderId::Tavily));
+        assert!(all.contains(&ProviderId::Exa));
     }
 
     #[test]

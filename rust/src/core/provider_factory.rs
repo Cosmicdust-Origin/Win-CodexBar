@@ -8,6 +8,7 @@
 use super::{Provider, ProviderId, ProviderPaceCapability};
 use crate::providers::AtlasCloudProvider;
 use crate::providers::ClawRouterProvider;
+use crate::providers::ExaProvider;
 use crate::providers::IBMBobProvider;
 use crate::providers::LangdockProvider;
 use crate::providers::LinkupProvider;
@@ -60,6 +61,7 @@ pub fn instantiate(id: ProviderId) -> Box<dyn Provider> {
         ProviderId::MuseAI => Box::new(MuseAIProvider::new()),
         ProviderId::WorkBuddy => Box::new(WorkBuddyProvider::new()),
         ProviderId::Tavily => Box::new(TavilyProvider::new()),
+        ProviderId::Exa => Box::new(ExaProvider::new()),
         ProviderId::Factory => Box::new(FactoryProvider::new()),
         ProviderId::Zai => Box::new(ZaiProvider::new()),
         ProviderId::Kiro => Box::new(KiroProvider::new()),
@@ -185,6 +187,7 @@ pub fn pace_capability(id: ProviderId) -> ProviderPaceCapability {
         | ProviderId::MuseAI
         | ProviderId::WorkBuddy
         | ProviderId::Tavily
+        | ProviderId::Exa
         | ProviderId::Factory
         | ProviderId::Kiro
         | ProviderId::VertexAI

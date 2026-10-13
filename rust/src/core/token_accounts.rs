@@ -454,7 +454,8 @@ impl TokenAccountSupport {
             | ProviderId::Sofya
             | ProviderId::TinyApi
             | ProviderId::Xapi
-            | ProviderId::Tavily => None,
+            | ProviderId::Tavily
+            | ProviderId::Exa => None,
         }
     }
 
