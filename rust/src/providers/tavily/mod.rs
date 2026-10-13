@@ -447,6 +447,14 @@ mod tests {
             json!({ "plan_usage": 1, "plan_limit": 2, "paygo_usage": 1 }),
             ok_key.clone(),
         )));
+        assert_unrecognized(parse_usage(&payload(
+            json!({ "plan_usage": 1, "plan_limit": 2, "paygo_usage": "1", "paygo_limit": 5 }),
+            ok_key.clone(),
+        )));
+        assert_unrecognized(parse_usage(&payload(
+            json!({ "plan_usage": 1, "plan_limit": 2, "paygo_usage": 1, "paygo_limit": null }),
+            ok_key.clone(),
+        )));
     }
 
     #[test]
