@@ -16,7 +16,7 @@ use serde_json::Value;
 use super::format;
 use crate::core::{
     FetchContext, Provider, ProviderDisplayDetail, ProviderError, ProviderFetchResult, ProviderId,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    ProviderMetadata, ProviderStateKind, RateWindow, SourceMode, UsageSnapshot,
 };
 use crate::providers::read_bounded_response;
 
@@ -30,7 +30,7 @@ const ROW_LABEL: &str = "Credit balance";
 const UNRECOGNIZED: &str = "Linkup returned an unrecognized credit balance.";
 
 pub struct LinkupProvider {
-    client: Client,
+    client: Option<Client>,
 }
 
 impl LinkupProvider {
@@ -40,7 +40,7 @@ impl LinkupProvider {
                 .redirect(reqwest::redirect::Policy::none())
                 .timeout(REQUEST_TIMEOUT)
                 .build()
-                .unwrap_or_else(|_| Client::new()),
+                .ok(),
         }
     }
 
@@ -48,14 +48,16 @@ impl LinkupProvider {
         &self,
         ctx: &FetchContext,
     ) -> Result<ProviderFetchResult, ProviderError> {
+        let client = self.client.as_ref().ok_or_else(|| {
+            ProviderError::Other("Could not create a secure Linkup HTTP client.".into())
+        })?;
         let api_key = crate::providers::resolve_api_key(
             ctx.api_key.as_deref(),
             CREDENTIAL_TARGET,
             &[API_KEY_ENV],
         )?;
 
-        let response = self
-            .client
+        let response = client
             .get(BALANCE_URL)
             .bearer_auth(&api_key)
             .header(reqwest::header::ACCEPT, "application/json")
@@ -63,27 +65,8 @@ impl LinkupProvider {
             .await?;
 
         let status = response.status().as_u16();
-        match status {
-            200 => {}
-            401 => {
-                return Err(ProviderError::Other("Linkup returned HTTP 401.".into()));
-            }
-            403 => {
-                return Err(ProviderError::Other("Linkup returned HTTP 403.".into()));
-            }
-            429 => {
-                return Err(ProviderError::Other("Linkup returned HTTP 429.".into()));
-            }
-            code if code >= 500 => {
-                return Err(ProviderError::Other(format!(
-                    "Linkup returned HTTP {code}."
-                )));
-            }
-            _ => {
-                return Err(ProviderError::Other(format!(
-                    "Linkup returned HTTP {status}."
-                )));
-            }
+        if status != 200 {
+            return Err(ProviderError::Other(status_message(status)));
         }
 
         let body = read_bounded_response(response, MAX_RESPONSE_BYTES)
@@ -122,6 +105,20 @@ impl Provider for LinkupProvider {
     fn available_sources(&self) -> Vec<SourceMode> {
         vec![SourceMode::Auto, SourceMode::OAuth]
     }
+
+    fn error_state_kind(&self, error: &ProviderError) -> ProviderStateKind {
+        match error {
+            // Upstream reports HTTP 401 as `authenticationExpired`.
+            ProviderError::Other(message) if *message == status_message(401) => {
+                ProviderStateKind::ExpiredSession
+            }
+            _ => error.state_kind(),
+        }
+    }
+}
+
+fn status_message(status: u16) -> String {
+    format!("Linkup returned HTTP {status}.")
 }
 
 fn unrecognized() -> ProviderError {

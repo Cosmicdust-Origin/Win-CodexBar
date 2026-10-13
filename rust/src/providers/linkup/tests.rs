@@ -69,3 +69,16 @@ fn balance_parsing_rejects_malformed() {
         );
     }
 }
+
+#[test]
+fn only_a_rejected_key_reports_an_expired_session() {
+    use crate::core::{ProviderError, ProviderStateKind};
+    let provider = LinkupProvider::new();
+    let kind =
+        |status| provider.error_state_kind(&ProviderError::Other(super::status_message(status)));
+    assert_eq!(super::status_message(401), "Linkup returned HTTP 401.");
+    assert_eq!(kind(401), ProviderStateKind::ExpiredSession);
+    for status in [403, 429, 503, 418] {
+        assert_eq!(kind(status), ProviderStateKind::Unknown, "status {status}");
+    }
+}
