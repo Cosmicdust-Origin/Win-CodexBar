@@ -71,6 +71,14 @@ pub fn validate_provider_workspace_value(
         ProviderId::LLMProxy => validate_llmproxy_base_url(trimmed),
         ProviderId::LLMMan => crate::providers::llmman::validated_llmman_base_url(trimmed)
             .map_err(|err| err.to_string()),
+        ProviderId::Exa => {
+            if trimmed.is_empty() || trimmed == "." || trimmed == ".." {
+                return Err(
+                    "Exa API key ID cannot be empty or a path normalization value".to_string(),
+                );
+            }
+            Ok(trimmed.to_string())
+        }
         _ => Ok(trimmed.to_string()),
     }
 }

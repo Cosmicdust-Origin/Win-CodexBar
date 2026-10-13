@@ -89,6 +89,7 @@ pub enum ProviderId {
     QwenCloud,
     Notion,
     Xai,
+    Xapi,
     Fireworks,
     AtlasCloud,
     #[serde(alias = "metaspark")]
@@ -114,6 +115,8 @@ pub enum ProviderId {
     MuseAI,
     WorkBuddy,
     SailResearch,
+    Tavily,
+    Exa,
     Cosmic,
     Aerostack,
 }
@@ -198,6 +201,7 @@ impl ProviderId {
             ProviderId::QwenCloud,
             ProviderId::Notion,
             ProviderId::Xai,
+            ProviderId::Xapi,
             ProviderId::Fireworks,
             ProviderId::AtlasCloud,
             ProviderId::Meta,
@@ -222,6 +226,8 @@ impl ProviderId {
             ProviderId::MuseAI,
             ProviderId::WorkBuddy,
             ProviderId::SailResearch,
+            ProviderId::Tavily,
+            ProviderId::Exa,
             ProviderId::Cosmic,
             ProviderId::Aerostack,
         ]
@@ -289,6 +295,7 @@ impl ProviderId {
             ProviderId::MuseAI => "museai",
             ProviderId::WorkBuddy => "workbuddy",
             ProviderId::SailResearch => "sailresearch",
+            ProviderId::Tavily => "tavily",
             ProviderId::AiAnd => "aiand",
             ProviderId::Windsurf => "windsurf",
             ProviderId::Manus => "manus",
@@ -328,8 +335,10 @@ impl ProviderId {
             ProviderId::QwenCloud => "qwen-cloud",
             ProviderId::Notion => "notion",
             ProviderId::Xai => "xai",
+            ProviderId::Xapi => "xapi",
             ProviderId::Replicate => "replicate",
             ProviderId::AtlasCloud => "atlascloud",
+            ProviderId::Exa => "exa",
             ProviderId::Cosmic => "cosmic",
             ProviderId::Aerostack => "aerostack",
         }
@@ -398,6 +407,7 @@ impl ProviderId {
             ProviderId::MuseAI => "Muse (muse.ai)",
             ProviderId::WorkBuddy => "WorkBuddy",
             ProviderId::SailResearch => "Sail Research",
+            ProviderId::Tavily => "Tavily",
             ProviderId::AiAnd => "ai&",
             ProviderId::Windsurf => "Windsurf",
             ProviderId::Manus => "Manus",
@@ -438,8 +448,10 @@ impl ProviderId {
             ProviderId::QwenCloud => "Qwen Cloud",
             ProviderId::Notion => "Notion AI",
             ProviderId::Xai => "xAI",
+            ProviderId::Xapi => "X API",
             ProviderId::Replicate => "Replicate",
             ProviderId::AtlasCloud => "Atlas Cloud",
+            ProviderId::Exa => "Exa",
             ProviderId::Cosmic => "Cosmic AI",
             ProviderId::Aerostack => "Aerostack",
         }
@@ -524,6 +536,7 @@ impl ProviderId {
             ProviderId::MuseAI => Some("muse.ai"),
             ProviderId::WorkBuddy => Some("workbuddy.cn"),
             ProviderId::SailResearch => None,
+            ProviderId::Tavily => None,
             ProviderId::AiAnd => None,
             ProviderId::Windsurf => None,
             ProviderId::Doubao => None,
@@ -554,7 +567,9 @@ impl ProviderId {
             ProviderId::ZoomMate => Some("zoommate.zoom.us"),
             ProviderId::QwenCloud => Some("qwencloud.com"),
             ProviderId::Notion => Some("app.notion.com"),
+            ProviderId::Xapi => Some("x.com"),
             ProviderId::Xai => None,
+            ProviderId::Exa => None,
             ProviderId::Cosmic => None,
             ProviderId::Aerostack => None,
         }
@@ -651,6 +666,7 @@ impl ProviderId {
             }
             "grok" | "supergrok" | "super-grok" => Some(ProviderId::Grok),
             "xai" | "x.ai" | "x-ai" => Some(ProviderId::Xai),
+            "xapi" | "x-api" | "x api" => Some(ProviderId::Xapi),
             "elevenlabs" | "eleven-labs" | "11labs" => Some(ProviderId::ElevenLabs),
             "deepgram" | "dg" => Some(ProviderId::Deepgram),
             "groq" | "groqcloud" | "groq-cloud" | "groq cloud" => Some(ProviderId::Groq),
@@ -697,6 +713,8 @@ impl ProviderId {
             "museai" | "muse (muse.ai)" => Some(ProviderId::MuseAI),
             "workbuddy" => Some(ProviderId::WorkBuddy),
             "sailresearch" | "sail research" => Some(ProviderId::SailResearch),
+            "tavily" => Some(ProviderId::Tavily),
+            "exa" => Some(ProviderId::Exa),
             "cosmic" | "cosmic ai" => Some(ProviderId::Cosmic),
             "aerostack" => Some(ProviderId::Aerostack),
             _ => None,
@@ -1394,6 +1412,7 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::QwenCloud => "#615CED",
         ProviderId::Notion => "#337EA9",
         ProviderId::Xai => "#8E8E93",
+        ProviderId::Xapi => "#71767B",
         ProviderId::Fireworks => "#F25B1C",
         ProviderId::Meta => "#0467DF",
         ProviderId::Muse => "#0668E1",
@@ -1421,6 +1440,8 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::MuseAI => "#0668E1",
         ProviderId::WorkBuddy => "#0DC8A6",
         ProviderId::SailResearch => "#2C4681",
+        ProviderId::Tavily => "#0F766E",
+        ProviderId::Exa => "#0143D9",
         ProviderId::Cosmic => "#6366F1",
         ProviderId::Aerostack => "#6366F1",
     }
@@ -1437,7 +1458,7 @@ mod tests {
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 102);
+        assert_eq!(all.len(), 105);
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Pi));
@@ -1494,6 +1515,7 @@ mod tests {
         assert!(all.contains(&ProviderId::QwenCloud));
         assert!(all.contains(&ProviderId::Notion));
         assert!(all.contains(&ProviderId::Xai));
+        assert!(all.contains(&ProviderId::Xapi));
         assert!(all.contains(&ProviderId::Meta));
         assert!(all.contains(&ProviderId::Replicate));
         assert!(all.contains(&ProviderId::Muse));
@@ -1518,6 +1540,8 @@ mod tests {
         assert!(all.contains(&ProviderId::WorkBuddy));
         assert!(all.contains(&ProviderId::SailResearch));
         assert!(all.contains(&ProviderId::TinyApi));
+        assert!(all.contains(&ProviderId::Tavily));
+        assert!(all.contains(&ProviderId::Exa));
         assert!(all.contains(&ProviderId::Aerostack));
     }
 
