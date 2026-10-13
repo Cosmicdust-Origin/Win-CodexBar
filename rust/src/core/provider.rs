@@ -66,6 +66,7 @@ pub enum ProviderId {
     HuggingFace,
     Helmcode,
     V0,
+    TinyApi,
     TypeSafe,
     LLMProxy,
     Chutes,
@@ -173,6 +174,7 @@ impl ProviderId {
             ProviderId::HuggingFace,
             ProviderId::Helmcode,
             ProviderId::V0,
+            ProviderId::TinyApi,
             ProviderId::TypeSafe,
             ProviderId::LLMProxy,
             ProviderId::Chutes,
@@ -301,6 +303,7 @@ impl ProviderId {
             ProviderId::HuggingFace => "huggingface",
             ProviderId::Helmcode => "helmcode",
             ProviderId::V0 => "v0",
+            ProviderId::TinyApi => "tinyapi",
             ProviderId::TypeSafe => "typesafe",
             ProviderId::LLMProxy => "llmproxy",
             ProviderId::Chutes => "chutes",
@@ -408,6 +411,7 @@ impl ProviderId {
             ProviderId::HuggingFace => "Hugging Face",
             ProviderId::Helmcode => "Helmcode",
             ProviderId::V0 => "v0",
+            ProviderId::TinyApi => "TinyApi",
             ProviderId::TypeSafe => "TypeSafe",
             ProviderId::LLMProxy => "LLM Proxy",
             ProviderId::Chutes => "Chutes",
@@ -528,6 +532,7 @@ impl ProviderId {
             ProviderId::Groq => Some("groq.com"),
             ProviderId::HuggingFace => None,
             ProviderId::Helmcode => Some("helmcode.com"),
+            ProviderId::TinyApi => Some("tinyapi.rest"),
             ProviderId::TypeSafe => Some("typesafe.ai"),
             ProviderId::V0 => None,
             ProviderId::LLMProxy => None,
@@ -648,6 +653,7 @@ impl ProviderId {
             "huggingface" | "hugging-face" | "hugging face" | "hf" => Some(ProviderId::HuggingFace),
             "helmcode" | "nan-builders" | "nan builders" => Some(ProviderId::Helmcode),
             "v0" | "v0-dev" | "v0.dev" => Some(ProviderId::V0),
+            "tinyapi" | "tiny-api" => Some(ProviderId::TinyApi),
             "typesafe" | "type-safe" | "type safe" => Some(ProviderId::TypeSafe),
             "llmproxy" | "llm-proxy" | "llm proxy" => Some(ProviderId::LLMProxy),
             "chutes" | "chutes-ai" | "chutes ai" => Some(ProviderId::Chutes),
@@ -1359,6 +1365,7 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::HuggingFace => "#FFD21E",
         ProviderId::Helmcode => "#4934E1",
         ProviderId::V0 => "#111111",
+        ProviderId::TinyApi => "#F97316",
         ProviderId::TypeSafe => "#111111",
         ProviderId::LLMProxy => "#24B47E",
         ProviderId::Chutes => "#3184FF",
@@ -1423,7 +1430,7 @@ mod tests {
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 100);
+        assert_eq!(all.len(), 101);
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Pi));
@@ -1504,6 +1511,7 @@ mod tests {
         assert!(all.contains(&ProviderId::MuseAI));
         assert!(all.contains(&ProviderId::WorkBuddy));
         assert!(all.contains(&ProviderId::SailResearch));
+        assert!(all.contains(&ProviderId::TinyApi));
     }
 
     #[test]

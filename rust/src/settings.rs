@@ -1210,6 +1210,7 @@ impl Settings {
                 | ProviderId::LithosAI
                 | ProviderId::MuseAI
                 | ProviderId::WorkBuddy
+                | ProviderId::TinyApi
                 | ProviderId::Xapi => "auto",
                 _ => DEFAULT_COOKIE_SOURCE,
             })

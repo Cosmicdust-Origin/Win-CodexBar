@@ -98,6 +98,15 @@ fn workbuddy_cookie_source_defaults_to_automatic_session_import() {
 }
 
 #[test]
+fn tinyapi_cookie_source_defaults_to_automatic_session_import() {
+    // Upstream's TinyApi cookie source falls back to `.auto`.
+    let mut settings = Settings::default();
+    assert_eq!(settings.cookie_source(ProviderId::TinyApi), "auto");
+    settings.set_cookie_source(ProviderId::TinyApi, "off");
+    assert_eq!(settings.cookie_source(ProviderId::TinyApi), "off");
+}
+
+#[test]
 fn xapi_cookie_source_defaults_to_automatic_session_import() {
     // X API cookie source falls back to `.auto`.
     let mut settings = Settings::default();

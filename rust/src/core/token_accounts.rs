@@ -452,6 +452,7 @@ impl TokenAccountSupport {
             | ProviderId::WorkBuddy
             | ProviderId::SailResearch
             | ProviderId::Sofya
+            | ProviderId::TinyApi
             | ProviderId::Xapi => None,
         }
     }

@@ -85,6 +85,7 @@ const MAC_PARITY_ACCENTS: Array<[string, string]> = [
   ["sakana", "#2975db"],
   ["stepfun", "#2196f2"],
   ["t3chat", "#f56647"],
+  ["tinyapi", "#f97316"],
   ["typesafe", "#111111"],
   ["v0", "#111111"],
   ["warp", "#938bb4"],

@@ -182,6 +182,36 @@ to `https://muse.ai/` with the session cookies and `Sec-Fetch-*` headers.
 - A 401, a 403 or a redirect to `auth.muse.ai` is reported as an expired
   session. Response bodies and cookies are never logged or echoed in errors.
 
+### TinyApi
+
+TinyApi reads available credit balance from the signed-in dashboard using
+`GET https://tinyapi.rest/api/user/credits` with session cookies or a manual
+Cookie header. The response returns a JSON object with a `data.totalAvailable`
+field containing the available credits as a number.
+
+- The cookie source in Settings → Providers → TinyApi picks the session and
+  defaults to Automatic. Automatic imports the `tinyapi.rest` cookies from the
+  browser you select (Chrome, Edge, Brave, Firefox); Manual accepts a pasted
+  Cookie header. Without an imported or pasted header, Automatic tries each
+  detected browser's `tinyapi.rest` cookies in turn, and Manual fails closed.
+  Off reads nothing.
+- Requests send the Cookie header and expect a JSON response with `success: true`
+  and `data.totalAvailable` as a finite non-negative number. HTTP 401 or 403
+  indicates an expired session; the provider skips to the next browser session
+  if Automatic has more candidates, and reports "TinyApi session expired. Sign
+  in again or paste a fresh Cookie header." if none remain. HTTP 429 is
+  rate-limited, and 500+ is unavailable. Other HTTP codes are reported with
+  their status code. Bodies over 256 KiB or without a valid balance report a
+  missing balance, and non-JSON bodies report invalid JSON. Response bodies and
+  cookies are never logged or echoed in errors.
+- The card shows a single "Available credits" detail row with the balance
+  formatted to up to two decimal places and the "credits" unit (e.g. "125.5
+  credits" or "100 credits"). The menu bar reads "Available credits: <value>"
+  from an informational window that is hidden on the card. Login method is
+  shown as "Browser session".
+- No multi-account support. A transport or timeout error while reading the
+  body keeps its cause instead of being reported as an invalid response.
+
 ### WorkBuddy credits
 
 WorkBuddy is Tencent's desktop AI work assistant, billed in credits. It is
