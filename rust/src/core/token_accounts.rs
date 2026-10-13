@@ -456,7 +456,8 @@ impl TokenAccountSupport {
             | ProviderId::Xapi
             | ProviderId::Tavily
             | ProviderId::Exa
-            | ProviderId::Cosmic => None,
+            | ProviderId::Cosmic
+            | ProviderId::Aerostack => None,
         }
     }
 

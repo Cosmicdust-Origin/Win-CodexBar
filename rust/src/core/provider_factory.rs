@@ -6,6 +6,7 @@
 //! this one match arm.
 
 use super::{Provider, ProviderId, ProviderPaceCapability};
+use crate::providers::AerostackProvider;
 use crate::providers::AtlasCloudProvider;
 use crate::providers::ClawRouterProvider;
 use crate::providers::CosmicProvider;
@@ -149,6 +150,7 @@ pub fn instantiate(id: ProviderId) -> Box<dyn Provider> {
         ProviderId::Raycast => Box::new(RaycastProvider::new()),
         ProviderId::Vercel => Box::new(VercelProvider::new()),
         ProviderId::Cosmic => Box::new(CosmicProvider::new()),
+        ProviderId::Aerostack => Box::new(AerostackProvider::new()),
     }
 }
 
@@ -262,7 +264,8 @@ pub fn pace_capability(id: ProviderId) -> ProviderPaceCapability {
         | ProviderId::XKiro
         | ProviderId::Raycast
         | ProviderId::Vercel
-        | ProviderId::Cosmic => ProviderPaceCapability::UNSUPPORTED,
+        | ProviderId::Cosmic
+        | ProviderId::Aerostack => ProviderPaceCapability::UNSUPPORTED,
     }
 }
 

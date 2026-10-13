@@ -8,6 +8,7 @@
 use futures::{Stream, StreamExt};
 
 pub mod abacus;
+pub mod aerostack;
 pub mod aiand;
 pub mod aixy;
 pub mod alibaba;
@@ -117,6 +118,7 @@ pub mod zoommate;
 
 // Re-export provider implementations
 pub use abacus::AbacusProvider;
+pub use aerostack::AerostackProvider;
 pub use aiand::AiAndProvider;
 pub use aixy::AixyProvider;
 pub use alibaba::{AlibabaProvider, AlibabaRegion};
