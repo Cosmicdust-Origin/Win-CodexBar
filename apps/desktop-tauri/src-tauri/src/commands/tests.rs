@@ -1477,6 +1477,31 @@ fn usage_item_descriptors_skip_card_hidden_windows() {
     let ids: Vec<&str> = items.iter().map(|item| item.id.as_str()).collect();
 
     assert_eq!(ids, ["detailSection:Spend", "metric:secondary"]);
+
+    // A saved hidden ID for a card-hidden window gets no placeholder, while
+    // one for a window the snapshot no longer reports still does.
+    let mut settings = Settings::default();
+    settings.set_hidden_usage_item_ids(
+        ProviderId::Codex,
+        vec![
+            "metric:primary".to_string(),
+            "metric:extra-hidden".to_string(),
+            "metric:tertiary".to_string(),
+        ],
+    );
+    let items = super::usage_item_descriptors(Some(&snapshot), &settings, ProviderId::Codex);
+    let ids: Vec<(&str, bool)> = items
+        .iter()
+        .map(|item| (item.id.as_str(), item.available))
+        .collect();
+    assert_eq!(
+        ids,
+        [
+            ("detailSection:Spend", true),
+            ("metric:secondary", true),
+            ("metric:tertiary", false),
+        ]
+    );
 }
 
 #[test]
