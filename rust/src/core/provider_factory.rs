@@ -30,10 +30,10 @@ use crate::providers::{
     NousProvider, OllamaProvider, OpenAIApiProvider, OpenCodeGoProvider, OpenCodeProvider,
     OpenRouterProvider, PerplexityProvider, PiProvider, PoeProvider, QoderProvider,
     QwenCloudProvider, RaycastProvider, ReplicateProvider, SailResearchProvider, SakanaProvider,
-    SofyaProvider, StepFunProvider, Sub2ApiProvider, T3ChatProvider, TypeSafeProvider, V0Provider,
-    VeniceProvider, VercelProvider, VertexAIProvider, WarpProvider, WayfinderProvider,
-    WindsurfProvider, XKiroProvider, XaiProvider, ZaiProvider, ZedProvider, ZenMuxProvider,
-    ZoomMateProvider,
+    SofyaProvider, StepFunProvider, Sub2ApiProvider, T3ChatProvider, TinyApiProvider,
+    TypeSafeProvider, V0Provider, VeniceProvider, VercelProvider, VertexAIProvider, WarpProvider,
+    WayfinderProvider, WindsurfProvider, XKiroProvider, XaiProvider, ZaiProvider, ZedProvider,
+    ZenMuxProvider, ZoomMateProvider,
 };
 
 /// Instantiate the concrete [`Provider`] implementation for a given [`ProviderId`].
@@ -104,6 +104,7 @@ pub fn instantiate(id: ProviderId) -> Box<dyn Provider> {
         ProviderId::HuggingFace => Box::new(HuggingFaceProvider::new()),
         ProviderId::Helmcode => Box::new(HelmcodeProvider::new()),
         ProviderId::V0 => Box::new(V0Provider::new()),
+        ProviderId::TinyApi => Box::new(TinyApiProvider::new()),
         ProviderId::TypeSafe => Box::new(TypeSafeProvider::new()),
         ProviderId::LLMProxy => Box::new(LLMProxyProvider::new()),
         ProviderId::Chutes => Box::new(ChutesProvider::new()),
@@ -214,6 +215,7 @@ pub fn pace_capability(id: ProviderId) -> ProviderPaceCapability {
         | ProviderId::HuggingFace
         | ProviderId::Helmcode
         | ProviderId::V0
+        | ProviderId::TinyApi
         | ProviderId::TypeSafe
         | ProviderId::LLMProxy
         | ProviderId::Chutes

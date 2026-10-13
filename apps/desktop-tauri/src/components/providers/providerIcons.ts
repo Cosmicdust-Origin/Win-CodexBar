@@ -75,6 +75,7 @@ import sub2api from "./icons/ProviderIcon-sub2api.svg?raw";
 import synthetic from "./icons/ProviderIcon-synthetic.svg?raw";
 import clawrouter from "./icons/ProviderIcon-clawrouter.svg?raw";
 import t3chat from "./icons/ProviderIcon-t3chat.svg?raw";
+import tinyapi from "./icons/ProviderIcon-tinyapi.svg?raw";
 import venice from "./icons/ProviderIcon-venice.svg?raw";
 import vercel from "./icons/ProviderIcon-vercel.svg?raw";
 import vertexai from "./icons/ProviderIcon-vertexai.svg?raw";
@@ -179,6 +180,7 @@ const RAW: Record<string, string> = {
   synthetic: tint(synthetic),
   clawrouter: tint(clawrouter),
   t3chat: tint(t3chat),
+  tinyapi: tint(tinyapi),
   venice: tint(venice),
   vercel: tint(vercel),
   vertexai: tint(vertexai),
@@ -243,6 +245,7 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   ollama:      { id: "ollama",      brandColor: "#888888", fallbackLetter: "○", svgPath: RAW.ollama },
   azureopenai: { id: "azureopenai", brandColor: "#0078d4", fallbackLetter: "A" },
   t3chat:      { id: "t3chat",      brandColor: "#f56647", fallbackLetter: "T", svgPath: RAW.t3chat },
+  tinyapi:     { id: "tinyapi",     brandColor: "#f97316", fallbackLetter: "T", svgPath: RAW.tinyapi },
   opencode:    { id: "opencode",    brandColor: "#3b82f6", fallbackLetter: "○", svgPath: RAW.opencode },
   opencodego:  { id: "opencodego",  brandColor: "#3b82f6", fallbackLetter: "○", svgPath: RAW.opencodego },
   openrouter:  { id: "openrouter",  brandColor: "#6467f2", fallbackLetter: "R", svgPath: RAW.openrouter },

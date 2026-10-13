@@ -60,6 +60,7 @@ export const TEST_PROVIDER_CATALOG: Array<[string, string]> = [
   ["huggingface", "Hugging Face"],
   ["helmcode", "Helmcode"],
   ["v0", "v0"],
+  ["tinyapi", "TinyApi"],
   ["typesafe", "TypeSafe"],
   ["llmproxy", "LLM Proxy"],
   ["chutes", "Chutes"],

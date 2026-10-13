@@ -451,7 +451,8 @@ impl TokenAccountSupport {
             | ProviderId::MuseAI
             | ProviderId::WorkBuddy
             | ProviderId::SailResearch
-            | ProviderId::Sofya => None,
+            | ProviderId::Sofya
+            | ProviderId::TinyApi => None,
         }
     }
 
