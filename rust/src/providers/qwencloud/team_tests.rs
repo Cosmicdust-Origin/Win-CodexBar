@@ -508,3 +508,26 @@ async fn load_human_info_failure_stops_the_team_lane() {
     assert_eq!(message(error), "Qwen Cloud Team LoadHumanInfo failed.");
     summary.assert_async().await;
 }
+
+#[test]
+fn team_auth_errors_report_an_expired_session() {
+    use crate::core::{Provider, ProviderStateKind};
+    let provider = super::QwenCloudProvider::new();
+    for status in [401, 403] {
+        let error = super::team::parse_response(status, b"{}").unwrap_err();
+        assert_eq!(
+            provider.error_state_kind(&error),
+            ProviderStateKind::ExpiredSession
+        );
+    }
+    let error = super::team::parse_response(200, br#"{"code":"ConsoleNeedLogin"}"#).unwrap_err();
+    assert_eq!(
+        provider.error_state_kind(&error),
+        ProviderStateKind::ExpiredSession
+    );
+    let error = super::team::parse_response(429, b"{}").unwrap_err();
+    assert_ne!(
+        provider.error_state_kind(&error),
+        ProviderStateKind::ExpiredSession
+    );
+}

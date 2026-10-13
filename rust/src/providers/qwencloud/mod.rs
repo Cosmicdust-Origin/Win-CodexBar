@@ -494,6 +494,14 @@ impl Provider for QwenCloudProvider {
     fn supports_web(&self) -> bool {
         true
     }
+
+    fn error_state_kind(&self, error: &ProviderError) -> crate::core::ProviderStateKind {
+        if team::is_auth_expired(error) {
+            crate::core::ProviderStateKind::ExpiredSession
+        } else {
+            error.state_kind()
+        }
+    }
 }
 
 fn api_url(api: &str) -> String {

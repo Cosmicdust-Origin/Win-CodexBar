@@ -42,6 +42,12 @@ pub(super) struct TeamUsage {
     pub login_method: String,
 }
 
+/// Upstream raises both messages with `authenticationExpired`.
+pub(super) fn is_auth_expired(error: &ProviderError) -> bool {
+    matches!(error, ProviderError::Other(message)
+        if message == SESSION_EXPIRED || message == LOGIN_REQUIRED)
+}
+
 fn fail(field: &str) -> ProviderError {
     ProviderError::Other(format!(
         "Unsupported Qwen Cloud Team {field}. Check Usage Dashboard."
