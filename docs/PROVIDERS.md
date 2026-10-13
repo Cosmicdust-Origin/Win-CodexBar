@@ -319,9 +319,8 @@ Configure the API key in Settings → Providers → Tavily (or `TAVILY_API_KEY`)
   `account.paygo_limit`), appear in a separate detail section.
 - The plan name (`account.current_plan`) identifies the account plan. No email
   or account ID is inferred; unknown plans do not create a phantom identity.
-- 401 and 403 report "Tavily API key is invalid or expired. Check your
-  settings."; 429 reports rate limiting with guidance on request frequency.
-  Response bodies are never echoed in errors.
+- Non-200 responses report "Tavily returned HTTP <status>."; response bodies
+  are never echoed in errors.
 - Tavily limits the usage endpoint to 10 requests per 10 minutes. Keep
   refreshes at least one minute apart and avoid repeated manual refreshes. A
   throttled request fails as rate-limited without automatic replay.

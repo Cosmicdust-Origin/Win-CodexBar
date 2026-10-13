@@ -6,13 +6,13 @@
 //! Ported from upstream CodexBar v0.74.1 (`Resources/Plugins/tavily.js`).
 
 use async_trait::async_trait;
-use reqwest::{Client, StatusCode};
+use reqwest::Client;
 use serde_json::Value;
 
 use super::format;
 use crate::core::{
     FetchContext, Provider, ProviderDisplayDetail, ProviderError, ProviderFetchResult, ProviderId,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    ProviderMetadata, ProviderStateKind, RateWindow, SourceMode, UsageSnapshot,
 };
 use crate::providers::read_bounded_response;
 
@@ -24,12 +24,18 @@ const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 pub struct TavilyProvider {
     metadata: ProviderMetadata,
-    client: Client,
+    client: Option<Client>,
+    usage_url: String,
 }
 
 impl TavilyProvider {
     pub fn new() -> Self {
+        Self::with_usage_url(USAGE_URL)
+    }
+
+    fn with_usage_url(usage_url: &str) -> Self {
         Self {
+            usage_url: usage_url.to_owned(),
             metadata: ProviderMetadata {
                 id: ProviderId::Tavily,
                 display_name: "Tavily",
@@ -47,7 +53,7 @@ impl TavilyProvider {
                 .redirect(reqwest::redirect::Policy::none())
                 .timeout(REQUEST_TIMEOUT)
                 .build()
-                .unwrap_or_else(|_| Client::new()),
+                .ok(),
         }
     }
 
@@ -55,30 +61,23 @@ impl TavilyProvider {
         &self,
         ctx: &FetchContext,
     ) -> Result<ProviderFetchResult, ProviderError> {
+        let client = self.client.as_ref().ok_or_else(|| {
+            ProviderError::Other("Could not create a secure Tavily HTTP client.".into())
+        })?;
         let key = crate::providers::resolve_api_key(
             ctx.api_key.as_deref(),
             CREDENTIAL_TARGET,
             &[API_KEY_ENV],
         )?;
 
-        let response = self
-            .client
-            .get(USAGE_URL)
+        let response = client
+            .get(&self.usage_url)
             .bearer_auth(&key)
             .header(reqwest::header::ACCEPT, "application/json")
             .send()
             .await?;
 
-        let status = response.status();
-        match status {
-            StatusCode::OK => {}
-            _ => {
-                return Err(ProviderError::Other(format!(
-                    "Tavily returned HTTP {}.",
-                    status.as_u16()
-                )));
-            }
-        }
+        check_status(response.status().as_u16())?;
 
         let body = read_bounded_response(response, MAX_RESPONSE_BYTES)
             .await
@@ -123,6 +122,47 @@ impl Provider for TavilyProvider {
 
     fn available_sources(&self) -> Vec<SourceMode> {
         vec![SourceMode::Auto, SourceMode::OAuth]
+    }
+
+    fn error_state_kind(&self, error: &ProviderError) -> ProviderStateKind {
+        match error {
+            ProviderError::Other(message) if *message == status_message(401) => {
+                ProviderStateKind::ExpiredSession
+            }
+            _ => error.state_kind(),
+        }
+    }
+}
+
+/// Upstream `ctx.fail.*` category for a non-200 `/usage` response.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StatusFailure {
+    AuthenticationExpired,
+    PermissionDenied,
+    RateLimited,
+    ProviderUnavailable,
+    ApiFailure,
+}
+
+fn classify_status(status: u16) -> Option<StatusFailure> {
+    match status {
+        200 => None,
+        401 => Some(StatusFailure::AuthenticationExpired),
+        403 => Some(StatusFailure::PermissionDenied),
+        429 => Some(StatusFailure::RateLimited),
+        500.. => Some(StatusFailure::ProviderUnavailable),
+        _ => Some(StatusFailure::ApiFailure),
+    }
+}
+
+fn status_message(status: u16) -> String {
+    format!("Tavily returned HTTP {}.", status)
+}
+
+fn check_status(status: u16) -> Result<(), ProviderError> {
+    match classify_status(status) {
+        None => Ok(()),
+        Some(_) => Err(ProviderError::Other(status_message(status))),
     }
 }
 
@@ -437,5 +477,144 @@ mod tests {
         assert_eq!(percent_of(50.0, 100.0), 50.0);
         assert_eq!(percent_of(150.0, 100.0), 100.0);
         assert_eq!(percent_of(50.0, 0.0), 0.0);
+    }
+
+    #[test]
+    fn status_classification_matches_upstream() {
+        use StatusFailure::*;
+        let cases = [
+            (200, None),
+            (302, Some(ApiFailure)),
+            (400, Some(ApiFailure)),
+            (401, Some(AuthenticationExpired)),
+            (403, Some(PermissionDenied)),
+            (429, Some(RateLimited)),
+            (503, Some(ProviderUnavailable)),
+        ];
+        for (status, expected) in cases {
+            assert_eq!(classify_status(status), expected, "status {status}");
+            match check_status(status) {
+                Ok(()) => assert!(expected.is_none()),
+                Err(ProviderError::Other(message)) => {
+                    assert_eq!(message, format!("Tavily returned HTTP {status}."))
+                }
+                Err(other) => panic!("unexpected error {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn only_http_401_maps_to_expired_session() {
+        let provider = TavilyProvider::new();
+        let kind = |status| provider.error_state_kind(&check_status(status).unwrap_err());
+        assert_eq!(kind(401), ProviderStateKind::ExpiredSession);
+        for status in [302, 400, 403, 429, 503] {
+            assert_eq!(kind(status), ProviderStateKind::Unknown, "status {status}");
+        }
+    }
+
+    /// Serves one canned response per connection and records each request's
+    /// path and Authorization header.
+    async fn serve(
+        responses: Vec<(u16, &'static str, &'static str)>,
+    ) -> (
+        String,
+        std::sync::Arc<std::sync::Mutex<Vec<(String, String)>>>,
+        tokio::task::JoinHandle<()>,
+    ) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .unwrap();
+        let url = format!(
+            "http://127.0.0.1:{}/usage",
+            listener.local_addr().unwrap().port()
+        );
+        let recorded = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let sink = std::sync::Arc::clone(&recorded);
+        let task = tokio::spawn(async move {
+            for (status, extra_headers, body) in responses {
+                let Ok((mut stream, _)) = listener.accept().await else {
+                    return;
+                };
+                let mut request = Vec::new();
+                let mut chunk = [0u8; 1024];
+                while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+                    match stream.read(&mut chunk).await {
+                        Ok(0) | Err(_) => break,
+                        Ok(read) => request.extend_from_slice(&chunk[..read]),
+                    }
+                }
+                let text = String::from_utf8_lossy(&request).to_string();
+                let path = text
+                    .split_whitespace()
+                    .nth(1)
+                    .unwrap_or_default()
+                    .to_string();
+                let auth = text
+                    .lines()
+                    .find_map(|line| {
+                        let (key, value) = line.split_once(':')?;
+                        key.eq_ignore_ascii_case("authorization")
+                            .then(|| value.trim().to_string())
+                    })
+                    .unwrap_or_default();
+                sink.lock().unwrap().push((path, auth));
+                let response = format!(
+                    "HTTP/1.1 {status} X\r\n{extra_headers}content-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                stream
+                    .write_all(response.as_bytes())
+                    .await
+                    .expect("write fixture response");
+                stream.shutdown().await.expect("close fixture stream");
+            }
+        });
+        (url, recorded, task)
+    }
+
+    fn keyed_context() -> FetchContext {
+        FetchContext {
+            api_key: Some("tvly-test".into()),
+            ..FetchContext::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn a_200_response_is_parsed_with_bearer_auth() {
+        let (url, recorded, task) = serve(vec![(
+            200,
+            "",
+            r#"{"account":{"plan_usage":1200,"plan_limit":4000,"current_plan":"Pro"},"key":{"usage":800,"limit":2000}}"#,
+        )])
+        .await;
+        let provider = TavilyProvider::with_usage_url(&url);
+        let result = provider.fetch_usage_impl(&keyed_context()).await.unwrap();
+        assert_eq!(result.usage.primary.used_percent, 30.0);
+        assert_eq!(
+            *recorded.lock().unwrap(),
+            vec![("/usage".to_string(), "Bearer tvly-test".to_string())]
+        );
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn rate_limits_and_redirects_are_neither_retried_nor_followed() {
+        let cases = [
+            (429, "", "Tavily returned HTTP 429."),
+            (302, "location: /elsewhere\r\n", "Tavily returned HTTP 302."),
+        ];
+        for (status, headers, expected) in cases {
+            let (url, recorded, task) = serve(vec![(status, headers, "{}"), (200, "", "{}")]).await;
+            let provider = TavilyProvider::with_usage_url(&url);
+            match provider.fetch_usage_impl(&keyed_context()).await {
+                Err(ProviderError::Other(message)) => assert_eq!(message, expected),
+                other => panic!("status {status}: unexpected {other:?}"),
+            }
+            assert_eq!(recorded.lock().unwrap().len(), 1, "status {status}");
+            task.abort();
+        }
     }
 }
