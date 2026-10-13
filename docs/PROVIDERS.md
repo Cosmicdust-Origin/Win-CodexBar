@@ -350,7 +350,8 @@ X API is disabled by default and reads prepaid credit balances from the X
 (Twitter) API console. Sign in to console.x.com in your browser, and CodexBar
 will read the `auth_token` and `ct0` cookies from that session.
 
-- **Automatic:** CodexBar tries each detected browser (Chrome, Edge, Brave,
+- **Automatic:** A previously imported Cookie header is used on its own.
+  Otherwise CodexBar tries each detected browser (Chrome, Edge, Brave,
   Firefox) holding both cookies. If a browser session expires (401), it moves
   to the next browser. No session means sign in to console.x.com.
 - **Manual:** Paste the Cookie header from a console.x.com request (with

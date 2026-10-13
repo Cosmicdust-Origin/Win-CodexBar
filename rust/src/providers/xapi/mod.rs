@@ -48,10 +48,15 @@ type BrowserCookieHeaders = dyn Fn() -> Result<Vec<(String, String)>, ProviderEr
 pub struct XapiProvider {
     metadata: ProviderMetadata,
     client: Option<Client>,
+    base_url: String,
 }
 
 impl XapiProvider {
     pub fn new() -> Self {
+        Self::with_base_url(BASE_URL)
+    }
+
+    fn with_base_url(base_url: &str) -> Self {
         let client = crate::core::credentialed_http_client_builder()
             .cookie_store(false)
             .redirect(reqwest::redirect::Policy::none())
@@ -73,6 +78,7 @@ impl XapiProvider {
                 tertiary_label_key: None,
             },
             client,
+            base_url: base_url.to_owned(),
         }
     }
 
@@ -93,7 +99,7 @@ impl XapiProvider {
         let timeout = Duration::from_secs(ctx.web_timeout.max(1)).min(REQUEST_TIMEOUT);
         let mut last_error = None;
         for session in &sessions {
-            match fetch_session(client, session, timeout).await {
+            match fetch_session(client, &self.base_url, session, timeout).await {
                 Err(error) if is_session_expired(&error) => last_error = Some(error),
                 result => return result,
             }
@@ -165,14 +171,15 @@ impl crate::core::Provider for XapiProvider {
 /// One session's me → credits sequence.
 async fn fetch_session(
     client: &Client,
+    base_url: &str,
     session: &Session,
     timeout: Duration,
 ) -> Result<ProviderFetchResult, ProviderError> {
-    let me = get_json(client, "/api/me", session, timeout).await?;
+    let me = get_json(client, &format!("{base_url}/api/me"), session, timeout).await?;
     let account_id = parse_account_id(&me)?;
     let credits = get_json(
         client,
-        &format!("/api/accounts/{}/credits", account_id),
+        &format!("{base_url}/api/accounts/{account_id}/credits"),
         session,
         timeout,
     )
@@ -249,12 +256,12 @@ fn session_from_header(header: &str) -> Option<Session> {
 
 async fn get_json(
     client: &Client,
-    path: &str,
+    url: &str,
     session: &Session,
     timeout: Duration,
 ) -> Result<Map<String, Value>, ProviderError> {
     let response = client
-        .get(format!("{}{}", BASE_URL, path))
+        .get(url)
         .header(ACCEPT, "application/json")
         .header("Cookie", &session.cookie_header)
         .header(CSRF_HEADER, &session.csrf)
@@ -344,7 +351,11 @@ fn parse_credits(
         Some(v) => amount(v.get("balance").unwrap_or(&Value::Null))?,
     };
 
+    // Upstream `amount(paid + free)`: two finite balances can overflow to infinity.
     let balance = paid + free;
+    if !balance.is_finite() {
+        return Err(invalid("account or dollar balance"));
+    }
 
     // Upstream has no window: the balance reaches the tray and float bar only.
     let usage = UsageSnapshot::new(
@@ -395,7 +406,7 @@ fn invalid(field: &str) -> ProviderError {
 
 /// Upstream's HTTP status taxonomy; only 200 continues to the body.
 /// Note: 400 with code 215 is handled specially in get_json; this is for generic 400s.
-fn check_status(status: StatusCode) -> Result<(), ProviderError> {
+pub(crate) fn check_status(status: StatusCode) -> Result<(), ProviderError> {
     let message = match status.as_u16() {
         200 => return Ok(()),
         401 => SESSION_EXPIRED.to_owned(),

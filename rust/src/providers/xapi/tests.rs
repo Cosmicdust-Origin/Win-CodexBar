@@ -108,6 +108,34 @@ mod xapi_tests {
     }
 
     #[test]
+    fn credits_reject_a_sum_that_overflows() {
+        let result = parse_credits(
+            "1",
+            &object(json!({
+                "credits": { "balance": f64::MAX },
+                "freeCredits": { "balance": f64::MAX }
+            })),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn status_errors_match_upstream() {
+        use reqwest::StatusCode;
+        let message = |code: u16| {
+            crate::providers::xapi::check_status(StatusCode::from_u16(code).unwrap())
+                .unwrap_err()
+                .to_string()
+        };
+        assert!(crate::providers::xapi::check_status(StatusCode::OK).is_ok());
+        assert!(message(401).contains("X API session expired"));
+        assert!(message(403).contains("X developer console access was denied."));
+        assert!(message(429).contains("X API console is rate limited."));
+        assert!(message(503).contains("X developer console is unavailable."));
+        assert!(message(418).contains("X developer console returned HTTP 418."));
+    }
+
+    #[test]
     fn provider_supports_web() {
         let provider = XapiProvider::new();
         assert!(provider.supports_web());
@@ -120,5 +148,161 @@ mod xapi_tests {
         assert_eq!(sources.len(), 2);
         assert!(sources.contains(&crate::core::SourceMode::Auto));
         assert!(sources.contains(&crate::core::SourceMode::Web));
+    }
+}
+
+#[cfg(test)]
+mod xapi_fetch_tests {
+    use std::sync::{Arc, Mutex};
+
+    use crate::core::{FetchContext, ProviderError};
+    use crate::providers::xapi::{SESSION_EXPIRED, XapiProvider};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    /// (request path, Cookie header, X-CSRF-Token header)
+    type Recorded = Arc<Mutex<Vec<(String, String, String)>>>;
+
+    /// Serves one canned response per connection, in order.
+    async fn serve_in_order(
+        responses: Vec<(u16, &'static str)>,
+    ) -> (String, Recorded, tokio::task::JoinHandle<()>) {
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .unwrap();
+        let base = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
+        let recorded: Recorded = Arc::new(Mutex::new(Vec::new()));
+        let sink = Arc::clone(&recorded);
+        let task = tokio::spawn(async move {
+            for (status, body) in responses {
+                let Ok((mut stream, _)) = listener.accept().await else {
+                    return;
+                };
+                let mut request = Vec::new();
+                let mut chunk = [0u8; 1024];
+                while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+                    match stream.read(&mut chunk).await {
+                        Ok(0) | Err(_) => break,
+                        Ok(read) => request.extend_from_slice(&chunk[..read]),
+                    }
+                }
+                let text = String::from_utf8_lossy(&request).to_string();
+                let path = text
+                    .split_whitespace()
+                    .nth(1)
+                    .unwrap_or_default()
+                    .to_string();
+                let header = |name: &str| {
+                    text.lines()
+                        .find_map(|line| {
+                            let (key, value) = line.split_once(':')?;
+                            key.eq_ignore_ascii_case(name)
+                                .then(|| value.trim().to_string())
+                        })
+                        .unwrap_or_default()
+                };
+                sink.lock()
+                    .unwrap()
+                    .push((path, header("cookie"), header("x-csrf-token")));
+                let response = format!(
+                    "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                stream
+                    .write_all(response.as_bytes())
+                    .await
+                    .expect("write fixture response");
+                stream.shutdown().await.expect("close fixture stream");
+            }
+        });
+        (base, recorded, task)
+    }
+
+    fn two_browsers() -> Result<Vec<(String, String)>, ProviderError> {
+        Ok(vec![
+            ("Chrome".to_string(), "auth_token=a; ct0=c1".to_string()),
+            ("Edge".to_string(), "auth_token=b; ct0=c2".to_string()),
+        ])
+    }
+
+    #[tokio::test]
+    async fn an_expired_session_moves_to_the_next_browser() {
+        let expired = [
+            (
+                400,
+                r#"{"errors":[{"code":215,"message":"Bad Authentication data."}]}"#,
+            ),
+            (401, "{}"),
+        ];
+        for first in expired {
+            let (base, recorded, task) = serve_in_order(vec![
+                first,
+                (200, r#"{"account":{"id":42}}"#),
+                (
+                    200,
+                    r#"{"credits":{"balance":5},"freeCredits":{"balance":2.5}}"#,
+                ),
+            ])
+            .await;
+            let provider = XapiProvider::with_base_url(&base);
+            let result = provider
+                .fetch_web(&FetchContext::default(), &two_browsers)
+                .await
+                .unwrap_or_else(|error| panic!("status {}: {error:?}", first.0));
+            assert_eq!(
+                result.usage.primary.reset_description.as_deref(),
+                Some("Balance: $7.50")
+            );
+            let requests = recorded.lock().unwrap().clone();
+            assert_eq!(
+                requests,
+                vec![
+                    ("/api/me".into(), "auth_token=a; ct0=c1".into(), "c1".into()),
+                    ("/api/me".into(), "auth_token=b; ct0=c2".into(), "c2".into()),
+                    (
+                        "/api/accounts/42/credits".into(),
+                        "auth_token=b; ct0=c2".into(),
+                        "c2".into()
+                    ),
+                ],
+                "status {}",
+                first.0
+            );
+            task.abort();
+        }
+    }
+
+    #[tokio::test]
+    async fn a_plain_bad_request_ends_the_fetch() {
+        let (base, recorded, task) = serve_in_order(vec![
+            (400, r#"{"errors":[{"code":88,"message":"Rate limit"}]}"#),
+            (200, r#"{"account":{"id":42}}"#),
+        ])
+        .await;
+        let provider = XapiProvider::with_base_url(&base);
+        match provider
+            .fetch_web(&FetchContext::default(), &two_browsers)
+            .await
+        {
+            Err(ProviderError::Other(message)) => {
+                assert_eq!(message, "X developer console returned HTTP 400.")
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+        assert_eq!(recorded.lock().unwrap().len(), 1);
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn every_expired_session_reports_the_upstream_message() {
+        let (base, _recorded, task) = serve_in_order(vec![(401, "{}"), (401, "{}")]).await;
+        let provider = XapiProvider::with_base_url(&base);
+        match provider
+            .fetch_web(&FetchContext::default(), &two_browsers)
+            .await
+        {
+            Err(ProviderError::Other(message)) => assert_eq!(message, SESSION_EXPIRED),
+            other => panic!("unexpected {other:?}"),
+        }
+        task.abort();
     }
 }
