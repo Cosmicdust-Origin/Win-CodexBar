@@ -58,6 +58,7 @@ import notion from "./icons/ProviderIcon-notion.svg?raw";
 import nous from "./icons/ProviderIcon-nous.svg?raw";
 import workbuddy from "./icons/ProviderIcon-workbuddy.svg?raw";
 import xai from "./icons/ProviderIcon-xai.svg?raw";
+import xapi from "./icons/ProviderIcon-xapi.svg?raw";
 import xkiro from "./icons/ProviderIcon-xkiro.svg?raw";
 import ollama from "./icons/ProviderIcon-ollama.svg?raw";
 import opencode from "./icons/ProviderIcon-opencode.svg?raw";
@@ -159,6 +160,7 @@ const RAW: Record<string, string> = {
   notion: tint(notion),
   nous: tint(nous),
   xai: tint(xai),
+  xapi: tint(xapi),
   xkiro: tint(xkiro),
   mistral: tint(mistral),
   muse: tint(muse),
@@ -294,6 +296,7 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   notion:      { id: "notion",      brandColor: "#337EA9", fallbackLetter: "N", svgPath: RAW.notion },
   nous:        { id: "nous",        brandColor: "#D6A55C", fallbackLetter: "N", svgPath: RAW.nous },
   xai:         { id: "xai",         brandColor: "#8e8e93", fallbackLetter: "X", svgPath: RAW.xai },
+  xapi:        { id: "xapi",        brandColor: "#71767B", fallbackLetter: "X", svgPath: RAW.xapi },
   xkiro:       { id: "xkiro",       brandColor: "#52c99b", fallbackLetter: "X", svgPath: RAW.xkiro },
   meta:        { id: "meta",        brandColor: "#0467DF", fallbackLetter: "M", svgPath: RAW.meta },
 };

@@ -32,8 +32,8 @@ use crate::providers::{
     QwenCloudProvider, RaycastProvider, ReplicateProvider, SailResearchProvider, SakanaProvider,
     SofyaProvider, StepFunProvider, Sub2ApiProvider, T3ChatProvider, TinyApiProvider,
     TypeSafeProvider, V0Provider, VeniceProvider, VercelProvider, VertexAIProvider, WarpProvider,
-    WayfinderProvider, WindsurfProvider, XKiroProvider, XaiProvider, ZaiProvider, ZedProvider,
-    ZenMuxProvider, ZoomMateProvider,
+    WayfinderProvider, WindsurfProvider, XKiroProvider, XaiProvider, XapiProvider, ZaiProvider,
+    ZedProvider, ZenMuxProvider, ZoomMateProvider,
 };
 
 /// Instantiate the concrete [`Provider`] implementation for a given [`ProviderId`].
@@ -129,6 +129,7 @@ pub fn instantiate(id: ProviderId) -> Box<dyn Provider> {
         ProviderId::SailResearch => Box::new(SailResearchProvider::new()),
         ProviderId::Notion => Box::new(NotionProvider::new()),
         ProviderId::Xai => Box::new(XaiProvider::new()),
+        ProviderId::Xapi => Box::new(XapiProvider::new()),
         ProviderId::Fireworks => Box::new(FireworksProvider::new()),
         ProviderId::Meta => Box::new(MetaProvider::new()),
         ProviderId::Muse => Box::new(MuseProvider::new()),
@@ -239,6 +240,7 @@ pub fn pace_capability(id: ProviderId) -> ProviderPaceCapability {
         | ProviderId::Replicate
         | ProviderId::SailResearch
         | ProviderId::Xai
+        | ProviderId::Xapi
         | ProviderId::Fireworks
         | ProviderId::Meta
         | ProviderId::Muse

@@ -136,6 +136,7 @@ See the full history in [CHANGELOG.md](CHANGELOG.md).
 | LithosAI | Browser cookies / manual Cookie header | Prepaid balance, UTC spend today and this month |
 | Muse (muse.ai) | Browser cookies / manual Cookie header | Weekly usage, tokens left, top-up tokens |
 | WorkBuddy | Browser cookies / manual Cookie header | Monthly credits left, plan, cycle reset |
+| X API | Browser cookies / manual Cookie header | Prepaid balance, purchased and free credits |
 
 </details>
 
