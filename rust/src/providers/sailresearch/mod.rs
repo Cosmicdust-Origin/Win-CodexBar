@@ -12,7 +12,7 @@ use serde_json::Value;
 use super::format;
 use crate::core::{
     FetchContext, Provider, ProviderDisplayDetail, ProviderError, ProviderFetchResult, ProviderId,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    ProviderMetadata, ProviderStateKind, RateWindow, SourceMode, UsageSnapshot,
 };
 use crate::providers::read_bounded_response;
 
@@ -24,7 +24,7 @@ const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 pub struct SailResearchProvider {
     metadata: ProviderMetadata,
-    client: Client,
+    client: Option<Client>,
 }
 
 impl SailResearchProvider {
@@ -47,7 +47,7 @@ impl SailResearchProvider {
                 .redirect(reqwest::redirect::Policy::none())
                 .timeout(REQUEST_TIMEOUT)
                 .build()
-                .unwrap_or_else(|_| Client::new()),
+                .ok(),
         }
     }
 
@@ -55,13 +55,16 @@ impl SailResearchProvider {
         &self,
         ctx: &FetchContext,
     ) -> Result<ProviderFetchResult, ProviderError> {
+        let client = self.client.as_ref().ok_or_else(|| {
+            ProviderError::Other("Could not create a secure Sail Research HTTP client.".into())
+        })?;
         let key = crate::providers::resolve_api_key(
             ctx.api_key.as_deref(),
             CREDENTIAL_TARGET,
             &[API_KEY_ENV],
         )?;
 
-        let response = self.client.get(USAGE_URL).bearer_auth(&key).send().await?;
+        let response = client.get(USAGE_URL).bearer_auth(&key).send().await?;
 
         let status = response.status();
         let message = format!("Sail Research returned HTTP {}.", status.as_u16());
@@ -130,7 +133,19 @@ impl Provider for SailResearchProvider {
     fn available_sources(&self) -> Vec<SourceMode> {
         vec![SourceMode::Auto, SourceMode::OAuth]
     }
+
+    fn error_state_kind(&self, error: &ProviderError) -> ProviderStateKind {
+        match error {
+            ProviderError::Other(message) if message == KEY_REJECTED => {
+                ProviderStateKind::ExpiredSession
+            }
+            _ => error.state_kind(),
+        }
+    }
 }
+
+/// Upstream reports HTTP 401 as `authenticationExpired` with this message.
+const KEY_REJECTED: &str = "Sail Research returned HTTP 401.";
 
 fn parse_usage(payload: &Value) -> Result<ProviderFetchResult, ProviderError> {
     let data = payload.as_object().ok_or_else(|| {
@@ -400,5 +415,22 @@ mod tests {
         let mut data = fixture();
         data["effective_range"] = json!("unknown");
         assert!(parse_usage(&data).is_err());
+    }
+
+    #[test]
+    fn only_a_rejected_key_reports_an_expired_session() {
+        let provider = SailResearchProvider::new();
+        let kind = |message: &str| provider.error_state_kind(&ProviderError::Other(message.into()));
+        assert_eq!(
+            kind("Sail Research returned HTTP 401."),
+            ProviderStateKind::ExpiredSession
+        );
+        for message in [
+            "Sail Research returned HTTP 429.",
+            "Sail Research API key has no organization access.",
+            "Sail Research disabled this API key because credits are exhausted.",
+        ] {
+            assert_eq!(kind(message), ProviderStateKind::Unknown, "{message}");
+        }
     }
 }
