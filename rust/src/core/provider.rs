@@ -111,6 +111,7 @@ pub enum ProviderId {
     Linkup,
     MuseAI,
     WorkBuddy,
+    SailResearch,
 }
 
 impl ProviderId {
@@ -214,6 +215,7 @@ impl ProviderId {
             ProviderId::Linkup,
             ProviderId::MuseAI,
             ProviderId::WorkBuddy,
+            ProviderId::SailResearch,
         ]
     }
 
@@ -278,6 +280,7 @@ impl ProviderId {
             ProviderId::Linkup => "linkup",
             ProviderId::MuseAI => "museai",
             ProviderId::WorkBuddy => "workbuddy",
+            ProviderId::SailResearch => "sailresearch",
             ProviderId::AiAnd => "aiand",
             ProviderId::Windsurf => "windsurf",
             ProviderId::Manus => "manus",
@@ -382,6 +385,7 @@ impl ProviderId {
             ProviderId::Linkup => "Linkup",
             ProviderId::MuseAI => "Muse (muse.ai)",
             ProviderId::WorkBuddy => "WorkBuddy",
+            ProviderId::SailResearch => "Sail Research",
             ProviderId::AiAnd => "ai&",
             ProviderId::Windsurf => "Windsurf",
             ProviderId::Manus => "Manus",
@@ -502,6 +506,7 @@ impl ProviderId {
             ProviderId::Linkup => None,
             ProviderId::MuseAI => Some("muse.ai"),
             ProviderId::WorkBuddy => Some("workbuddy.cn"),
+            ProviderId::SailResearch => None,
             ProviderId::AiAnd => None,
             ProviderId::Windsurf => None,
             ProviderId::Doubao => None,
@@ -669,6 +674,7 @@ impl ProviderId {
             "linkup" => Some(ProviderId::Linkup),
             "museai" | "muse (muse.ai)" => Some(ProviderId::MuseAI),
             "workbuddy" => Some(ProviderId::WorkBuddy),
+            "sailresearch" | "sail research" => Some(ProviderId::SailResearch),
             _ => None,
         }
     }
@@ -1387,6 +1393,7 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::LithosAI => "#6B7280",
         ProviderId::MuseAI => "#0668E1",
         ProviderId::WorkBuddy => "#0DC8A6",
+        ProviderId::SailResearch => "#2C4681",
     }
 }
 
@@ -1401,7 +1408,7 @@ mod tests {
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 97);
+        assert_eq!(all.len(), 98);
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Pi));
@@ -1479,6 +1486,7 @@ mod tests {
         assert!(all.contains(&ProviderId::LithosAI));
         assert!(all.contains(&ProviderId::MuseAI));
         assert!(all.contains(&ProviderId::WorkBuddy));
+        assert!(all.contains(&ProviderId::SailResearch));
     }
 
     #[test]

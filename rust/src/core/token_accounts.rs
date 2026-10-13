@@ -449,7 +449,8 @@ impl TokenAccountSupport {
             | ProviderId::LithosAI
             | ProviderId::Linkup
             | ProviderId::MuseAI
-            | ProviderId::WorkBuddy => None,
+            | ProviderId::WorkBuddy
+            | ProviderId::SailResearch => None,
         }
     }
 

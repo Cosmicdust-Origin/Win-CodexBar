@@ -67,6 +67,7 @@ import perplexity from "./icons/ProviderIcon-perplexity.svg?raw";
 import qoder from "./icons/ProviderIcon-qoder.svg?raw";
 import raycast from "./icons/ProviderIcon-raycast.svg?raw";
 import replicate from "./icons/ProviderIcon-replicate.svg?raw";
+import sailresearch from "./icons/ProviderIcon-sailresearch.svg?raw";
 import sakana from "./icons/ProviderIcon-sakana.svg?raw";
 import stepfun from "./icons/ProviderIcon-stepfun.svg?raw";
 import sub2api from "./icons/ProviderIcon-sub2api.svg?raw";
@@ -169,6 +170,7 @@ const RAW: Record<string, string> = {
   qoder: tint(qoder),
   raycast: tint(raycast),
   replicate: tint(replicate),
+  sailresearch: tint(sailresearch),
   sakana: tint(sakana),
   stepfun: tint(stepfun),
   sub2api: tint(sub2api),
@@ -261,6 +263,7 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   qoder:       { id: "qoder",       brandColor: "#10b981", fallbackLetter: "Q", svgPath: RAW.qoder },
   raycast:     { id: "raycast",     brandColor: "#FF6363", fallbackLetter: "R", svgPath: RAW.raycast },
   replicate:   { id: "replicate",   brandColor: "#000000", fallbackLetter: "R", svgPath: RAW.replicate },
+  sailresearch: { id: "sailresearch", brandColor: "#2C4681", fallbackLetter: "S", svgPath: RAW.sailresearch },
   codebuddy:   { id: "codebuddy",   brandColor: "#0052d9", fallbackLetter: "C" },
   sakana:      { id: "sakana",      brandColor: "#2975db", fallbackLetter: "S", svgPath: RAW.sakana },
   stepfun:     { id: "stepfun",     brandColor: "#2196f2", fallbackLetter: "S", svgPath: RAW.stepfun },
