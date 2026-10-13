@@ -447,8 +447,10 @@ impl TokenAccountSupport {
             | ProviderId::ClawRouter
             | ProviderId::Langdock
             | ProviderId::LithosAI
+            | ProviderId::Linkup
             | ProviderId::MuseAI
             | ProviderId::WorkBuddy
+            | ProviderId::SailResearch
             | ProviderId::Xapi => None,
         }
     }
