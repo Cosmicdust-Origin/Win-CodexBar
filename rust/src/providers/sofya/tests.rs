@@ -45,6 +45,10 @@ fn free_tier_preserves_separate_balances_and_supplied_reset() {
     assert!(result.usage.primary.hidden_on_card);
     assert_eq!(result.usage.login_method.as_deref(), Some("Free tier"));
     assert_eq!(
+        result.usage.primary.reset_description.as_deref(),
+        Some("Available credits: 1,034")
+    );
+    assert_eq!(
         rows(&result),
         vec![
             row("Available credits", "1,034"),

@@ -302,7 +302,15 @@ fn parse_usage(root: &Value) -> Result<ProviderFetchResult, ProviderError> {
         None => "API",
     };
 
-    let primary = RateWindow::informational(SECTION_TITLE).hidden_on_card();
+    // Upstream's menu bar balance is the "Available credits" row.
+    let primary_text = rows
+        .iter()
+        .find(|(label, _)| label == "Available credits")
+        .map_or_else(
+            || SECTION_TITLE.to_string(),
+            |(label, value)| format!("{label}: {value}"),
+        );
+    let primary = RateWindow::informational(primary_text).hidden_on_card();
     let usage = UsageSnapshot::new(primary).with_login_method(login_method);
 
     let mut result = ProviderFetchResult::new(usage, "api");
