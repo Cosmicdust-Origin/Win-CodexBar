@@ -350,3 +350,14 @@ fn malformed_reset_fails_even_when_not_shown() {
         })));
     }
 }
+
+#[test]
+fn only_a_rejected_key_reports_an_expired_session() {
+    let provider = SofyaProvider::new();
+    let kind = |status| provider.error_state_kind(&ProviderError::Other(status_message(status)));
+    assert_eq!(status_message(401), "Sofya returned HTTP 401.");
+    assert_eq!(kind(401), ProviderStateKind::ExpiredSession);
+    for status in [403, 429, 503, 418] {
+        assert_eq!(kind(status), ProviderStateKind::Unknown, "status {status}");
+    }
+}
