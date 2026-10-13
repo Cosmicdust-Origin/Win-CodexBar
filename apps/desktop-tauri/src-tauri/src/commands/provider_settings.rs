@@ -367,6 +367,7 @@ fn workspace_provider(provider_id: &str) -> Option<codexbar::core::ProviderId> {
         "helmcode" => ProviderId::Helmcode,
         "gitkraken" => ProviderId::GitKraken,
         "muse" => ProviderId::Muse,
+        "cosmic" => ProviderId::Cosmic,
         _ => return None,
     })
 }
@@ -497,6 +498,11 @@ mod tests {
     #[test]
     fn maps_llmman_workspace_provider() {
         assert_eq!(workspace_provider("llmman"), Some(ProviderId::LLMMan));
+    }
+
+    #[test]
+    fn maps_cosmic_project_provider() {
+        assert_eq!(workspace_provider("cosmic"), Some(ProviderId::Cosmic));
     }
 
     #[test]
