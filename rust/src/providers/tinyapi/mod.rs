@@ -23,7 +23,7 @@ use crate::core::{
     ProviderFetchResult, ProviderId, ProviderMetadata, ProviderStateKind, RateWindow, SourceMode,
     UsageSnapshot,
 };
-use crate::providers::read_bounded_response;
+use crate::providers::{BoundedBodyError, read_bounded_response};
 
 const USAGE_URL: &str = "https://tinyapi.rest/api/user/credits";
 const COOKIE_DOMAIN: &str = "tinyapi.rest";
@@ -41,17 +41,25 @@ type BrowserCookieHeaders = dyn Fn() -> Result<Vec<(String, String)>, ProviderEr
 
 pub struct TinyApiProvider {
     client: Option<Client>,
+    usage_url: String,
 }
 
 impl TinyApiProvider {
     pub fn new() -> Self {
+        Self::with_usage_url(USAGE_URL)
+    }
+
+    fn with_usage_url(usage_url: &str) -> Self {
         let client = crate::core::credentialed_http_client_builder()
             .cookie_store(false)
             .redirect(reqwest::redirect::Policy::none())
             .timeout(REQUEST_TIMEOUT)
             .build()
             .ok();
-        Self { client }
+        Self {
+            client,
+            usage_url: usage_url.to_owned(),
+        }
     }
 
     /// Tries each candidate session in order. Only an expired session (401/403)
@@ -71,7 +79,7 @@ impl TinyApiProvider {
         let timeout = Duration::from_secs(ctx.web_timeout.max(1)).min(REQUEST_TIMEOUT);
         let mut last_error = None;
         for cookie_header in sessions {
-            match fetch_credits(client, &cookie_header, timeout).await {
+            match fetch_credits(client, &self.usage_url, &cookie_header, timeout).await {
                 Err(error) if is_session_expired(&error) => last_error = Some(error),
                 result => return result,
             }
@@ -143,11 +151,12 @@ impl Provider for TinyApiProvider {
 /// Fetch credits from a single cookie header.
 async fn fetch_credits(
     client: &Client,
+    usage_url: &str,
     cookie_header: &str,
     timeout: Duration,
 ) -> Result<ProviderFetchResult, ProviderError> {
     let response = client
-        .get(USAGE_URL)
+        .get(usage_url)
         .header(reqwest::header::COOKIE, cookie_header)
         .timeout(timeout)
         .send()
@@ -158,7 +167,10 @@ async fn fetch_credits(
 
     let body = read_bounded_response(response, MAX_RESPONSE_BYTES)
         .await
-        .map_err(|_| invalid_response())?;
+        .map_err(|error| match error {
+            BoundedBodyError::TooLarge => invalid_response(),
+            BoundedBodyError::Read(error) => ProviderError::from(error),
+        })?;
 
     let root: Value = serde_json::from_slice(&body)
         .map_err(|_| ProviderError::Other("TinyApi credits response is not valid JSON.".into()))?;
@@ -252,7 +264,8 @@ pub fn parse_usage(root: &Value) -> Result<ProviderFetchResult, ProviderError> {
     let balance_text = format::number(balance, 2);
     let value_text = format!("{} credits", balance_text);
 
-    let primary = RateWindow::informational("Credits").hidden_on_card();
+    let primary =
+        RateWindow::informational(format!("Available credits: {value_text}")).hidden_on_card();
     let usage = UsageSnapshot::new(primary).with_login_method("Browser session");
 
     let mut result = ProviderFetchResult::new(usage, "web");

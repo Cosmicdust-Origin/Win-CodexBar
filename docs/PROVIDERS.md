@@ -200,15 +200,17 @@ field containing the available credits as a number.
   indicates an expired session; the provider skips to the next browser session
   if Automatic has more candidates, and reports "TinyApi session expired. Sign
   in again or paste a fresh Cookie header." if none remain. HTTP 429 is
-  rate-limited, and 500+ is unavailable. Other HTTP codes and malformed JSON
-  are reported generically. Response bodies and cookies are never logged or
-  echoed in errors.
+  rate-limited, and 500+ is unavailable. Other HTTP codes are reported with
+  their status code. Bodies over 256 KiB or without a valid balance report a
+  missing balance, and non-JSON bodies report invalid JSON. Response bodies and
+  cookies are never logged or echoed in errors.
 - The card shows a single "Available credits" detail row with the balance
   formatted to up to two decimal places and the "credits" unit (e.g. "125.5
-  credits" or "100 credits"). The informational dashboard window ("Credits") is
-  hidden on the card. Login method is shown as "Browser session".
-- No multi-account support. Bounds-check failure (too large a response) is
-  reported the same way as invalid JSON.
+  credits" or "100 credits"). The menu bar reads "Available credits: <value>"
+  from an informational window that is hidden on the card. Login method is
+  shown as "Browser session".
+- No multi-account support. A transport or timeout error while reading the
+  body keeps its cause instead of being reported as an invalid response.
 
 ### WorkBuddy credits
 

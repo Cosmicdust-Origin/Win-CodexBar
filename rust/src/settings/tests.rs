@@ -98,6 +98,15 @@ fn workbuddy_cookie_source_defaults_to_automatic_session_import() {
 }
 
 #[test]
+fn tinyapi_cookie_source_defaults_to_automatic_session_import() {
+    // Upstream's TinyApi cookie source falls back to `.auto`.
+    let mut settings = Settings::default();
+    assert_eq!(settings.cookie_source(ProviderId::TinyApi), "auto");
+    settings.set_cookie_source(ProviderId::TinyApi, "off");
+    assert_eq!(settings.cookie_source(ProviderId::TinyApi), "off");
+}
+
+#[test]
 fn preferred_currency_defaults_validates_and_round_trips() {
     let legacy: Settings = serde_json::from_str(r#"{"enabled_providers": []}"#)
         .expect("legacy settings without a preferred currency remain valid");

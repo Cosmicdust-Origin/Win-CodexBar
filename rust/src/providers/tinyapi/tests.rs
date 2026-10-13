@@ -24,6 +24,10 @@ mod tinyapi_tests {
             detail_values(&result),
             vec![("Available credits".to_string(), "125.5 credits".to_string())]
         );
+        assert_eq!(
+            result.usage.primary.reset_description.as_deref(),
+            Some("Available credits: 125.5 credits")
+        );
     }
 
     #[test]
@@ -117,13 +121,15 @@ mod tinyapi_tests {
 
     #[test]
     fn parse_usage_rejects_non_finite_balance() {
-        // Test that a very large exponent would be rejected if it were serializable
-        // (JSON cannot represent infinity directly, so we test the validation logic indirectly)
-        let result = parse_usage(&json!({
-            "success": true,
-            "data": { "totalAvailable": 0.0 }
-        }));
-        assert!(result.is_ok());
+        // serde_json encodes non-finite floats as null, so this is the shape a
+        // non-finite balance takes on the wire.
+        for value in [f64::INFINITY, f64::NEG_INFINITY, f64::NAN] {
+            let result = parse_usage(&json!({
+                "success": true,
+                "data": { "totalAvailable": value }
+            }));
+            assert!(result.is_err(), "{value} should be rejected");
+        }
     }
 
     #[test]
@@ -303,5 +309,113 @@ mod tinyapi_tests {
             }
             other => panic!("unexpected {other:?}"),
         }
+    }
+
+    /// Serves one canned response per connection, recording each Cookie header.
+    async fn serve_in_order(
+        responses: Vec<(u16, &'static str)>,
+    ) -> (
+        String,
+        std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+        tokio::task::JoinHandle<()>,
+    ) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .unwrap();
+        let url = format!(
+            "http://127.0.0.1:{}/api/user/credits",
+            listener.local_addr().unwrap().port()
+        );
+        let cookies = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let recorded = std::sync::Arc::clone(&cookies);
+        let task = tokio::spawn(async move {
+            for (status, body) in responses {
+                let Ok((mut stream, _)) = listener.accept().await else {
+                    return;
+                };
+                let mut request = Vec::new();
+                let mut chunk = [0u8; 1024];
+                while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+                    match stream.read(&mut chunk).await {
+                        Ok(0) | Err(_) => break,
+                        Ok(read) => request.extend_from_slice(&chunk[..read]),
+                    }
+                }
+                let text = String::from_utf8_lossy(&request).to_string();
+                let cookie = text
+                    .lines()
+                    .find_map(|line| {
+                        line.strip_prefix("cookie: ")
+                            .or_else(|| line.strip_prefix("Cookie: "))
+                    })
+                    .unwrap_or_default()
+                    .to_string();
+                recorded.lock().unwrap().push(cookie);
+                let response = format!(
+                    "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                stream
+                    .write_all(response.as_bytes())
+                    .await
+                    .expect("write fixture response");
+                stream.shutdown().await.expect("close fixture stream");
+            }
+        });
+        (url, cookies, task)
+    }
+
+    #[tokio::test]
+    async fn an_expired_browser_session_moves_to_the_next_one() {
+        use crate::core::FetchContext;
+        use crate::providers::tinyapi::TinyApiProvider;
+
+        let (url, cookies, task) = serve_in_order(vec![
+            (401, "{}"),
+            (200, r#"{"success":true,"data":{"totalAvailable":7}}"#),
+        ])
+        .await;
+        let provider = TinyApiProvider::with_usage_url(&url);
+        let browser = || {
+            Ok(vec![
+                ("Chrome".to_string(), "a=1".to_string()),
+                ("Edge".to_string(), "b=2".to_string()),
+            ])
+        };
+        let result = provider
+            .fetch_web(&FetchContext::default(), &browser)
+            .await
+            .unwrap();
+        assert_eq!(
+            result.usage.primary.reset_description.as_deref(),
+            Some("Available credits: 7 credits")
+        );
+        assert_eq!(*cookies.lock().unwrap(), vec!["a=1", "b=2"]);
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn a_non_auth_failure_stops_at_the_first_session() {
+        use crate::core::{FetchContext, ProviderError};
+        use crate::providers::tinyapi::TinyApiProvider;
+
+        let (url, cookies, task) = serve_in_order(vec![(429, "{}"), (200, "{}")]).await;
+        let provider = TinyApiProvider::with_usage_url(&url);
+        let browser = || {
+            Ok(vec![
+                ("Chrome".to_string(), "a=1".to_string()),
+                ("Edge".to_string(), "b=2".to_string()),
+            ])
+        };
+        match provider.fetch_web(&FetchContext::default(), &browser).await {
+            Err(ProviderError::Other(message)) => {
+                assert_eq!(message, "TinyApi credits requests are rate limited.")
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+        assert_eq!(*cookies.lock().unwrap(), vec!["a=1"]);
+        task.abort();
     }
 }
