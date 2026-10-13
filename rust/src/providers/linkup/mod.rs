@@ -143,11 +143,14 @@ pub fn parse_balance(root: &Value) -> Result<ProviderFetchResult, ProviderError>
         return Err(unrecognized());
     }
 
-    let usage = UsageSnapshot::new(RateWindow::informational(SECTION_TITLE).hidden_on_card())
-        .with_login_method("API");
+    let balance_text = format::usd(balance);
+    let usage = UsageSnapshot::new(
+        RateWindow::informational(format!("{ROW_LABEL}: {balance_text}")).hidden_on_card(),
+    )
+    .with_login_method("API");
 
     Ok(ProviderFetchResult::new(usage, "api").with_display_detail(
-        ProviderDisplayDetail::new("linkup-balance", ROW_LABEL, format::usd(balance))
+        ProviderDisplayDetail::new("linkup-balance", ROW_LABEL, balance_text)
             .and_then(|d| d.with_section_title(SECTION_TITLE)),
     ))
 }

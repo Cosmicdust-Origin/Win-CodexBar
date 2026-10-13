@@ -27,6 +27,11 @@ fn balance_parsing_basic() {
         result.display_details[0].section_title(),
         Some("Account balance")
     );
+    assert_eq!(
+        result.usage.primary.reset_description.as_deref(),
+        Some("Credit balance: $123.46")
+    );
+    assert!(result.usage.primary.is_informational);
 }
 
 #[test]
