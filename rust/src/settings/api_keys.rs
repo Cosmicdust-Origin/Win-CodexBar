@@ -772,6 +772,17 @@ pub fn get_api_key_providers() -> Vec<ProviderConfigInfo> {
             dashboard_url: None,
         },
         ProviderConfigInfo {
+            id: ProviderId::Tavily,
+            name: "Tavily",
+            requires_api_key: true,
+            api_key_env_var: Some(crate::providers::tavily::API_KEY_ENV),
+            api_key_help: Some(
+                "Save a Tavily API key to fetch account plan, API key, and pay-as-you-go credit usage. Or set TAVILY_API_KEY.",
+            ),
+            config_file_path: None,
+            dashboard_url: Some("https://app.tavily.com"),
+        },
+        ProviderConfigInfo {
             id: ProviderId::ClawRouter,
             name: "ClawRouter",
             requires_api_key: true,

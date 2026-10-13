@@ -74,6 +74,7 @@ import sofya from "./icons/ProviderIcon-sofya.svg?raw";
 import stepfun from "./icons/ProviderIcon-stepfun.svg?raw";
 import sub2api from "./icons/ProviderIcon-sub2api.svg?raw";
 import synthetic from "./icons/ProviderIcon-synthetic.svg?raw";
+import tavily from "./icons/ProviderIcon-tavily.svg?raw";
 import clawrouter from "./icons/ProviderIcon-clawrouter.svg?raw";
 import t3chat from "./icons/ProviderIcon-t3chat.svg?raw";
 import tinyapi from "./icons/ProviderIcon-tinyapi.svg?raw";
@@ -180,6 +181,7 @@ const RAW: Record<string, string> = {
   stepfun: tint(stepfun),
   sub2api: tint(sub2api),
   synthetic: tint(synthetic),
+  tavily: tint(tavily),
   clawrouter: tint(clawrouter),
   t3chat: tint(t3chat),
   tinyapi: tint(tinyapi),
@@ -279,6 +281,7 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   venice:      { id: "venice",      brandColor: "#3c8fdd", fallbackLetter: "V", svgPath: RAW.venice },
   vercel:      { id: "vercel",      brandColor: "#737373", fallbackLetter: "V", svgPath: RAW.vercel },
   synthetic:   { id: "synthetic",   brandColor: "#141414", fallbackLetter: "S", svgPath: RAW.synthetic },
+  tavily:      { id: "tavily",      brandColor: "#0F766E", fallbackLetter: "T", svgPath: RAW.tavily },
   clawrouter:  { id: "clawrouter",  brandColor: "#596EF6", fallbackLetter: "C", svgPath: RAW.clawrouter },
   ibmbob:      { id: "ibmbob",      brandColor: "#0E61FA", fallbackLetter: "B", svgPath: RAW.ibmbob },
   langdock:    { id: "langdock",    brandColor: "#5A4AE7", fallbackLetter: "L", svgPath: RAW.langdock },

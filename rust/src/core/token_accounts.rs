@@ -453,7 +453,8 @@ impl TokenAccountSupport {
             | ProviderId::SailResearch
             | ProviderId::Sofya
             | ProviderId::TinyApi
-            | ProviderId::Xapi => None,
+            | ProviderId::Xapi
+            | ProviderId::Tavily => None,
         }
     }
 

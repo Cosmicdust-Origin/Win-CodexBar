@@ -378,6 +378,26 @@ Configure the API key in Settings → Providers → Sofya (or `SOFYA_API_KEY`).
 - Every non-200 status reports "Sofya returned HTTP <status>."; other account
   fields (email, API key, usernames) are never read or displayed.
 
+### Tavily
+
+Tavily reads `GET https://api.tavily.com/usage` with bearer authentication.
+Configure the API key in Settings → Providers → Tavily (or `TAVILY_API_KEY`).
+
+- The "Account plan" lane reads `account.plan_usage` / `account.plan_limit`.
+  The "API key" lane reads `key.usage` / `key.limit`. A null key limit means
+  Unlimited; zero limits and unlimited keys display their rows without a
+  usage percentage. Remaining credits are the nonnegative difference between
+  reported cap and usage.
+- Pay-as-you-go totals, when present (`account.paygo_usage` and
+  `account.paygo_limit`), appear in a separate detail section.
+- The plan name (`account.current_plan`) identifies the account plan. No email
+  or account ID is inferred; unknown plans do not create a phantom identity.
+- Non-200 responses report "Tavily returned HTTP <status>."; response bodies
+  are never echoed in errors.
+- Tavily limits the usage endpoint to 10 requests per 10 minutes. Keep
+  refreshes at least one minute apart and avoid repeated manual refreshes. A
+  throttled request fails as rate-limited without automatic replay.
+
 ### ClawRouter
 
 ClawRouter reports the monthly budget, spend and routed-provider usage of one
