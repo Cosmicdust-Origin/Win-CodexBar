@@ -7,7 +7,7 @@
 //! Ported from upstream CodexBar v0.74.1 (`Resources/Plugins/exa.js`).
 
 use async_trait::async_trait;
-use chrono::{Datelike, Timelike, Utc};
+use chrono::{DateTime, Datelike, Timelike, Utc};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -16,7 +16,7 @@ use crate::core::{
     FetchContext, Provider, ProviderDisplayDetail, ProviderError, ProviderFetchResult, ProviderId,
     ProviderMetadata, ProviderStateKind, RateWindow, SourceMode, UsageSnapshot,
 };
-use crate::providers::read_bounded_response;
+use crate::providers::{BoundedBodyError, read_bounded_response};
 
 const USAGE_URL_BASE: &str = "https://admin-api.exa.ai/team-management/api-keys";
 const CREDENTIAL_TARGET: &str = "codexbar-exa";
@@ -86,23 +86,7 @@ impl ExaProvider {
         )
         .ok_or_else(|| ProviderError::Other(MISSING_KEY_ID.into()))?;
 
-        // Calculate date range: start of month to current time (in UTC)
-        let now = Utc::now();
-        let month_start = Utc::now()
-            .with_day(1)
-            .unwrap_or(now)
-            .with_hour(0)
-            .unwrap_or(now)
-            .with_minute(0)
-            .unwrap_or(now)
-            .with_second(0)
-            .unwrap_or(now)
-            .with_nanosecond(0)
-            .unwrap_or(now);
-
-        // Round current time down to whole seconds
-        let end_time = now.with_nanosecond(0).unwrap_or(now);
-
+        let (month_start, end_time) = month_to_date_range(Utc::now());
         let start_date = month_start.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
         let end_date = end_time.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
 
@@ -125,7 +109,10 @@ impl ExaProvider {
 
         let body = read_bounded_response(response, MAX_RESPONSE_BYTES)
             .await
-            .map_err(|_| ProviderError::Parse(UNRECOGNIZED.into()))?;
+            .map_err(|error| match error {
+                BoundedBodyError::TooLarge => ProviderError::Parse(UNRECOGNIZED.into()),
+                BoundedBodyError::Read(error) => ProviderError::from(error),
+            })?;
 
         let data: Value =
             serde_json::from_slice(&body).map_err(|_| ProviderError::Parse(UNRECOGNIZED.into()))?;
@@ -221,6 +208,17 @@ fn check_status(status: u16) -> Result<(), ProviderError> {
     Err(ProviderError::Other(message))
 }
 
+/// Start of the UTC month containing `now`, and `now` truncated to whole seconds.
+fn month_to_date_range(now: DateTime<Utc>) -> (DateTime<Utc>, DateTime<Utc>) {
+    let end_time = now.with_nanosecond(0).unwrap_or(now);
+    let month_start = now
+        .date_naive()
+        .with_day(1)
+        .and_then(|day| day.and_hms_opt(0, 0, 0))
+        .map_or(end_time, |start| start.and_utc());
+    (month_start, end_time)
+}
+
 /// Saved Scope value first, then `EXA_API_KEY_ID`.
 fn resolve_key_id(workspace_id: Option<&str>, env_value: Option<&str>) -> Option<String> {
     let usable = |value: &str| {
@@ -310,6 +308,23 @@ mod tests_module;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn month_range_comes_from_one_instant() {
+        let at = |text: &str| {
+            chrono::DateTime::parse_from_rfc3339(text)
+                .unwrap()
+                .with_timezone(&Utc)
+        };
+        assert_eq!(
+            month_to_date_range(at("2026-10-31T23:59:59.900Z")),
+            (at("2026-10-01T00:00:00Z"), at("2026-10-31T23:59:59Z"))
+        );
+        assert_eq!(
+            month_to_date_range(at("2026-11-01T00:00:00.000Z")),
+            (at("2026-11-01T00:00:00Z"), at("2026-11-01T00:00:00Z"))
+        );
+    }
 
     #[test]
     fn test_parse_valid_usage() {
