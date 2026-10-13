@@ -89,6 +89,7 @@ pub enum ProviderId {
     QwenCloud,
     Notion,
     Xai,
+    Xapi,
     Fireworks,
     AtlasCloud,
     #[serde(alias = "metaspark")]
@@ -198,6 +199,7 @@ impl ProviderId {
             ProviderId::QwenCloud,
             ProviderId::Notion,
             ProviderId::Xai,
+            ProviderId::Xapi,
             ProviderId::Fireworks,
             ProviderId::AtlasCloud,
             ProviderId::Meta,
@@ -329,6 +331,7 @@ impl ProviderId {
             ProviderId::QwenCloud => "qwen-cloud",
             ProviderId::Notion => "notion",
             ProviderId::Xai => "xai",
+            ProviderId::Xapi => "xapi",
             ProviderId::Replicate => "replicate",
             ProviderId::AtlasCloud => "atlascloud",
             ProviderId::Exa => "exa",
@@ -439,6 +442,7 @@ impl ProviderId {
             ProviderId::QwenCloud => "Qwen Cloud",
             ProviderId::Notion => "Notion AI",
             ProviderId::Xai => "xAI",
+            ProviderId::Xapi => "X API",
             ProviderId::Replicate => "Replicate",
             ProviderId::AtlasCloud => "Atlas Cloud",
             ProviderId::Exa => "Exa",
@@ -555,6 +559,7 @@ impl ProviderId {
             ProviderId::ZoomMate => Some("zoommate.zoom.us"),
             ProviderId::QwenCloud => Some("qwencloud.com"),
             ProviderId::Notion => Some("app.notion.com"),
+            ProviderId::Xapi => Some("x.com"),
             ProviderId::Xai => None,
             ProviderId::Exa => None,
         }
@@ -651,6 +656,7 @@ impl ProviderId {
             }
             "grok" | "supergrok" | "super-grok" => Some(ProviderId::Grok),
             "xai" | "x.ai" | "x-ai" => Some(ProviderId::Xai),
+            "xapi" | "x-api" | "x api" => Some(ProviderId::Xapi),
             "elevenlabs" | "eleven-labs" | "11labs" => Some(ProviderId::ElevenLabs),
             "deepgram" | "dg" => Some(ProviderId::Deepgram),
             "groq" | "groqcloud" | "groq-cloud" | "groq cloud" => Some(ProviderId::Groq),
@@ -1394,6 +1400,7 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::QwenCloud => "#615CED",
         ProviderId::Notion => "#337EA9",
         ProviderId::Xai => "#8E8E93",
+        ProviderId::Xapi => "#71767B",
         ProviderId::Fireworks => "#F25B1C",
         ProviderId::Meta => "#0467DF",
         ProviderId::Muse => "#0668E1",
@@ -1437,7 +1444,7 @@ mod tests {
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 102);
+        assert_eq!(all.len(), 103);
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Pi));
@@ -1494,6 +1501,7 @@ mod tests {
         assert!(all.contains(&ProviderId::QwenCloud));
         assert!(all.contains(&ProviderId::Notion));
         assert!(all.contains(&ProviderId::Xai));
+        assert!(all.contains(&ProviderId::Xapi));
         assert!(all.contains(&ProviderId::Meta));
         assert!(all.contains(&ProviderId::Replicate));
         assert!(all.contains(&ProviderId::Muse));

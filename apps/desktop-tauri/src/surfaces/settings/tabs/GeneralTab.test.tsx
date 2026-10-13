@@ -318,6 +318,26 @@ describe("GeneralTab language picker", () => {
     });
   });
 
+  it("cancels the sound preview timer on unmount", () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = render(
+        <GeneralTab mode="notifications" settings={settings} set={vi.fn()} saving={false} />,
+      );
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "NotificationSoundEventHighUsage: NotificationTestSound",
+        }),
+      );
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("assigns and clears a custom WAV for one notification", async () => {
     const set = vi.fn();
     vi.mocked(open).mockResolvedValue("C:\\sounds\\high-usage.wav");
