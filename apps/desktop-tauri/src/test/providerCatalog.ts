@@ -91,6 +91,7 @@ export const TEST_PROVIDER_CATALOG: Array<[string, string]> = [
   ["clawrouter", "ClawRouter"],
   ["ibmbob", "IBM Bob"],
   ["langdock", "Langdock"],
+  ["linkup", "Linkup"],
   ["lithosai", "LithosAI"],
   ["museai", "Muse (muse.ai)"],
   ["workbuddy", "WorkBuddy"],

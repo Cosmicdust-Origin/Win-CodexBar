@@ -321,6 +321,18 @@ Sail Research (or `SAIL_API_KEY`).
   unavailable, has no billing account, or fails validation is reported as an
   error. Response bodies are never echoed in errors.
 
+### Linkup
+
+Linkup reads `GET https://api.linkup.so/v1/credits/balance` with bearer
+authentication. Configure the API key in Settings → Providers → Linkup (or
+`LINKUP_API_KEY`).
+
+- The "Account balance" section shows one "Credit balance" row in USD. Zero
+  and negative balances are shown as reported.
+- Every non-200 status reports "Linkup returned HTTP <status>."; a body that is
+  not an object with a finite numeric `balance` reports "Linkup returned an
+  unrecognized credit balance.". Response bodies are never echoed in errors.
+
 ### ClawRouter
 
 ClawRouter reports the monthly budget, spend and routed-provider usage of one
