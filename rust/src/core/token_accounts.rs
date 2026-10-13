@@ -453,6 +453,9 @@ impl TokenAccountSupport {
             | ProviderId::SailResearch
             | ProviderId::Sofya
             | ProviderId::TinyApi
+            | ProviderId::Xapi
+            | ProviderId::Tavily
+            | ProviderId::Exa
             | ProviderId::Cosmic => None,
         }
     }

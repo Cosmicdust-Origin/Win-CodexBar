@@ -48,6 +48,7 @@ export const TEST_PROVIDER_CATALOG: Array<[string, string]> = [
   ["manus", "Manus"],
   ["mimo", "Xiaomi MiMo"],
   ["doubao", "Doubao"],
+  ["exa", "Exa"],
   ["commandcode", "Command Code"],
   ["cosmic", "Cosmic AI"],
   ["stepfun", "StepFun"],
@@ -91,6 +92,7 @@ export const TEST_PROVIDER_CATALOG: Array<[string, string]> = [
   ["raycast", "Raycast"],
   ["synthetic", "Synthetic"],
   ["sailresearch", "Sail Research"],
+  ["tavily", "Tavily"],
   ["clawrouter", "ClawRouter"],
   ["ibmbob", "IBM Bob"],
   ["langdock", "Langdock"],
@@ -98,4 +100,5 @@ export const TEST_PROVIDER_CATALOG: Array<[string, string]> = [
   ["lithosai", "LithosAI"],
   ["museai", "Muse (muse.ai)"],
   ["workbuddy", "WorkBuddy"],
+  ["xapi", "X API"],
 ];

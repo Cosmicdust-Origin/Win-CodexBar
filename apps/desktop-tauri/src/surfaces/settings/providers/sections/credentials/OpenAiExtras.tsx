@@ -103,6 +103,7 @@ const WORKSPACE_EXTRA_IDS: Record<string, true> = {
   xai: true,
   fireworks: true,
   gitkraken: true,
+  exa: true,
   cosmic: true,
 };
 
@@ -184,6 +185,13 @@ function extraConfig(providerId: string, t: Props["t"]) {
         label: "Organization ID (optional)",
         placeholder: "organization-id",
         help: "Adds the organization ID to shared-pool usage requests. Or set GITKRAKEN_ORG_ID.",
+      };
+    case "exa":
+      return {
+        title: t("ExaApiTitle"),
+        label: t("ExaApiKeyIdLabel"),
+        placeholder: t("ExaApiKeyIdPlaceholder"),
+        help: t("ExaApiKeyIdHelp"),
       };
     case "cosmic":
       return {

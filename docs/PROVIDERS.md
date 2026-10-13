@@ -378,6 +378,45 @@ Configure the API key in Settings → Providers → Sofya (or `SOFYA_API_KEY`).
 - Every non-200 status reports "Sofya returned HTTP <status>."; other account
   fields (email, API key, usernames) are never read or displayed.
 
+### Tavily
+
+Tavily reads `GET https://api.tavily.com/usage` with bearer authentication.
+Configure the API key in Settings → Providers → Tavily (or `TAVILY_API_KEY`).
+
+- The "Account plan" lane reads `account.plan_usage` / `account.plan_limit`.
+  The "API key" lane reads `key.usage` / `key.limit`. A null key limit means
+  Unlimited; zero limits and unlimited keys display their rows without a
+  usage percentage. Remaining credits are the nonnegative difference between
+  reported cap and usage.
+- Pay-as-you-go totals, when present (`account.paygo_usage` and
+  `account.paygo_limit`), appear in a separate detail section.
+- The plan name (`account.current_plan`) identifies the account plan. No email
+  or account ID is inferred; unknown plans do not create a phantom identity.
+- Non-200 responses report "Tavily returned HTTP <status>."; response bodies
+  are never echoed in errors.
+- Tavily limits the usage endpoint to 10 requests per 10 minutes. Keep
+  refreshes at least one minute apart and avoid repeated manual refreshes. A
+  throttled request fails as rate-limited without automatic replay.
+
+### Exa
+
+Exa reads selected API key monthly spend from `GET https://admin-api.exa.ai/team-management/api-keys/{id}/usage`
+with Team Management service key authentication (`x-api-key` header). Request dates are rounded down to whole
+seconds. Configure both the service key and the API key ID in Settings → Providers → Exa (or `EXA_SERVICE_KEY`
+and `EXA_API_KEY_ID`).
+
+- Exa requires Team Management API access, enabled per-team by Exa support (`support@exa.ai`). Create a service
+  account API key under **Service keys** on the API keys page; ordinary search API keys are not supported.
+- The scope field (API key ID) is the identifier of the API key whose spend you want to monitor, not its secret.
+  Both keys must belong to the same team. API key IDs reject empty strings and path normalization values ("." and "..").
+- The "Spend" lane shows selected-key month-to-date USD (UTC calendar month start to request time). Zero spend
+  stays visible. Window percentage is a placeholder; only the detail section is meaningful.
+- No team balance, allowance, reset date, or quota is inferred. Account history and burn-down widgets are
+  unavailable because the plugin does not expose a stable account identity. No browser cookies are imported.
+- 401 reports "Exa rejected the service key. Ordinary search API keys are not supported."; 403 reports "Exa Team
+  Management must be enabled and both keys must belong to the same team." Response bodies are never echoed in
+  errors. Malformed, nonfinite, negative, or period-mismatched spend values fail parsing.
+
 ### ClawRouter
 
 ClawRouter reports the monthly budget, spend and routed-provider usage of one
@@ -416,6 +455,32 @@ portal in Settings → Providers → IBM Bob, as token accounts, or with
   with its plan, and the plan names are shown as the organization.
 - 401 and 403 report that the key was rejected; response bodies are never
   echoed in errors.
+
+### X API prepaid credits
+
+X API is disabled by default and reads prepaid credit balances from the X
+(Twitter) API console. Sign in to console.x.com in your browser, and CodexBar
+will read the `auth_token` and `ct0` cookies from that session.
+
+- **Automatic:** A previously imported Cookie header is used on its own.
+  Otherwise CodexBar tries each detected browser (Chrome, Edge, Brave,
+  Firefox) holding both cookies. If a browser session expires (401), it moves
+  to the next browser. No session means sign in to console.x.com.
+- **Manual:** Paste the Cookie header from a console.x.com request (with
+  `auth_token` and `ct0`). Manual mode does not fall back to browser sessions.
+- **Off:** Cookies are disabled.
+
+The primary lane shows the balance (paid + free credits). Details rows show:
+- Balance (total: paid + free)
+- Purchased credits
+- Free credits
+
+Balance is a prepaid meter (no quota percentage); costs are always zero (no
+usage tracking available). The provider reports identity as "Browser session".
+Cost resets are never inferred. Session rotation on 401 is implemented: sessions
+are tried in browser order, stale sessions are skipped, and a missing session
+after all attempts triggers "sign in to console.x.com". Errors never echo
+response bodies.
 
 ### Cosmic AI
 

@@ -33,6 +33,7 @@ import zenmux from "./icons/ProviderIcon-zenmux.svg?raw";
 import deepseek from "./icons/ProviderIcon-deepseek.svg?raw";
 import doubao from "./icons/ProviderIcon-doubao.svg?raw";
 import elevenlabs from "./icons/ProviderIcon-elevenlabs.svg?raw";
+import exa from "./icons/ProviderIcon-exa.svg?raw";
 import factory from "./icons/ProviderIcon-factory.svg?raw";
 import gemini from "./icons/ProviderIcon-gemini.svg?raw";
 import grok from "./icons/ProviderIcon-grok.svg?raw";
@@ -59,6 +60,7 @@ import notion from "./icons/ProviderIcon-notion.svg?raw";
 import nous from "./icons/ProviderIcon-nous.svg?raw";
 import workbuddy from "./icons/ProviderIcon-workbuddy.svg?raw";
 import xai from "./icons/ProviderIcon-xai.svg?raw";
+import xapi from "./icons/ProviderIcon-xapi.svg?raw";
 import xkiro from "./icons/ProviderIcon-xkiro.svg?raw";
 import ollama from "./icons/ProviderIcon-ollama.svg?raw";
 import opencode from "./icons/ProviderIcon-opencode.svg?raw";
@@ -74,6 +76,7 @@ import sofya from "./icons/ProviderIcon-sofya.svg?raw";
 import stepfun from "./icons/ProviderIcon-stepfun.svg?raw";
 import sub2api from "./icons/ProviderIcon-sub2api.svg?raw";
 import synthetic from "./icons/ProviderIcon-synthetic.svg?raw";
+import tavily from "./icons/ProviderIcon-tavily.svg?raw";
 import clawrouter from "./icons/ProviderIcon-clawrouter.svg?raw";
 import t3chat from "./icons/ProviderIcon-t3chat.svg?raw";
 import tinyapi from "./icons/ProviderIcon-tinyapi.svg?raw";
@@ -139,6 +142,7 @@ const RAW: Record<string, string> = {
   deepseek: tint(deepseek),
   doubao: tint(doubao),
   elevenlabs: tint(elevenlabs),
+  exa: tint(exa),
   factory: tint(factory),
   gemini: tint(gemini),
   grok: tint(grok),
@@ -161,6 +165,7 @@ const RAW: Record<string, string> = {
   notion: tint(notion),
   nous: tint(nous),
   xai: tint(xai),
+  xapi: tint(xapi),
   xkiro: tint(xkiro),
   mistral: tint(mistral),
   muse: tint(muse),
@@ -180,6 +185,7 @@ const RAW: Record<string, string> = {
   stepfun: tint(stepfun),
   sub2api: tint(sub2api),
   synthetic: tint(synthetic),
+  tavily: tint(tavily),
   clawrouter: tint(clawrouter),
   t3chat: tint(t3chat),
   tinyapi: tint(tinyapi),
@@ -266,6 +272,7 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   manus:       { id: "manus",       brandColor: "#34322d", fallbackLetter: "M", svgPath: RAW.manus },
   mimo:        { id: "mimo",        brandColor: "#ff6900", fallbackLetter: "M", svgPath: RAW.mimo },
   doubao:      { id: "doubao",      brandColor: "#3370ff", fallbackLetter: "D", svgPath: RAW.doubao },
+  exa:         { id: "exa",         brandColor: "#0143D9", fallbackLetter: "E", svgPath: RAW.exa },
   commandcode: { id: "commandcode", brandColor: "#8c4edd", fallbackLetter: "C", svgPath: RAW.commandcode },
   crossmodel:  { id: "crossmodel",  brandColor: "#c084fc", fallbackLetter: "X", svgPath: RAW.crossmodel },
   qoder:       { id: "qoder",       brandColor: "#10b981", fallbackLetter: "Q", svgPath: RAW.qoder },
@@ -280,6 +287,7 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   venice:      { id: "venice",      brandColor: "#3c8fdd", fallbackLetter: "V", svgPath: RAW.venice },
   vercel:      { id: "vercel",      brandColor: "#737373", fallbackLetter: "V", svgPath: RAW.vercel },
   synthetic:   { id: "synthetic",   brandColor: "#141414", fallbackLetter: "S", svgPath: RAW.synthetic },
+  tavily:      { id: "tavily",      brandColor: "#0F766E", fallbackLetter: "T", svgPath: RAW.tavily },
   clawrouter:  { id: "clawrouter",  brandColor: "#596EF6", fallbackLetter: "C", svgPath: RAW.clawrouter },
   ibmbob:      { id: "ibmbob",      brandColor: "#0E61FA", fallbackLetter: "B", svgPath: RAW.ibmbob },
   langdock:    { id: "langdock",    brandColor: "#5A4AE7", fallbackLetter: "L", svgPath: RAW.langdock },
@@ -297,6 +305,7 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   notion:      { id: "notion",      brandColor: "#337EA9", fallbackLetter: "N", svgPath: RAW.notion },
   nous:        { id: "nous",        brandColor: "#D6A55C", fallbackLetter: "N", svgPath: RAW.nous },
   xai:         { id: "xai",         brandColor: "#8e8e93", fallbackLetter: "X", svgPath: RAW.xai },
+  xapi:        { id: "xapi",        brandColor: "#71767B", fallbackLetter: "X", svgPath: RAW.xapi },
   xkiro:       { id: "xkiro",       brandColor: "#52c99b", fallbackLetter: "X", svgPath: RAW.xkiro },
   meta:        { id: "meta",        brandColor: "#0467DF", fallbackLetter: "M", svgPath: RAW.meta },
 };
