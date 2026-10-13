@@ -14,7 +14,7 @@ use crate::core::{
     FetchContext, Provider, ProviderDisplayDetail, ProviderError, ProviderFetchResult, ProviderId,
     ProviderMetadata, ProviderStateKind, RateWindow, SourceMode, UsageSnapshot,
 };
-use crate::providers::read_bounded_response;
+use crate::providers::{BoundedBodyError, read_bounded_response};
 
 const USAGE_URL: &str = "https://api.sailresearch.com/v2/usage/summary?range=30d";
 const CREDENTIAL_TARGET: &str = "codexbar-sailresearch";
@@ -91,10 +91,11 @@ impl SailResearchProvider {
 
         let body = read_bounded_response(response, MAX_RESPONSE_BYTES)
             .await
-            .map_err(|_| {
-                ProviderError::Other(
+            .map_err(|error| match error {
+                BoundedBodyError::TooLarge => ProviderError::Other(
                     "Sail Research returned an unrecognized billing summary.".into(),
-                )
+                ),
+                BoundedBodyError::Read(error) => ProviderError::from(error),
             })?;
 
         let data: Value = serde_json::from_slice(&body).map_err(|_| {
