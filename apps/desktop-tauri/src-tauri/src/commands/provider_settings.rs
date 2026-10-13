@@ -256,6 +256,7 @@ fn cookie_source_provider(provider_id: &str) -> Option<codexbar::core::ProviderI
         "lithosai" => ProviderId::LithosAI,
         "langdock" => ProviderId::Langdock,
         "tinyapi" => ProviderId::TinyApi,
+        "xapi" => ProviderId::Xapi,
         _ => return None,
     })
 }
@@ -896,6 +897,13 @@ pub fn cookie_source_options_for(provider_id: &str, lang: Language) -> Vec<Cooki
         // Upstream's TinyApi cookie source: automatic browser import,
         // a pasted header, or off.
         "tinyapi" => vec![
+            cookie_option(lang, "auto", None),
+            cookie_option(lang, "manual", None),
+            cookie_option(lang, "off", None),
+        ],
+        // X API cookie source: automatic browser import,
+        // a pasted header, or off.
+        "xapi" => vec![
             cookie_option(lang, "auto", None),
             cookie_option(lang, "manual", None),
             cookie_option(lang, "off", None),

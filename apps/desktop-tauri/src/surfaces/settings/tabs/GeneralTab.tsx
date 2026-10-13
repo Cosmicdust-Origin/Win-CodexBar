@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale } from "../../../hooks/useLocale";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -168,15 +168,33 @@ export default function GeneralTab({
       .catch(() => {}); // version row degrades to absent, never blocks the tab
   }, []);
 
+  const soundPreviewTimeoutRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (soundPreviewTimeoutRef.current !== null) {
+        window.clearTimeout(soundPreviewTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
   const handleTestSound = useCallback((event: NotificationSoundEvent) => {
     setSoundError(null);
     setPlayingSound(event);
-    const timeoutId = window.setTimeout(
-      () => setPlayingSound(null),
-      NOTIFICATION_SOUND_PREVIEW_DURATION_MS,
-    );
+    if (soundPreviewTimeoutRef.current !== null) {
+      window.clearTimeout(soundPreviewTimeoutRef.current);
+    }
+    const timeoutId = window.setTimeout(() => {
+      soundPreviewTimeoutRef.current = null;
+      setPlayingSound(null);
+    }, NOTIFICATION_SOUND_PREVIEW_DURATION_MS);
+    soundPreviewTimeoutRef.current = timeoutId;
     void playNotificationSound(event).catch((error: unknown) => {
       window.clearTimeout(timeoutId);
+      if (soundPreviewTimeoutRef.current === timeoutId) {
+        soundPreviewTimeoutRef.current = null;
+      }
       setPlayingSound(null);
       setSoundError(error instanceof Error ? error.message : String(error));
     });
