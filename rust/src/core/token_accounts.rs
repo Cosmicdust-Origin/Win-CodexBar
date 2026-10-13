@@ -450,7 +450,8 @@ impl TokenAccountSupport {
             | ProviderId::Linkup
             | ProviderId::MuseAI
             | ProviderId::WorkBuddy
-            | ProviderId::SailResearch => None,
+            | ProviderId::SailResearch
+            | ProviderId::Sofya => None,
         }
     }
 

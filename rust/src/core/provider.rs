@@ -77,6 +77,7 @@ pub enum ProviderId {
     Qoder,
     CodeBuddy,
     Sakana,
+    Sofya,
     Sub2Api,
     Wayfinder,
     ZenMux,
@@ -182,6 +183,7 @@ impl ProviderId {
             ProviderId::Qoder,
             ProviderId::CodeBuddy,
             ProviderId::Sakana,
+            ProviderId::Sofya,
             ProviderId::Sub2Api,
             ProviderId::Wayfinder,
             ProviderId::ZenMux,
@@ -308,6 +310,7 @@ impl ProviderId {
             ProviderId::Qoder => "qoder",
             ProviderId::CodeBuddy => "codebuddy",
             ProviderId::Sakana => "sakana",
+            ProviderId::Sofya => "sofya",
             ProviderId::Sub2Api => "sub2api",
             ProviderId::Wayfinder => "wayfinder",
             ProviderId::ZenMux => "zenmux",
@@ -414,6 +417,7 @@ impl ProviderId {
             ProviderId::Qoder => "Qoder",
             ProviderId::CodeBuddy => "CodeBuddy",
             ProviderId::Sakana => "Sakana AI",
+            ProviderId::Sofya => "Sofya",
             ProviderId::Sub2Api => "sub2api",
             ProviderId::Wayfinder => "Wayfinder",
             ProviderId::ZenMux => "ZenMux",
@@ -466,6 +470,7 @@ impl ProviderId {
             ProviderId::Qoder => Some("qoder.com"),
             ProviderId::CodeBuddy => Some("codebuddy.cn"),
             ProviderId::Sakana => Some("console.sakana.ai"),
+            ProviderId::Sofya => None,
             ProviderId::LongCat => Some("longcat.chat"),
             ProviderId::Replicate => Some("replicate.com"),
             ProviderId::AtlasCloud => None,
@@ -652,6 +657,7 @@ impl ProviderId {
                 Some(ProviderId::CodeBuddy)
             }
             "sakana" | "sakana-ai" | "sakana ai" => Some(ProviderId::Sakana),
+            "sofya" => Some(ProviderId::Sofya),
             "sub2api" | "sub-2-api" | "sub 2 api" => Some(ProviderId::Sub2Api),
             "wayfinder" => Some(ProviderId::Wayfinder),
             "zenmux" | "zen-mux" => Some(ProviderId::ZenMux),
@@ -1275,6 +1281,7 @@ pub fn cli_name_map() -> HashMap<&'static str, ProviderId> {
     map.insert("llm-proxy", ProviderId::LLMProxy);
     map.insert("cross-model", ProviderId::CrossModel);
     map.insert("sakana-ai", ProviderId::Sakana);
+    map.insert("sofya", ProviderId::Sofya);
     map.insert("sub-2-api", ProviderId::Sub2Api);
     map.insert("notion-ai", ProviderId::Notion);
     map.insert("notionai", ProviderId::Notion);
@@ -1357,6 +1364,7 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::Qoder => "#10B981",
         ProviderId::CodeBuddy => "#0052D9",
         ProviderId::Sakana => "#2975DB",
+        ProviderId::Sofya => "#B0B820",
         ProviderId::Sub2Api => "#14B8A6",
         ProviderId::Wayfinder => "#10A37F",
         ProviderId::ZenMux => "#6C5CE7",
@@ -1408,7 +1416,7 @@ mod tests {
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 98);
+        assert_eq!(all.len(), 99);
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Pi));
@@ -1454,6 +1462,7 @@ mod tests {
         assert!(all.contains(&ProviderId::Qoder));
         assert!(all.contains(&ProviderId::CodeBuddy));
         assert!(all.contains(&ProviderId::Sakana));
+        assert!(all.contains(&ProviderId::Sofya));
         assert!(all.contains(&ProviderId::Sub2Api));
         assert!(all.contains(&ProviderId::Wayfinder));
         assert!(all.contains(&ProviderId::ZenMux));
