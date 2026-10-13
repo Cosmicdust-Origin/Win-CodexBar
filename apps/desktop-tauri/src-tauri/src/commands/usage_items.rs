@@ -133,6 +133,28 @@ pub(crate) fn usage_item_descriptors(
         }
     }
 
+    // A card-hidden window is never drawn as a row, so neither a live toggle
+    // nor a saved-ID placeholder for it would control anything. Marking it
+    // seen suppresses both; windows absent from the snapshot keep placeholders.
+    if let Some(snapshot) = snapshot {
+        let windows = [
+            ("primary", Some(&snapshot.primary)),
+            ("secondary", snapshot.secondary.as_ref()),
+            ("model-specific", snapshot.model_specific.as_ref()),
+            ("tertiary", snapshot.tertiary.as_ref()),
+        ];
+        for (raw_id, window) in windows {
+            if window.is_some_and(|w| w.hidden_on_card) {
+                seen.insert(usage_item_id(raw_id));
+            }
+        }
+        for extra in &snapshot.extra_rate_windows {
+            if extra.window.hidden_on_card {
+                seen.insert(usage_item_id(&format!("extra-{}", extra.id)));
+            }
+        }
+    }
+
     let mut push = |raw_id: &str, title: &str, available: bool| {
         let id = usage_item_id(raw_id);
         if seen.insert(id.clone()) {
@@ -150,21 +172,13 @@ pub(crate) fn usage_item_descriptors(
     };
 
     if let Some(snapshot) = snapshot {
-        // A card-hidden window is never drawn as a row, so a visibility
-        // toggle for it would control nothing.
-        if !snapshot.primary.hidden_on_card {
-            let session = locale::get_text(lang, LocaleKey::ProviderSessionLabel);
-            push(
-                "primary",
-                snapshot.primary_label.as_deref().unwrap_or(&session),
-                true,
-            );
-        }
-        if snapshot
-            .secondary
-            .as_ref()
-            .is_some_and(|w| !w.hidden_on_card)
-        {
+        let session = locale::get_text(lang, LocaleKey::ProviderSessionLabel);
+        push(
+            "primary",
+            snapshot.primary_label.as_deref().unwrap_or(&session),
+            true,
+        );
+        if snapshot.secondary.is_some() {
             let weekly = locale::get_text(lang, LocaleKey::ProviderWeeklyLabel);
             push(
                 "secondary",
@@ -172,19 +186,11 @@ pub(crate) fn usage_item_descriptors(
                 true,
             );
         }
-        if snapshot
-            .model_specific
-            .as_ref()
-            .is_some_and(|w| !w.hidden_on_card)
-        {
+        if snapshot.model_specific.is_some() {
             let model = locale::get_text(lang, LocaleKey::DetailWindowModelSpecific);
             push("model-specific", &model, true);
         }
-        if snapshot
-            .tertiary
-            .as_ref()
-            .is_some_and(|w| !w.hidden_on_card)
-        {
+        if snapshot.tertiary.is_some() {
             let tertiary = locale::get_text(lang, LocaleKey::DetailWindowTertiary);
             push(
                 "tertiary",
@@ -192,11 +198,7 @@ pub(crate) fn usage_item_descriptors(
                 true,
             );
         }
-        for extra in snapshot
-            .extra_rate_windows
-            .iter()
-            .filter(|extra| !extra.window.hidden_on_card)
-        {
+        for extra in &snapshot.extra_rate_windows {
             push(&format!("extra-{}", extra.id), &extra.title, true);
         }
     }
