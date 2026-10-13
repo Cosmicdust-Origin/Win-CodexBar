@@ -11,6 +11,7 @@ use crate::providers::ClawRouterProvider;
 use crate::providers::ExaProvider;
 use crate::providers::IBMBobProvider;
 use crate::providers::LangdockProvider;
+use crate::providers::LinkupProvider;
 use crate::providers::LithosAIProvider;
 use crate::providers::MuseAIProvider;
 use crate::providers::SyntheticProvider;
@@ -30,10 +31,11 @@ use crate::providers::{
     MistralProvider, MuseProvider, NanoGPTProvider, NeuralwattProvider, NotionProvider,
     NousProvider, OllamaProvider, OpenAIApiProvider, OpenCodeGoProvider, OpenCodeProvider,
     OpenRouterProvider, PerplexityProvider, PiProvider, PoeProvider, QoderProvider,
-    QwenCloudProvider, RaycastProvider, ReplicateProvider, SakanaProvider, StepFunProvider,
-    Sub2ApiProvider, T3ChatProvider, TypeSafeProvider, V0Provider, VeniceProvider, VercelProvider,
-    VertexAIProvider, WarpProvider, WayfinderProvider, WindsurfProvider, XKiroProvider,
-    XaiProvider, ZaiProvider, ZedProvider, ZenMuxProvider, ZoomMateProvider,
+    QwenCloudProvider, RaycastProvider, ReplicateProvider, SailResearchProvider, SakanaProvider,
+    SofyaProvider, StepFunProvider, Sub2ApiProvider, T3ChatProvider, TinyApiProvider,
+    TypeSafeProvider, V0Provider, VeniceProvider, VercelProvider, VertexAIProvider, WarpProvider,
+    WayfinderProvider, WindsurfProvider, XKiroProvider, XaiProvider, ZaiProvider, ZedProvider,
+    ZenMuxProvider, ZoomMateProvider,
 };
 
 /// Instantiate the concrete [`Provider`] implementation for a given [`ProviderId`].
@@ -54,6 +56,7 @@ pub fn instantiate(id: ProviderId) -> Box<dyn Provider> {
         ProviderId::ClawRouter => Box::new(ClawRouterProvider::new()),
         ProviderId::IBMBob => Box::new(IBMBobProvider::new()),
         ProviderId::Langdock => Box::new(LangdockProvider::new()),
+        ProviderId::Linkup => Box::new(LinkupProvider::new()),
         ProviderId::LithosAI => Box::new(LithosAIProvider::new()),
         ProviderId::MuseAI => Box::new(MuseAIProvider::new()),
         ProviderId::WorkBuddy => Box::new(WorkBuddyProvider::new()),
@@ -105,6 +108,7 @@ pub fn instantiate(id: ProviderId) -> Box<dyn Provider> {
         ProviderId::HuggingFace => Box::new(HuggingFaceProvider::new()),
         ProviderId::Helmcode => Box::new(HelmcodeProvider::new()),
         ProviderId::V0 => Box::new(V0Provider::new()),
+        ProviderId::TinyApi => Box::new(TinyApiProvider::new()),
         ProviderId::TypeSafe => Box::new(TypeSafeProvider::new()),
         ProviderId::LLMProxy => Box::new(LLMProxyProvider::new()),
         ProviderId::Chutes => Box::new(ChutesProvider::new()),
@@ -116,6 +120,7 @@ pub fn instantiate(id: ProviderId) -> Box<dyn Provider> {
         ProviderId::Qoder => Box::new(QoderProvider::new()),
         ProviderId::CodeBuddy => Box::new(CodeBuddyProvider::new()),
         ProviderId::Sakana => Box::new(SakanaProvider::new()),
+        ProviderId::Sofya => Box::new(SofyaProvider::new()),
         ProviderId::Sub2Api => Box::new(Sub2ApiProvider::new()),
         ProviderId::Wayfinder => Box::new(WayfinderProvider::new()),
         ProviderId::ZenMux => Box::new(ZenMuxProvider::new()),
@@ -125,6 +130,7 @@ pub fn instantiate(id: ProviderId) -> Box<dyn Provider> {
         ProviderId::ZoomMate => Box::new(ZoomMateProvider::new()),
         ProviderId::QwenCloud => Box::new(QwenCloudProvider::new()),
         ProviderId::Replicate => Box::new(ReplicateProvider::new()),
+        ProviderId::SailResearch => Box::new(SailResearchProvider::new()),
         ProviderId::Notion => Box::new(NotionProvider::new()),
         ProviderId::Xai => Box::new(XaiProvider::new()),
         ProviderId::Fireworks => Box::new(FireworksProvider::new()),
@@ -175,6 +181,7 @@ pub fn pace_capability(id: ProviderId) -> ProviderPaceCapability {
         | ProviderId::ClawRouter
         | ProviderId::IBMBob
         | ProviderId::Langdock
+        | ProviderId::Linkup
         | ProviderId::LithosAI
         | ProviderId::MuseAI
         | ProviderId::WorkBuddy
@@ -214,6 +221,7 @@ pub fn pace_capability(id: ProviderId) -> ProviderPaceCapability {
         | ProviderId::HuggingFace
         | ProviderId::Helmcode
         | ProviderId::V0
+        | ProviderId::TinyApi
         | ProviderId::TypeSafe
         | ProviderId::LLMProxy
         | ProviderId::Chutes
@@ -225,6 +233,7 @@ pub fn pace_capability(id: ProviderId) -> ProviderPaceCapability {
         | ProviderId::Qoder
         | ProviderId::CodeBuddy
         | ProviderId::Sakana
+        | ProviderId::Sofya
         | ProviderId::Sub2Api
         | ProviderId::Wayfinder
         | ProviderId::ZenMux
@@ -234,6 +243,7 @@ pub fn pace_capability(id: ProviderId) -> ProviderPaceCapability {
         | ProviderId::ZoomMate
         | ProviderId::QwenCloud
         | ProviderId::Replicate
+        | ProviderId::SailResearch
         | ProviderId::Xai
         | ProviderId::Fireworks
         | ProviderId::Meta
