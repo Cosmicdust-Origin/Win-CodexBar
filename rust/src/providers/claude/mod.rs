@@ -39,6 +39,18 @@ use cli_reset::{
     parse_percent_line, starts_next_usage_section,
 };
 
+/// Limit reset detection (upstream `UsageStore+LimitResetCelebration.swift`):
+/// after a weekly reset, two above-threshold samples must confirm recovery
+/// before the lane re-arms, and identity-less samples need a second low sample.
+pub(crate) const LIMIT_RESET_POLICY: crate::core::ProviderLimitResetPolicy =
+    crate::core::ProviderLimitResetPolicy {
+        supported: true,
+        weekly: crate::core::WeeklyResetRule::RecoveryObservations { count: 2 },
+        missing_identity: crate::core::MissingIdentityRule::Track {
+            requires_low_confirmation: true,
+        },
+    };
+
 // ── Upstream 0.50.1 #2516: CLI usage-result cache ────────────────────────────
 //
 // When token rotation revokes OAuth access, the auto path falls back to the

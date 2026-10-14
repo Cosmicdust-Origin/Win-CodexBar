@@ -84,6 +84,7 @@ const ALLOWED_PREFERENCES: &[(&str, Validator)] = &[
     ("high_usage_threshold", percent),
     ("critical_usage_threshold", percent),
     ("predictive_pace_warning_enabled", typed::<bool>),
+    ("limit_reset_notifications_enabled", typed::<bool>),
     ("show_pace", typed::<bool>),
     ("show_as_used", typed::<bool>),
     ("reset_time_relative", typed::<bool>),

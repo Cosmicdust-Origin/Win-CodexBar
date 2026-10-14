@@ -591,6 +591,12 @@ impl ProviderId {
         super::provider_factory::pace_capability(*self)
     }
 
+    /// Limit reset detector rule. Each provider declares its rule in its own
+    /// module; the dispatch lives in `provider_factory::limit_reset_policy`.
+    pub fn limit_reset_policy(&self) -> super::ProviderLimitResetPolicy {
+        super::provider_factory::limit_reset_policy(*self)
+    }
+
     /// Parse from CLI name string
     pub fn from_cli_name(name: &str) -> Option<Self> {
         match name.to_lowercase().as_str() {

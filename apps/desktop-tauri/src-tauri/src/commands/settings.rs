@@ -28,6 +28,7 @@ pub struct SettingsUpdate {
     pub provider_quota_warnings:
         Option<std::collections::HashMap<String, codexbar::settings::ProviderQuotaWarnings>>,
     pub predictive_pace_warning_enabled: Option<bool>,
+    pub limit_reset_notifications_enabled: Option<bool>,
     pub credential_expiry_notifications_enabled: Option<bool>,
     pub session_quota_notifications_enabled: Option<bool>,
     pub show_pace: Option<bool>,
@@ -429,6 +430,9 @@ impl SettingsUpdate {
         if let Some(v) = self.predictive_pace_warning_enabled {
             settings.predictive_pace_warning_enabled = v;
         }
+        if let Some(v) = self.limit_reset_notifications_enabled {
+            settings.limit_reset_notifications_enabled = v;
+        }
         if let Some(v) = self.credential_expiry_notifications_enabled {
             settings.credential_expiry_notifications_enabled = v;
         }
@@ -715,6 +719,7 @@ pub async fn update_settings(
     let tray_panel_always_on_top_changed = patch.tray_panel_always_on_top.is_some();
     let previous_promoted = settings.promote_tray_icon;
     let previous_language = settings.ui_language;
+    let previous_limit_reset = settings.limit_reset_notifications_enabled;
     let status_targets_changed =
         patch.status_checks_enabled.is_some() || patch.enabled_providers.is_some();
 
@@ -727,6 +732,18 @@ pub async fn update_settings(
 
     settings.save().map_err(|e| e.to_string())?;
     drop(write_guard);
+    if previous_limit_reset && !settings.limit_reset_notifications_enabled {
+        // The next refresh batch also clears it; doing it here forgets the
+        // saved reset state even if the app quits before that refresh.
+        let removal = app
+            .state::<Mutex<AppState>>()
+            .lock()
+            .ok()
+            .and_then(|mut guard| guard.notification_manager.clear_limit_reset_state());
+        if let Some(removal) = removal {
+            removal.apply();
+        }
+    }
     if clear_local_usage_cache {
         crate::commands::clear_provider_local_usage_cache();
     }
@@ -1454,5 +1471,25 @@ mod tests {
         assert_eq!(map["previous"], "left");
         assert_eq!(map["select9"], "ctrl+9");
         assert_eq!(map.as_object().unwrap().len(), 11);
+    }
+
+    #[test]
+    fn limit_reset_toggle_travels_through_patch_and_snapshot() {
+        let snapshot = |settings: &Settings| {
+            serde_json::to_value(super::super::bridge::SettingsSnapshot::from(
+                settings.clone(),
+            ))
+            .unwrap()["limitResetNotificationsEnabled"]
+                .clone()
+        };
+        let mut settings = Settings::default();
+        assert_eq!(snapshot(&settings), serde_json::Value::Bool(false));
+
+        serde_json::from_str::<SettingsUpdate>(r#"{"limitResetNotificationsEnabled":true}"#)
+            .unwrap()
+            .apply_to(&mut settings)
+            .unwrap();
+        assert!(settings.limit_reset_notifications_enabled);
+        assert_eq!(snapshot(&settings), serde_json::Value::Bool(true));
     }
 }

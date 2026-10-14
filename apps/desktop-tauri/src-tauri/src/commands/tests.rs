@@ -2796,3 +2796,138 @@ fn other_providers_never_request_the_muse_browser_import() {
 
     assert!(!ctx.browser_cookie_import);
 }
+
+fn limit_reset_snapshot() -> ProviderUsageSnapshot {
+    let metadata = instantiate_provider(ProviderId::Codex).metadata().clone();
+    let result = ProviderFetchResult {
+        usage: codexbar::core::UsageSnapshot::new(codexbar::core::RateWindow::new(10.0)),
+        cost: None,
+        wayfinder_usage: None,
+        open_ai_api_usage: None,
+        inventory: Vec::new(),
+        reset_credits: None,
+        display_details: Vec::new(),
+        source_label: "OAuth".to_string(),
+        has_successful_claude_cli_quota: false,
+        pace_authoritative: true,
+        account_identity: None,
+        last_good_owner: None,
+    };
+    let mut snapshot =
+        ProviderUsageSnapshot::from_fetch_result(ProviderId::Codex, &metadata, &result, None, None);
+    snapshot.updated_at = "2026-05-01T12:00:00Z".to_string();
+    snapshot.account_email = Some("owner@example.com".to_string());
+    snapshot.primary.window_minutes = Some(300);
+    snapshot.primary.resets_at = Some("2026-05-01T15:00:00Z".to_string());
+    let mut weekly = snapshot.primary.clone();
+    weekly.used_percent = 40.0;
+    weekly.window_minutes = Some(10080);
+    weekly.resets_at = Some("2026-05-07T00:00:00Z".to_string());
+    snapshot.secondary = Some(weekly);
+    snapshot
+}
+
+fn limit_reset_identity(
+    snapshot: &ProviderUsageSnapshot,
+    token_account_id: Option<uuid::Uuid>,
+) -> super::warning_identity::WarningIdentity {
+    super::warning_identity::WarningIdentity::new(
+        ProviderId::Codex,
+        &snapshot.source_label,
+        snapshot.account_email.as_deref(),
+        snapshot.account_organization.as_deref(),
+        token_account_id,
+    )
+}
+
+#[test]
+fn limit_reset_sample_observes_session_and_weekly_lanes() {
+    let snapshot = limit_reset_snapshot();
+    let identity = limit_reset_identity(&snapshot, None);
+    let sample = super::providers::limit_reset_sample(
+        ProviderId::Codex,
+        &snapshot,
+        &identity,
+        None,
+        "owner@example.com",
+        &Settings::default(),
+    );
+
+    let observed_at = chrono::DateTime::parse_from_rfc3339("2026-05-01T12:00:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+    let session = sample.session.expect("session observed");
+    assert_eq!(session.used_percent, 10.0);
+    assert_eq!(session.observed_at, observed_at);
+    assert_eq!(
+        session.reset_boundary,
+        Some(
+            chrono::DateTime::parse_from_rfc3339("2026-05-01T15:00:00Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc)
+        )
+    );
+    assert_eq!(sample.weekly.expect("weekly observed").used_percent, 40.0);
+    assert_eq!(sample.session_transition_account, "owner@example.com");
+    let account = sample.account.expect("owner account");
+    assert_eq!(account.key, "owner@example.com");
+    assert_eq!(account.label.as_deref(), Some("owner@example.com"));
+}
+
+#[test]
+fn limit_reset_sample_skips_non_reset_lanes() {
+    let mut snapshot = limit_reset_snapshot();
+    snapshot.primary.window_minutes = Some(1440);
+    if let Some(weekly) = snapshot.secondary.as_mut() {
+        weekly.is_informational = true;
+    }
+    let identity = limit_reset_identity(&snapshot, None);
+    let sample = super::providers::limit_reset_sample(
+        ProviderId::Codex,
+        &snapshot,
+        &identity,
+        None,
+        "",
+        &Settings::default(),
+    );
+    assert!(sample.session.is_none());
+    assert!(sample.weekly.is_none());
+
+    let mut snapshot = limit_reset_snapshot();
+    snapshot.updated_at = "not a date".to_string();
+    let identity = limit_reset_identity(&snapshot, None);
+    let sample = super::providers::limit_reset_sample(
+        ProviderId::Codex,
+        &snapshot,
+        &identity,
+        None,
+        "",
+        &Settings::default(),
+    );
+    assert!(sample.session.is_none());
+    assert!(sample.weekly.is_none());
+}
+
+#[test]
+fn limit_reset_sample_prefers_token_label_and_hides_personal_info() {
+    let snapshot = limit_reset_snapshot();
+    let identity = limit_reset_identity(&snapshot, Some(uuid::Uuid::nil()));
+    let label = |settings: &Settings| {
+        super::providers::limit_reset_sample(
+            ProviderId::Codex,
+            &snapshot,
+            &identity,
+            Some("Work"),
+            "",
+            settings,
+        )
+        .account
+        .and_then(|account| account.label)
+    };
+    assert_eq!(label(&Settings::default()).as_deref(), Some("Work"));
+    let hidden = Settings {
+        hide_personal_info: true,
+        ..Settings::default()
+    };
+    assert_eq!(label(&hidden), None);
+}

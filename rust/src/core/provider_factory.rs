@@ -5,7 +5,7 @@
 //! only requires editing `ProviderId`, the matching `providers/` module, and
 //! this one match arm.
 
-use super::{Provider, ProviderId, ProviderPaceCapability};
+use super::{Provider, ProviderId, ProviderLimitResetPolicy, ProviderPaceCapability};
 use crate::providers::AerostackProvider;
 use crate::providers::AtlasCloudProvider;
 use crate::providers::ClawRouterProvider;
@@ -269,6 +269,120 @@ pub fn pace_capability(id: ProviderId) -> ProviderPaceCapability {
     }
 }
 
+/// Limit reset detector rule declared by each provider's module. Exhaustive
+/// over [`ProviderId`]: a new variant is a compile error until it is listed
+/// here, and providers without a specific rule map to
+/// [`ProviderLimitResetPolicy::DEFAULT`].
+pub fn limit_reset_policy(id: ProviderId) -> ProviderLimitResetPolicy {
+    use crate::providers as p;
+    match id {
+        ProviderId::Claude => p::claude::LIMIT_RESET_POLICY,
+        ProviderId::Codex => p::codex::LIMIT_RESET_POLICY,
+        ProviderId::TinyApi => p::tinyapi::LIMIT_RESET_POLICY,
+        ProviderId::Xapi => p::xapi::LIMIT_RESET_POLICY,
+        ProviderId::Langdock => p::langdock::LIMIT_RESET_POLICY,
+        ProviderId::Exa => p::exa::LIMIT_RESET_POLICY,
+        ProviderId::Copilot
+        | ProviderId::Cursor
+        | ProviderId::Grok
+        | ProviderId::Kimi
+        | ProviderId::Zai
+        | ProviderId::Amp
+        | ProviderId::Alibaba
+        | ProviderId::AlibabaTokenPlan
+        | ProviderId::CommandCode
+        | ProviderId::Doubao
+        | ProviderId::MiMo
+        | ProviderId::StepFun
+        | ProviderId::Notion
+        | ProviderId::Ollama
+        | ProviderId::OpenCodeGo
+        | ProviderId::Pi
+        | ProviderId::Gemini
+        | ProviderId::Antigravity
+        | ProviderId::AtlasCloud
+        | ProviderId::Synthetic
+        | ProviderId::ClawRouter
+        | ProviderId::IBMBob
+        | ProviderId::Linkup
+        | ProviderId::LithosAI
+        | ProviderId::MuseAI
+        | ProviderId::WorkBuddy
+        | ProviderId::Tavily
+        | ProviderId::Factory
+        | ProviderId::Kiro
+        | ProviderId::VertexAI
+        | ProviderId::Augment
+        | ProviderId::MiniMax
+        | ProviderId::OpenCode
+        | ProviderId::KimiK2
+        | ProviderId::Warp
+        | ProviderId::AzureOpenAI
+        | ProviderId::T3Chat
+        | ProviderId::OpenRouter
+        | ProviderId::JetBrains
+        | ProviderId::NanoGPT
+        | ProviderId::Infini
+        | ProviderId::Perplexity
+        | ProviderId::Abacus
+        | ProviderId::Mistral
+        | ProviderId::Kilo
+        | ProviderId::Bedrock
+        | ProviderId::Codebuff
+        | ProviderId::CodeRabbit
+        | ProviderId::DeepSeek
+        | ProviderId::DeepInfra
+        | ProviderId::AiAnd
+        | ProviderId::Windsurf
+        | ProviderId::Manus
+        | ProviderId::Venice
+        | ProviderId::OpenAIApi
+        | ProviderId::ElevenLabs
+        | ProviderId::Deepgram
+        | ProviderId::Groq
+        | ProviderId::HuggingFace
+        | ProviderId::Helmcode
+        | ProviderId::V0
+        | ProviderId::TypeSafe
+        | ProviderId::LLMProxy
+        | ProviderId::Chutes
+        | ProviderId::LiteLLM
+        | ProviderId::Poe
+        | ProviderId::Devin
+        | ProviderId::Zed
+        | ProviderId::CrossModel
+        | ProviderId::Qoder
+        | ProviderId::CodeBuddy
+        | ProviderId::Sakana
+        | ProviderId::Sofya
+        | ProviderId::Sub2Api
+        | ProviderId::Wayfinder
+        | ProviderId::ZenMux
+        | ProviderId::ClinePass
+        | ProviderId::LongCat
+        | ProviderId::Neuralwatt
+        | ProviderId::ZoomMate
+        | ProviderId::QwenCloud
+        | ProviderId::Replicate
+        | ProviderId::SailResearch
+        | ProviderId::Xai
+        | ProviderId::Fireworks
+        | ProviderId::Meta
+        | ProviderId::Muse
+        | ProviderId::Nous
+        | ProviderId::Hyper
+        | ProviderId::GitKraken
+        | ProviderId::Bifrost
+        | ProviderId::Aixy
+        | ProviderId::LLMMan
+        | ProviderId::DevPass
+        | ProviderId::XKiro
+        | ProviderId::Raycast
+        | ProviderId::Vercel
+        | ProviderId::Cosmic
+        | ProviderId::Aerostack => ProviderLimitResetPolicy::DEFAULT,
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -283,5 +397,61 @@ mod tests {
                 "factory returned wrong provider for {id}"
             );
         }
+    }
+
+    #[test]
+    fn limit_reset_policies_match_the_provider_rules() {
+        use super::super::{MissingIdentityRule, WeeklyResetRule};
+
+        assert_eq!(
+            limit_reset_policy(ProviderId::Claude),
+            ProviderLimitResetPolicy {
+                supported: true,
+                weekly: WeeklyResetRule::RecoveryObservations { count: 2 },
+                missing_identity: MissingIdentityRule::Track {
+                    requires_low_confirmation: true,
+                },
+            }
+        );
+        assert_eq!(
+            limit_reset_policy(ProviderId::Codex),
+            ProviderLimitResetPolicy {
+                supported: true,
+                weekly: WeeklyResetRule::AdvancedBoundary {
+                    reset_threshold_percent: 5.0,
+                    requires_previous_boundary: true,
+                },
+                missing_identity: MissingIdentityRule::Skip,
+            }
+        );
+        let unsupported = [
+            ProviderId::TinyApi,
+            ProviderId::Xapi,
+            ProviderId::Langdock,
+            ProviderId::Exa,
+        ];
+        for id in unsupported {
+            assert_eq!(
+                limit_reset_policy(id),
+                ProviderLimitResetPolicy::UNSUPPORTED,
+                "{id}"
+            );
+        }
+        for &id in ProviderId::all() {
+            if !unsupported.contains(&id) && !matches!(id, ProviderId::Claude | ProviderId::Codex) {
+                assert_eq!(
+                    id.limit_reset_policy(),
+                    ProviderLimitResetPolicy::DEFAULT,
+                    "{id}"
+                );
+            }
+        }
+        assert_eq!(
+            ProviderLimitResetPolicy::UNSUPPORTED,
+            ProviderLimitResetPolicy {
+                supported: false,
+                ..ProviderLimitResetPolicy::DEFAULT
+            }
+        );
     }
 }

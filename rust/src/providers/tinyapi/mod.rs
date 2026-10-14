@@ -25,6 +25,11 @@ use crate::core::{
 };
 use crate::providers::{BoundedBodyError, read_bounded_response};
 
+/// Usage history cannot back a limit reset detector (upstream excludes this
+/// provider from plan-utilization history).
+pub(crate) const LIMIT_RESET_POLICY: crate::core::ProviderLimitResetPolicy =
+    crate::core::ProviderLimitResetPolicy::UNSUPPORTED;
+
 const USAGE_URL: &str = "https://tinyapi.rest/api/user/credits";
 const COOKIE_DOMAIN: &str = "tinyapi.rest";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);

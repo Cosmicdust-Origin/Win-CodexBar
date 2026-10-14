@@ -168,6 +168,7 @@ pub(super) struct RawSettings {
     reset_time_relative: bool,
     show_reset_when_exhausted: bool,
     predictive_pace_warning_enabled: bool,
+    limit_reset_notifications_enabled: bool,
     credential_expiry_notifications_enabled: bool,
     /// `None` when the file predates the key; it then inherits `show_notifications`.
     #[serde(default)]
@@ -371,6 +372,7 @@ impl Default for RawSettings {
             reset_time_relative: s.reset_time_relative,
             show_reset_when_exhausted: s.show_reset_when_exhausted,
             predictive_pace_warning_enabled: s.predictive_pace_warning_enabled,
+            limit_reset_notifications_enabled: s.limit_reset_notifications_enabled,
             credential_expiry_notifications_enabled: s.credential_expiry_notifications_enabled,
             session_quota_notifications_enabled: Some(s.session_quota_notifications_enabled),
             show_pace: s.show_pace,
@@ -746,6 +748,7 @@ impl From<RawSettings> for Settings {
             reset_time_relative: raw.reset_time_relative,
             show_reset_when_exhausted: raw.show_reset_when_exhausted,
             predictive_pace_warning_enabled: raw.predictive_pace_warning_enabled,
+            limit_reset_notifications_enabled: raw.limit_reset_notifications_enabled,
             credential_expiry_notifications_enabled: raw.credential_expiry_notifications_enabled,
             session_quota_notifications_enabled: raw
                 .session_quota_notifications_enabled

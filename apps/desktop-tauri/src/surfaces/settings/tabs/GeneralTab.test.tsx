@@ -655,7 +655,42 @@ describe("GeneralTab notifications pane", () => {
       "SessionQuotaNotifications",
       "ShowNotifications",
       "PredictivePaceWarnings",
+      "LimitResetNotifications",
     ]);
+  });
+
+  it("saves the limit reset preference and treats an absent key as off", () => {
+    const set = vi.fn();
+    render(
+      <GeneralTab
+        mode="notifications"
+        settings={{ ...settings, limitResetNotificationsEnabled: undefined }}
+        set={set}
+        saving={false}
+      />,
+    );
+    const toggle = screen.getByRole("checkbox", { name: "LimitResetNotifications" });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    expect(set).toHaveBeenCalledWith({ limitResetNotificationsEnabled: true });
+  });
+
+  it("keeps the limit reset toggle usable while usage warnings are off", () => {
+    render(
+      <GeneralTab
+        mode="notifications"
+        settings={{
+          ...settings,
+          showNotifications: false,
+          limitResetNotificationsEnabled: true,
+        }}
+        set={vi.fn()}
+        saving={false}
+      />,
+    );
+    const toggle = screen.getByRole("checkbox", { name: "LimitResetNotifications" });
+    expect(toggle).toBeEnabled();
+    expect(toggle).toBeChecked();
   });
 
   it("saves quota depleted and restored alerts as their own key", () => {
