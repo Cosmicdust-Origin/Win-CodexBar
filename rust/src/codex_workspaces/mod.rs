@@ -5,6 +5,7 @@
 
 mod freshness;
 mod indexer;
+mod project_names;
 mod sidecar;
 mod thread_names;
 mod types;
