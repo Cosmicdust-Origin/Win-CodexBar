@@ -171,11 +171,12 @@ export default function MenuCard({
   useEffect(() => {
     if (!providerSupportsChartData(provider.providerId)) return;
     let cancelled = false;
+    let frame: number | undefined;
     getProviderChartData(provider.providerId, provider.accountEmail ?? undefined)
       .then((data) => {
         if (!cancelled) {
           setChartData(data);
-          requestAnimationFrame(() => onLayoutChange?.());
+          frame = requestAnimationFrame(() => onLayoutChange?.());
         }
       })
       .catch(() => {
@@ -183,6 +184,7 @@ export default function MenuCard({
       });
     return () => {
       cancelled = true;
+      if (frame !== undefined) cancelAnimationFrame(frame);
     };
     // "Track costs" flips local estimates on or off; the backend answers for the new value.
   }, [provider.providerId, provider.accountEmail, localDay, costTrackingEnabled, onLayoutChange]);
