@@ -24,7 +24,8 @@ const OLLAMA_SETTINGS_URL: &str = "https://ollama.com/settings";
 const OLLAMA_TAGS_URL: &str = "https://ollama.com/api/tags";
 const OLLAMA_VALIDATION_URL: &str = "https://ollama.com/api/web_search";
 const OLLAMA_MONTHLY_WINDOW_MINUTES: u32 = 30 * 24 * 60;
-const OLLAMA_MONTHLY_USAGE_LABEL: &str = "Monthly usage";
+/// Current settings use monthly credits; "Free usage" is the free-plan meter label.
+const OLLAMA_MONTHLY_USAGE_LABELS: [&str; 2] = ["Monthly usage", "Free usage"];
 
 /// Reset-window pace (upstream `OllamaProviderDescriptor.pace`, v0.70.0):
 /// `.calendarMonthResetWindow`.
@@ -242,14 +243,16 @@ impl OllamaProvider {
         if html.contains("Sign in")
             && !html.contains("Cloud Usage")
             && !html.contains("Included usage")
-            && !html.contains(OLLAMA_MONTHLY_USAGE_LABEL)
+            && !OLLAMA_MONTHLY_USAGE_LABELS
+                .iter()
+                .any(|label| html.contains(label))
             && !html.contains("Session usage")
         {
             return Err(ProviderError::AuthRequired);
         }
 
         let monthly_block = self.parse_usage_block(
-            &[OLLAMA_MONTHLY_USAGE_LABEL],
+            &OLLAMA_MONTHLY_USAGE_LABELS,
             html,
             Some(OLLAMA_MONTHLY_WINDOW_MINUTES),
         );
@@ -295,45 +298,48 @@ impl OllamaProvider {
         window_minutes: Option<u32>,
     ) -> Option<UsageBlock> {
         for label in labels {
-            if let Some(pos) = html.find(label) {
-                let tail = &html[pos..];
-                let end = usage_block_end(tail, label).unwrap_or_else(|| tail.len().min(4000));
-                let window = &tail[..end.min(tail.len())];
+            // Anchor on the element text so prose that merely mentions a label
+            // (e.g. "Free usage credits can be used...") is not treated as a meter.
+            let Some(label_match) = usage_label_regex(label).and_then(|re| re.find(html)) else {
+                continue;
+            };
+            let tail = &html[label_match.end()..];
+            let end = usage_block_end(tail, label).unwrap_or_else(|| tail.len().min(4000));
+            let window = &tail[..end.min(tail.len())];
 
-                // Try "XX% used" pattern
-                let used_re = Regex::new(r"(\d+(?:\.\d+)?)\s*%\s*used").ok()?;
-                if let Some(caps) = used_re.captures(window)
-                    && let Ok(val) = caps[1].parse::<f64>()
-                {
-                    return Some(UsageBlock {
-                        used_percent: val,
-                        window_minutes,
-                        resets_at: parse_first_datetime(window),
-                        reset_description: parse_reset_description(window),
-                    });
-                }
+            // Try "XX% used" pattern
+            let used_re = Regex::new(r"(\d+(?:\.\d+)?)\s*%\s*used").ok()?;
+            if let Some(caps) = used_re.captures(window)
+                && let Ok(val) = caps[1].parse::<f64>()
+            {
+                return Some(UsageBlock {
+                    used_percent: val,
+                    window_minutes,
+                    resets_at: parse_first_datetime(window),
+                    reset_description: parse_reset_description(window),
+                });
+            }
 
-                if let Some(val) = parse_dollar_used_percent(window) {
-                    return Some(UsageBlock {
-                        used_percent: val,
-                        window_minutes,
-                        resets_at: parse_first_datetime(window),
-                        reset_description: parse_reset_description(window),
-                    });
-                }
+            if let Some(val) = parse_dollar_used_percent(window) {
+                return Some(UsageBlock {
+                    used_percent: val,
+                    window_minutes,
+                    resets_at: parse_first_datetime(window),
+                    reset_description: parse_reset_description(window),
+                });
+            }
 
-                // Try "width: XX%" pattern (progress bar CSS)
-                let width_re = Regex::new(r"width:\s*(\d+(?:\.\d+)?)%").ok()?;
-                if let Some(caps) = width_re.captures(window)
-                    && let Ok(val) = caps[1].parse::<f64>()
-                {
-                    return Some(UsageBlock {
-                        used_percent: val,
-                        window_minutes,
-                        resets_at: parse_first_datetime(window),
-                        reset_description: parse_reset_description(window),
-                    });
-                }
+            // Try "width: XX%" pattern (progress bar CSS)
+            let width_re = Regex::new(r"width:\s*(\d+(?:\.\d+)?)%").ok()?;
+            if let Some(caps) = width_re.captures(window)
+                && let Ok(val) = caps[1].parse::<f64>()
+            {
+                return Some(UsageBlock {
+                    used_percent: val,
+                    window_minutes,
+                    resets_at: parse_first_datetime(window),
+                    reset_description: parse_reset_description(window),
+                });
             }
         }
         None
@@ -440,19 +446,21 @@ fn clean_secret(raw: Option<&str>) -> Option<String> {
     (!value.is_empty()).then_some(value)
 }
 
+/// Matches a usage label rendered as complete element text, i.e. `>Label<`.
+fn usage_label_regex(label: &str) -> Option<Regex> {
+    Regex::new(&format!(r">\s*{label}\s*<")).ok()
+}
+
+/// `tail` starts just after the current label's closing `<`.
 fn usage_block_end(tail: &str, current_label: &str) -> Option<usize> {
-    [
-        OLLAMA_MONTHLY_USAGE_LABEL,
-        "Session usage",
-        "Hourly usage",
-        "Weekly usage",
-    ]
-    .iter()
-    .filter(|label| **label != current_label)
-    .filter_map(|label| tail.get(current_label.len()..)?.find(label))
-    .map(|idx| idx + current_label.len())
-    .min()
-    .map(|idx| idx.min(4000))
+    OLLAMA_MONTHLY_USAGE_LABELS
+        .iter()
+        .chain(["Session usage", "Hourly usage", "Weekly usage"].iter())
+        .filter(|label| **label != current_label)
+        .filter_map(|label| usage_label_regex(label)?.find(tail))
+        .map(|label_match| label_match.start())
+        .min()
+        .map(|idx| idx.min(4000))
 }
 
 /// Convert included dollar credits to quota utilization, not a spend estimate.
@@ -815,6 +823,62 @@ mod tests {
         assert_eq!(snapshot.primary_label.as_deref(), Some("Monthly"));
         assert_eq!(snapshot.secondary.unwrap().used_percent, 25.0);
         assert_eq!(snapshot.login_method.as_deref(), Some("Pro"));
+    }
+
+    #[test]
+    fn parses_free_usage_meter_as_monthly_window() {
+        // Sanitized free-plan settings-page fragment (ported from upstream
+        // OllamaUsageParserTests); the "Free usage credits..." prose must not be read as the meter label.
+        let provider = OllamaProvider::new();
+        let snapshot = provider
+            .parse_usage_html(
+                r#"
+                    <h2 class="text-xl font-medium flex items-center space-x-2">
+                      <span>Included usage</span>
+                      <span
+                        class="text-xs font-normal px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-600 capitalize"
+                        >free</span
+                      >
+                    </h2>
+                    <h2 id="header-email">user@example.com</h2>
+                    <div id="free-plan-models">
+                      <p>Free usage credits can be used with the following cloud models:</p>
+                    </div>
+                    <div>
+                      <div class="flex justify-between mb-2">
+                        <span class="text-sm">Free usage</span>
+                        <span class="text-sm">69.5% used</span>
+                      </div>
+                      <div class="relative group" data-usage-meter>
+                        <div
+                          class="relative h-3 overflow-hidden rounded-full bg-neutral-200"
+                          data-usage-track
+                          aria-label="Free usage 69.5% used"
+                        >
+                          <div class="flex h-full overflow-hidden bg-neutral-950" style="width: 69.5%; "></div>
+                        </div>
+                      </div>
+                      <div class="text-xs text-neutral-500 mt-1 local-time" data-time="2026-10-26T15:19:11Z">
+                        Resets in 2 weeks.
+                      </div>
+                    </div>
+                "#,
+            )
+            .unwrap();
+
+        assert_eq!(snapshot.primary.used_percent, 69.5);
+        assert_eq!(
+            snapshot.primary.window_minutes,
+            Some(OLLAMA_MONTHLY_WINDOW_MINUTES)
+        );
+        assert_eq!(snapshot.primary_label.as_deref(), Some("Monthly"));
+        assert_eq!(
+            snapshot.primary.resets_at,
+            DateTime::parse_from_rfc3339("2026-10-26T15:19:11Z")
+                .ok()
+                .map(|date| date.with_timezone(&Utc))
+        );
+        assert!(snapshot.secondary.is_none());
     }
 
     #[test]
