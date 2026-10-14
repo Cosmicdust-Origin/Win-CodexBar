@@ -27,6 +27,7 @@ function settings(extra: Partial<OptionSettings> = {}): OptionSettings {
     claudeAvoidKeychainPrompts: false,
     claudeAllowReadingClaudeCodeCredentials: false,
     claudeSwapEnabled: false,
+    claudeSwapExecutablePath: "",
     disableKeychainAccess: false,
     ...extra,
   } as OptionSettings;
@@ -123,6 +124,43 @@ describe("OptionsSection", () => {
     );
     expect(toggle("ProviderClaudeAvoidKeychainPrompts")).toBeDisabled();
     expect(toggle("ProviderClaudeAllowReadingClaudeCodeCredentials")).toBeEnabled();
+  });
+
+  it("shows the claude-swap path inline under its toggle only while the toggle is on", async () => {
+    const onSettingsChange = vi.fn();
+    const { rerender } = render(
+      <OptionsSection
+        detail={detail("claude")}
+        settings={settings()}
+        disabled={false}
+        t={t}
+        onSettingsChange={onSettingsChange}
+        onReload={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("textbox", { name: "ClaudeSwapExecutablePath" })).toBeNull();
+
+    rerender(
+      <OptionsSection
+        detail={detail("claude")}
+        settings={settings({ claudeSwapEnabled: true, claudeSwapExecutablePath: "C:/tools/cswap.exe" })}
+        disabled={false}
+        t={t}
+        onSettingsChange={onSettingsChange}
+        onReload={vi.fn()}
+      />,
+    );
+    const input = screen.getByRole("textbox", { name: "ClaudeSwapExecutablePath" });
+    expect(input).toHaveValue("C:/tools/cswap.exe");
+    expect(input).toHaveAttribute("placeholder", "ClaudeSwapExecutablePathPlaceholder");
+    const toggleRow = toggle("ClaudeSwapEnable").closest(".settings-field")!;
+    expect(toggleRow.nextElementSibling).toBe(input.closest(".settings-field"));
+
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "D:/bin/cswap.exe" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+    });
+    expect(onSettingsChange).toHaveBeenLastCalledWith({ claudeSwapExecutablePath: "D:/bin/cswap.exe" });
   });
 
   it("renders an empty group for a provider without options", () => {
