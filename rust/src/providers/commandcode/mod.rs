@@ -32,9 +32,7 @@ static PLAN_CACHE: LazyLock<Mutex<CommandCodePlanCache>> =
 /// Recognized better-auth session cookie names in upstream priority order
 /// (upstream `CommandCodeCookieHeader.supportedSessionCookieNames`). #2706 added
 /// the production `commandcode_prod_` family; the legacy `better-auth` names stay
-/// as fallback. Name matching against a pasted header is case-insensitive, and a
-/// bare pasted token keeps the legacy production name until a renamed production
-/// cookie is proven live (same rule as upstream).
+/// as fallback. Name matching against a pasted header is case-insensitive.
 const SESSION_COOKIE_NAMES: &[&str] = &[
     "__Secure-commandcode_prod_.session_token",
     "commandcode_prod_.session_token",
@@ -43,7 +41,10 @@ const SESSION_COOKIE_NAMES: &[&str] = &[
     "__Secure-better-auth.session_token",
     "better-auth.session_token",
 ];
-const LEGACY_BARE_TOKEN_COOKIE_NAME: &str = "__Secure-better-auth.session_token";
+/// Cookie name wrapped around a bare pasted token (upstream #4212). This is the
+/// live production cookie name; the legacy `better-auth` default made every
+/// pasted bare token look expired.
+const BARE_TOKEN_COOKIE_NAME: &str = "__Secure-commandcode_prod_.session_token";
 
 /// Static `planId` → monthly grant catalog mirroring upstream
 /// `CommandCodePlanCatalog`. The credits endpoint only reports the *remaining*
@@ -231,10 +232,8 @@ fn normalize_cookie_header(raw: &str) -> Option<String> {
         return None;
     }
     if !header.contains('=') && !header.contains(';') {
-        // Bare token — assume the established production cookie name (upstream
-        // #2706 keeps the legacy better-auth default until a renamed production
-        // cookie is proven live).
-        return Some(format!("{LEGACY_BARE_TOKEN_COOKIE_NAME}={header}"));
+        // Bare token — wrap it in the production cookie name (upstream #4212).
+        return Some(format!("{BARE_TOKEN_COOKIE_NAME}={header}"));
     }
 
     // A pasted header narrows to the session cookie only (upstream
@@ -659,10 +658,10 @@ mod tests {
 
     #[test]
     fn command_code_accepts_bare_session_token() {
-        // Upstream #2706: bare tokens keep the legacy production cookie name.
+        // Upstream #4212: bare tokens use the live production cookie name.
         assert_eq!(
             normalize_cookie_header("abc123").as_deref(),
-            Some("__Secure-better-auth.session_token=abc123")
+            Some("__Secure-commandcode_prod_.session_token=abc123")
         );
     }
 
