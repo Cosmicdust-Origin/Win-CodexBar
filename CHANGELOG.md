@@ -9,6 +9,7 @@
 
 ## [Windows] Unreleased
 
+- Codex: publish the fresh weekly quota and reset credits after a confirmed weekly reset when the previously published usage had no reset-credit inventory. Both fresh reads must come from the exact OAuth source, report the same plan, and list the same available credits observed after the last published usage (upstream #4218).
 - Show an optional **Live remaining (est.)** row for xAI beside the posted prepaid balance, from the current postpaid invoice preview (upstream #4419). A missing or failed preview hides only that row.
 - Show independent session and weekly usage for native saved Claude Code accounts, with account-scoped OAuth renewal and safe authentication warnings.
 - Offer Refresh login beside Switch only for Claude and Codex accounts that need sign-in. Repair the selected saved login without switching to another account.
