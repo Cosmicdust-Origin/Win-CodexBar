@@ -1,4 +1,4 @@
-use codexbar::core::ProviderId;
+use codexbar::core::{MissingIdentityRule, ProviderId};
 use codexbar::notifications::{LimitResetAccount, WarningScope};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -123,9 +123,11 @@ impl WarningIdentity {
     }
 
     /// Reset-detector account for this identity (upstream
-    /// `limitResetAccountIdentifier`). `None` skips detection: Codex without an
-    /// owner key and Claude OAuth without a resolved owner. Identity-less
-    /// Claude samples need a second low sample before a reset is announced.
+    /// `limitResetAccountIdentifier`). `None` skips detection: an unresolved
+    /// lane other than Claude CLI, or a missing identity when the provider's
+    /// [`MissingIdentityRule`] skips it. Otherwise the rule decides whether an
+    /// identity-less sample needs a second low sample before a reset is
+    /// announced.
     pub(super) fn limit_reset_account(
         &self,
         label: Option<&str>,
@@ -139,13 +141,17 @@ impl WarningIdentity {
                 Some(WarningSourceLane::ClaudeCli) => (self.unresolved_key()?, true),
                 _ => return None,
             },
-            WarningAccountState::Missing => match self.provider {
-                ProviderId::Codex => return None,
-                provider => (
-                    provider.cli_name().to_string(),
-                    provider == ProviderId::Claude,
-                ),
-            },
+            WarningAccountState::Missing => {
+                match self.provider.limit_reset_policy().missing_identity {
+                    MissingIdentityRule::Skip => return None,
+                    MissingIdentityRule::Track {
+                        requires_low_confirmation,
+                    } => (
+                        self.provider.cli_name().to_string(),
+                        requires_low_confirmation,
+                    ),
+                }
+            }
         };
         let label = label
             .map(str::trim)

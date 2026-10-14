@@ -18,6 +18,11 @@ use crate::core::{
 };
 use crate::providers::{BoundedBodyError, read_bounded_response};
 
+/// Usage history cannot back a limit reset detector (upstream excludes this
+/// provider from plan-utilization history).
+pub(crate) const LIMIT_RESET_POLICY: crate::core::ProviderLimitResetPolicy =
+    crate::core::ProviderLimitResetPolicy::UNSUPPORTED;
+
 const USAGE_URL_BASE: &str = "https://admin-api.exa.ai/team-management/api-keys";
 const CREDENTIAL_TARGET: &str = "codexbar-exa";
 pub const SERVICE_KEY_ENV: &str = "EXA_SERVICE_KEY";

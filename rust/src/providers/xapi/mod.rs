@@ -27,6 +27,11 @@ use crate::core::{
 };
 use crate::providers::{BoundedBodyError, read_bounded_response};
 
+/// Usage history cannot back a limit reset detector (upstream excludes this
+/// provider from plan-utilization history).
+pub(crate) const LIMIT_RESET_POLICY: crate::core::ProviderLimitResetPolicy =
+    crate::core::ProviderLimitResetPolicy::UNSUPPORTED;
+
 const BASE_URL: &str = "https://console.x.com";
 const COOKIE_DOMAIN: &str = "x.com";
 const AUTH_COOKIE: &str = "auth_token";

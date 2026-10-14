@@ -21,17 +21,13 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use super::{NotificationManager, SessionTransitionKey};
-use crate::core::ProviderId;
+use crate::core::{ProviderId, WeeklyResetRule};
 use crate::locale::{self, LocaleKey};
 use crate::settings::Settings;
 use crate::sound::NotificationSoundEvent;
 use crate::{atomic_file, secure_file};
 
 const LIMIT_RESET_THRESHOLD: f64 = 1.0;
-const CLAUDE_WEEKLY_RECOVERY_OBSERVATION_COUNT: u32 = 2;
-// A newly advanced weekly boundary is strong reset evidence; allow modest usage
-// so a reset is not missed when the first post-rollover sample arrives late.
-const CODEX_WEEKLY_ADVANCED_BOUNDARY_RESET_THRESHOLD: f64 = 5.0;
 const RESET_BOUNDARY_TOLERANCE_SECONDS: i64 = 2 * 60;
 const DEPLETED_USED_PERCENT: f64 = 99.99;
 
@@ -41,13 +37,9 @@ const KEY_NAMESPACE: &str = "com.codexbar.limit-reset.v1";
 const MAX_STATES_PER_WINDOW: usize = 256;
 const STATE_RETENTION_DAYS: i64 = 30;
 
-/// Providers whose usage history cannot back a reset detector (upstream
-/// excludes them from plan-utilization history).
+/// Whether the provider's usage history can back a reset detector.
 pub fn limit_reset_supported(provider: ProviderId) -> bool {
-    !matches!(
-        provider,
-        ProviderId::TinyApi | ProviderId::Xapi | ProviderId::Langdock | ProviderId::Exa
-    )
+    provider.limit_reset_policy().supported
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -177,25 +169,42 @@ pub(super) fn boundary_advanced(
     !equivalent_boundaries(previous, current) && current > previous
 }
 
-/// Reset detector transition. Ports the upstream detector without the Codex
-/// weekly delayed-candidate path and plan tracking (deferred on Windows).
+/// Reset detector transition. Ports the upstream detector without the
+/// advanced-boundary weekly delayed-candidate path and plan tracking (deferred
+/// on Windows). Weekly lanes follow the provider's [`WeeklyResetRule`].
 pub(super) fn detector_transition(input: TransitionInput<'_>) -> Transition {
     let observation = input.observation;
     let previous = input.previous;
     let current_used = observation.used_percent;
     let was_above = current_used > LIMIT_RESET_THRESHOLD;
     let is_session = input.window == LimitResetWindow::Session;
-    let is_claude_weekly =
-        input.provider == ProviderId::Claude && input.window == LimitResetWindow::Weekly;
-    let is_codex_weekly =
-        input.provider == ProviderId::Codex && input.window == LimitResetWindow::Weekly;
-    let claude_weekly_recovery_pending = is_claude_weekly
+    let weekly_rule = if input.window == LimitResetWindow::Weekly {
+        input.provider.limit_reset_policy().weekly
+    } else {
+        WeeklyResetRule::Standard
+    };
+    let recovery_observation_count = match weekly_rule {
+        WeeklyResetRule::RecoveryObservations { count } => Some(count),
+        _ => None,
+    };
+    let advanced_boundary_rule = match weekly_rule {
+        WeeklyResetRule::AdvancedBoundary {
+            reset_threshold_percent,
+            requires_previous_boundary,
+        } => Some((reset_threshold_percent, requires_previous_boundary)),
+        _ => None,
+    };
+    let recovery_pending = recovery_observation_count.is_some()
         && previous.is_some_and(|state| state.recovery_above_threshold_count.is_some());
     let previous_boundary = previous.and_then(|state| state.reset_boundary);
     let boundary_allows_post = if is_session {
         boundary_advanced(previous_boundary, observation.reset_boundary, false)
-    } else if is_codex_weekly {
-        boundary_advanced(previous_boundary, observation.reset_boundary, true)
+    } else if let Some((_, requires_previous_boundary)) = advanced_boundary_rule {
+        boundary_advanced(
+            previous_boundary,
+            observation.reset_boundary,
+            requires_previous_boundary,
+        )
     } else {
         true
     };
@@ -203,44 +212,41 @@ pub(super) fn detector_transition(input: TransitionInput<'_>) -> Transition {
     let crossed_below = previous_above && !was_above;
     let confirming_low_sample =
         previous.is_some_and(|state| state.pending_low_confirmation) && !was_above;
-    let codex_should_post = is_codex_weekly
-        && previous_above
-        && current_used <= CODEX_WEEKLY_ADVANCED_BOUNDARY_RESET_THRESHOLD
-        && boundary_allows_post;
 
     let should_post = if input.requires_low_confirmation {
-        confirming_low_sample && !claude_weekly_recovery_pending
-    } else if is_codex_weekly {
-        codex_should_post
+        confirming_low_sample && !recovery_pending
+    } else if let Some((reset_threshold_percent, _)) = advanced_boundary_rule {
+        previous_above && current_used <= reset_threshold_percent && boundary_allows_post
     } else {
-        crossed_below && boundary_allows_post && !claude_weekly_recovery_pending
+        crossed_below && boundary_allows_post && !recovery_pending
     };
     let suppressed_guarded_crossing = crossed_below && !boundary_allows_post;
     let should_await_low_confirmation = input.requires_low_confirmation
         && crossed_below
         && !confirming_low_sample
         && boundary_allows_post
-        && !claude_weekly_recovery_pending;
+        && !recovery_pending;
     // Sessions keep the last non-regressed boundary on every guarded sample;
-    // Codex weekly adopts a newly appearing boundary so a later advance counts.
+    // an advanced-boundary weekly lane adopts a newly appearing boundary so a
+    // later advance counts.
     let preserve_boundary = !boundary_allows_post && (is_session || previous_boundary.is_some());
 
     let previous_recovery_count = previous
         .and_then(|state| state.recovery_above_threshold_count)
         .unwrap_or(0);
-    let next_recovery_count = if claude_weekly_recovery_pending && was_above {
+    let next_recovery_count = if recovery_pending && was_above {
         previous_recovery_count + 1
     } else {
         0
     };
-    let recovery_confirmed = claude_weekly_recovery_pending
-        && next_recovery_count >= CLAUDE_WEEKLY_RECOVERY_OBSERVATION_COUNT;
+    let recovery_confirmed = recovery_pending
+        && recovery_observation_count.is_some_and(|count| next_recovery_count >= count);
 
     // A transient zero must not erase the baseline needed to recognize the
     // real reset that follows.
     let next_was_above = if should_post {
         false
-    } else if claude_weekly_recovery_pending {
+    } else if recovery_pending {
         recovery_confirmed
     } else if suppressed_guarded_crossing || should_await_low_confirmation {
         true
@@ -249,7 +255,7 @@ pub(super) fn detector_transition(input: TransitionInput<'_>) -> Transition {
     };
     let recovery_above_threshold_count = if should_post {
         Some(0)
-    } else if claude_weekly_recovery_pending && !recovery_confirmed {
+    } else if recovery_pending && !recovery_confirmed {
         Some(next_recovery_count)
     } else {
         None
