@@ -7,7 +7,7 @@ use super::warning_identity::WarningIdentity;
 use super::*;
 use chrono::{Local, Utc};
 use codexbar::core::HookUsageWindow;
-use codexbar::notifications::WarningScope;
+use codexbar::notifications::{LimitResetObservation, LimitResetSample, WarningScope};
 use serde::Serialize;
 use std::sync::Arc;
 
@@ -1230,7 +1230,7 @@ fn notify_usage_thresholds(
     cached: &[ProviderUsageSnapshot],
 ) {
     let cli_map = codexbar::core::cli_name_map();
-    if let Ok(mut guard) = state.lock() {
+    let persistence = if let Ok(mut guard) = state.lock() {
         for snapshot in cached {
             if snapshot.error.is_none()
                 && let Some(&provider) = cli_map.get(snapshot.provider_id.as_str())
@@ -1302,6 +1302,21 @@ fn notify_usage_thresholds(
                         weekly.used_percent,
                     );
                 }
+                let token_account_label = token_accounts
+                    .get(&provider)
+                    .and_then(ProviderAccountData::active_account)
+                    .map(|account| account.label.as_str());
+                guard.notification_manager.observe_limit_reset(
+                    limit_reset_sample(
+                        provider,
+                        snapshot,
+                        &warning_identity,
+                        token_account_label,
+                        &session_account,
+                        settings,
+                    ),
+                    settings,
+                );
                 notify_predictive_pace(
                     &mut guard.notification_manager,
                     provider,
@@ -1311,6 +1326,63 @@ fn notify_usage_thresholds(
                 );
             }
         }
+        guard
+            .notification_manager
+            .finish_limit_reset_batch(settings, chrono::Utc::now())
+    } else {
+        None
+    };
+    if let Some(persistence) = persistence {
+        persistence.apply();
+    }
+}
+
+/// Reset-detector input for one cached snapshot. Only real session lanes
+/// (1..=360 minutes) and the 7-day weekly lane are observed.
+pub(super) fn limit_reset_sample<'a>(
+    provider: ProviderId,
+    snapshot: &ProviderUsageSnapshot,
+    identity: &WarningIdentity,
+    token_account_label: Option<&str>,
+    session_transition_account: &'a str,
+    settings: &Settings,
+) -> LimitResetSample<'a> {
+    let label = token_account_label
+        .filter(|label| !label.trim().is_empty())
+        .or(snapshot.account_email.as_deref())
+        .filter(|label| !label.trim().is_empty())
+        .or(snapshot.account_organization.as_deref());
+    let account = identity.limit_reset_account(label, settings.hide_personal_info);
+    let observed_at = chrono::DateTime::parse_from_rfc3339(&snapshot.updated_at)
+        .ok()
+        .map(|date| date.with_timezone(&chrono::Utc));
+    let observe = |lane: &RateWindowSnapshot| {
+        Some(LimitResetObservation {
+            used_percent: lane.used_percent,
+            observed_at: observed_at?,
+            reset_boundary: lane
+                .resets_at
+                .as_deref()
+                .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+                .map(|date| date.with_timezone(&chrono::Utc)),
+        })
+    };
+    let session = Some(&snapshot.primary)
+        .filter(|lane| {
+            !lane.is_informational && lane.window_minutes.is_some_and(|m| (1..=360).contains(&m))
+        })
+        .and_then(observe);
+    let weekly = snapshot
+        .secondary
+        .as_ref()
+        .filter(|lane| !lane.is_informational && lane.window_minutes == Some(10080))
+        .and_then(observe);
+    LimitResetSample {
+        provider,
+        account,
+        session_transition_account,
+        session,
+        weekly,
     }
 }
 
