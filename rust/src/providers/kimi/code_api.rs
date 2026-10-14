@@ -126,9 +126,11 @@ fn code_api_status_error(status: reqwest::StatusCode) -> ProviderError {
 
 /// Upstream `KimiUsageSnapshot.toUsageSnapshot` (0.60.5 #3694): weekly is the
 /// primary lane and the 5-hour rate limit the secondary, as on the web path.
-/// Each ratio pool takes precedence over the legacy counters of its lane; an
-/// absent or invalid pool falls back to those counters. The monthly pool is
-/// the `Total usage` extra lane. Missing lanes are not invented: an absent
+/// Each ratio pool takes precedence over the legacy counters of its lane,
+/// unless matching counters for the same window and reset report more usage
+/// (upstream #4311; see `ratio_pool`). An absent or invalid pool falls back to
+/// those counters. The monthly pool is the `Total usage` extra lane. Missing
+/// lanes are not invented: an absent
 /// weekly quota stays an informational primary, and a response without any
 /// supported window is a parse error.
 pub(super) fn snapshot_from_code_api_response(
@@ -142,7 +144,6 @@ pub(super) fn snapshot_from_code_api_response(
         .and_then(|pools| pools.weekly.as_ref())
         .and_then(|pool| {
             ratio_pool::resolved_ratio_window(
-                &response,
                 pool,
                 response.usage.as_ref(),
                 WEEKLY_WINDOW_MINUTES,
@@ -159,7 +160,6 @@ pub(super) fn snapshot_from_code_api_response(
         .and_then(|pools| pools.session.as_ref())
         .and_then(|pool| {
             ratio_pool::resolved_ratio_window(
-                &response,
                 pool,
                 legacy_limit.map(|limit| &limit.detail),
                 SESSION_WINDOW_MINUTES,
