@@ -543,6 +543,20 @@ function NotificationsPane({
             onChange={(v) => set({ predictivePaceWarningEnabled: v })}
           />
         </Field>
+        {/* Independent of the master alerts switch, like the Mac: a reset is
+            good news, not a usage warning. */}
+        <Field
+          label={t("LimitResetNotifications")}
+          description={t("LimitResetNotificationsHelper")}
+        >
+          <Toggle
+            variant="switch"
+            checked={settings.limitResetNotificationsEnabled ?? false}
+            ariaLabel={t("LimitResetNotifications")}
+            disabled={saving}
+            onChange={(v) => set({ limitResetNotificationsEnabled: v })}
+          />
+        </Field>
       </SettingsGroup>
 
       {/* The thresholds stay visible while threshold warnings are off: they also set
