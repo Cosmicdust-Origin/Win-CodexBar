@@ -753,6 +753,40 @@ describe("MenuCard", () => {
     });
   });
 
+  it("cancels the pending layout frame when it unmounts", async () => {
+    const onLayoutChange = vi.fn();
+    const frames = new Map<number, FrameRequestCallback>();
+    let nextFrame = 0;
+    const raf = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback) => {
+        frames.set(++nextFrame, callback);
+        return nextFrame;
+      });
+    const cancel = vi
+      .spyOn(window, "cancelAnimationFrame")
+      .mockImplementation((id) => {
+        frames.delete(id);
+      });
+    try {
+      const { unmount } = renderCard(provider(null), { onLayoutChange });
+      await waitFor(() => expect(tauriMocks.getProviderChartData).toHaveBeenCalled());
+      // Let the resolved chart data land so its layout frame is queued.
+      await act(async () => {
+        await Promise.resolve();
+      });
+      await waitFor(() => expect(frames.size).toBeGreaterThan(0));
+
+      unmount();
+      for (const callback of frames.values()) callback(0);
+
+      expect(onLayoutChange).not.toHaveBeenCalled();
+    } finally {
+      raf.mockRestore();
+      cancel.mockRestore();
+    }
+  });
+
   it("leaves the provider-level exhaustion ETA to Settings > Providers", async () => {
     const snapshot = provider(null, 40);
     snapshot.pace = {
