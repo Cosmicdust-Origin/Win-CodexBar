@@ -16,10 +16,15 @@ use chrono::{DateTime, Utc};
 
 mod credential;
 mod identity_gaps;
+mod limit_reset;
 
 pub use credential::CredentialAlertPolicy;
 use credential::CredentialEpisodes;
 pub use identity_gaps::WarningScope;
+pub use limit_reset::{
+    LimitResetAccount, LimitResetObservation, LimitResetPersistence, LimitResetSample,
+    LimitResetWindow, limit_reset_notification_copy, limit_reset_supported,
+};
 
 /// Notification types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -145,6 +150,10 @@ pub struct NotificationManager {
     identity_gaps: identity_gaps::IdentityGapState,
     /// Open credential-expiry episodes (in memory; reset on restart).
     credential_episodes: CredentialEpisodes,
+    /// Session restored toasts held for the reset detector this batch (only
+    /// while limit reset notifications are on).
+    deferred_restored: std::collections::HashSet<SessionTransitionKey>,
+    limit_reset: limit_reset::LimitResetTracker,
     /// Toasts that would have been shown; tests assert on this instead of popping real toasts.
     #[cfg(test)]
     toasts: std::cell::RefCell<Vec<String>>,
@@ -159,6 +168,10 @@ impl NotificationManager {
             deepseek_pricing_period: None,
             identity_gaps: identity_gaps::IdentityGapState::default(),
             credential_episodes: CredentialEpisodes::default(),
+            deferred_restored: std::collections::HashSet::new(),
+            limit_reset: limit_reset::LimitResetTracker::new(
+                limit_reset::LimitResetTracker::default_config_root(),
+            ),
             #[cfg(test)]
             toasts: std::cell::RefCell::new(Vec::new()),
         }
@@ -444,14 +457,13 @@ impl NotificationManager {
                 NotificationType::SessionDepleted,
             );
             if self.sent_notifications.contains(&depleted_key) {
-                let title = NotificationType::SessionRestored.title(settings.ui_language);
-                let body = locale::format_locale(
-                    settings.ui_language,
-                    LocaleKey::NotificationSessionRestoredBody,
-                    &[provider.display_name()],
-                );
-                self.show_toast(&title, &body);
-                Self::play_notification_sound(NotificationSoundEvent::SessionRestored, settings);
+                if settings.limit_reset_notifications_enabled {
+                    // The reset detector decides whether this restored toast or a
+                    // reset banner announces the session reset.
+                    self.deferred_restored.insert(transition_key.clone());
+                } else {
+                    self.post_session_restored(provider, settings);
+                }
                 self.sent_notifications.remove(&depleted_key);
             }
         }
@@ -459,6 +471,17 @@ impl NotificationManager {
         // Update the tracked previous percent for this account
         self.previous_session_percent
             .insert(transition_key, current_percent);
+    }
+
+    fn post_session_restored(&self, provider: ProviderId, settings: &Settings) {
+        let title = NotificationType::SessionRestored.title(settings.ui_language);
+        let body = locale::format_locale(
+            settings.ui_language,
+            LocaleKey::NotificationSessionRestoredBody,
+            &[provider.display_name()],
+        );
+        self.show_toast(&title, &body);
+        Self::play_notification_sound(NotificationSoundEvent::SessionRestored, settings);
     }
 
     /// Send a Windows toast notification with sound
