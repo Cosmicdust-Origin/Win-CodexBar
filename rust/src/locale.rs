@@ -1932,6 +1932,12 @@ locale_keys! {
     ProviderCodexBatterySaverHelp,
     ProviderOptionNotUsedOnWindows,
     ClaudeSwapExecutablePathHelp,
+    AntigravityProfileHomesLabel,
+    AntigravityProfileHomesHelp,
+    AntigravityProfileHomesAdd,
+    AntigravityProfileHomesRemove,
+    AntigravityProfileHomesEmpty,
+    AntigravityProfileHomesPickFailed,
 }
 
 #[cfg(test)]

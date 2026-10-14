@@ -92,6 +92,7 @@ const settings: SettingsSnapshot = {
   globalShortcut: "",
   switcherShortcuts: {},
   codexCustomSessionsDirs: [],
+  antigravityAdditionalProfileHomes: [],
   updateChannel: "stable",
   uiLanguage: "english",
   uiLanguageFollowsSystem: false,

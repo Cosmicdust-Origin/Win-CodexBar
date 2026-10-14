@@ -59,6 +59,8 @@ pub struct SettingsUpdate {
     /// Provider-switcher shortcut overrides; replaces the stored overrides.
     pub switcher_shortcuts: Option<std::collections::BTreeMap<String, String>>,
     pub codex_custom_sessions_dirs: Option<Vec<String>>,
+    /// Extra Gemini profile homes scanned for Antigravity local history.
+    pub antigravity_additional_profile_homes: Option<Vec<String>>,
     pub agent_sessions_enabled: Option<bool>,
     pub stay_awake_enabled: Option<bool>,
     pub agent_session_ssh_hosts: Option<Vec<String>>,
@@ -465,6 +467,9 @@ impl SettingsUpdate {
         if let Some(v) = self.codex_custom_sessions_dirs.clone() {
             settings.codex_custom_sessions_dirs = normalize_custom_sessions_dirs(v);
         }
+        if let Some(v) = self.antigravity_additional_profile_homes.clone() {
+            settings.antigravity_additional_profile_homes = normalize_custom_sessions_dirs(v);
+        }
         if let Some(v) = self.agent_sessions_enabled {
             settings.agent_sessions_enabled = v;
         }
@@ -710,6 +715,7 @@ pub async fn update_settings(
     let notify_float_bar = patch.notifies_float_bar();
     let refresh_provider_data = patch.refreshes_provider_data();
     let clear_local_usage_cache = patch.codex_custom_sessions_dirs.is_some()
+        || patch.antigravity_additional_profile_homes.is_some()
         || patch.cost_reporting_period.is_some()
         || patch.cost_usage_enabled.is_some();
     let rebuild_tray_menu = patch.rebuilds_tray_menu();

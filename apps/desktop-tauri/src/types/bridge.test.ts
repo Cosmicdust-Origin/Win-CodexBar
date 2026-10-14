@@ -119,6 +119,7 @@ describe("Language type", () => {
       globalShortcut: "",
       switcherShortcuts: {},
       codexCustomSessionsDirs: [],
+      antigravityAdditionalProfileHomes: [],
       updateChannel: "stable",
       uiLanguage: "spanish",
       uiLanguageFollowsSystem: false,
