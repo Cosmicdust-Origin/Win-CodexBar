@@ -110,6 +110,7 @@ fn secret_settings() -> Settings {
     settings.http_proxy_username = "SECRET-PROXY-USER".to_string();
     settings.http_proxy_password = "SECRET-PROXY-PASSWORD".to_string();
     settings.codex_custom_sessions_dirs = vec!["C:\\secret\\sessions".to_string()];
+    settings.antigravity_additional_profile_homes = vec!["C:\\secret\\gemini-home".to_string()];
     settings.agent_session_ssh_hosts = vec!["secret-host.invalid".to_string()];
     settings.notification_sound_paths.high_usage = Some("C:\\secret\\ding.wav".to_string());
     settings.cost_usage_bucket_time_zone = "Asia/Tokyo".to_string();

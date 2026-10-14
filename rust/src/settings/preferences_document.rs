@@ -152,6 +152,7 @@ pub const EXCLUDED_KEYS: &[&str] = &[
     // Machine-specific paths, hosts and state.
     "notification_sound_paths",
     "codex_custom_sessions_dirs",
+    "antigravity_additional_profile_homes",
     "agent_session_ssh_hosts",
     // Pinned to this machine's zone on first launch; no settings control.
     "cost_usage_bucket_time_zone",

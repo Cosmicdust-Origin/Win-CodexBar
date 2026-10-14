@@ -138,7 +138,27 @@ pub(super) fn database_roots(gemini_base: &Path) -> [PathBuf; 3] {
     ]
 }
 
+/// How the reader keys one conversation across database files.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum SessionIdentity {
+    /// Full canonical database path. Same-named databases in different roots
+    /// are different sessions (the single Gemini home default).
+    Path,
+    /// Database file stem. A conversation copied into another selected Gemini
+    /// home is the same conversation, so its rows and responses count once.
+    FileStem,
+}
+
 pub(super) fn summarize(roots: &[PathBuf], now: DateTime<Utc>, days: u32) -> SQLiteScan {
+    summarize_with_identity(roots, now, days, SessionIdentity::Path)
+}
+
+pub(super) fn summarize_with_identity(
+    roots: &[PathBuf],
+    now: DateTime<Utc>,
+    days: u32,
+    identity: SessionIdentity,
+) -> SQLiteScan {
     let mut budget = Budget::new();
     let (paths, discovery_complete) = discover_databases(roots, &mut budget);
     if paths.is_empty() && discovery_complete {
@@ -167,7 +187,7 @@ pub(super) fn summarize(roots: &[PathBuf], now: DateTime<Utc>, days: u32) -> SQL
             budget.exhausted = true;
             break;
         }
-        match read_database(path, &mut budget) {
+        match read_database(path, identity, &mut budget) {
             Ok(DatabaseScan::Supported {
                 events: mut database_events,
                 complete: database_complete,
@@ -404,7 +424,26 @@ fn discover_databases(roots: &[PathBuf], budget: &mut Budget) -> (Vec<PathBuf>, 
     (paths, complete)
 }
 
-fn read_database(path: &Path, budget: &mut Budget) -> rusqlite::Result<DatabaseScan> {
+fn session_key(path: &Path, identity: SessionIdentity) -> String {
+    match identity {
+        SessionIdentity::Path => path
+            .canonicalize()
+            .unwrap_or_else(|_| path.to_path_buf())
+            .to_string_lossy()
+            .into_owned(),
+        SessionIdentity::FileStem => path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .map(str::to_owned)
+            .unwrap_or_else(|| path.to_string_lossy().into_owned()),
+    }
+}
+
+fn read_database(
+    path: &Path,
+    identity: SessionIdentity,
+    budget: &mut Budget,
+) -> rusqlite::Result<DatabaseScan> {
     if !budget.check() {
         return Ok(DatabaseScan::Supported {
             events: Vec::new(),
@@ -424,11 +463,7 @@ fn read_database(path: &Path, budget: &mut Budget) -> rusqlite::Result<DatabaseS
         }
     }
 
-    let session = path
-        .canonicalize()
-        .unwrap_or_else(|_| path.to_path_buf())
-        .to_string_lossy()
-        .into_owned();
+    let session = session_key(path, identity);
     let mut rows = read_generation_rows(&tx, &session, budget)?;
     if rows.pending.is_empty() {
         return Ok(DatabaseScan::Supported {
@@ -891,3 +926,7 @@ mod synthetic_tests;
 #[cfg(test)]
 #[path = "local_sqlite_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "local_sqlite_profile_homes_tests.rs"]
+mod profile_homes_tests;
