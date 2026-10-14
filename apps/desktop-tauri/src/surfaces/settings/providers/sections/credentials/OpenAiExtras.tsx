@@ -11,17 +11,11 @@ interface Props {
 }
 
 /**
- * OpenAI/Codex-specific detail help.
- *
- * Port of the help strings below the `ProviderId::Codex` toggles in
- * `rust/src/native_ui/preferences.rs::render_provider_detail_panel` (~6625).
- * The toggles themselves (`codex_historical_tracking`,
- * `codex_openai_web_extras`) are not yet persisted through
- * `update_settings` in the Tauri bridge, so this component shows the
- * upstream hint copy only. The toggles will be surfaced once they join
- * the SettingsUpdate bridge (tracked alongside Phase 6e token-accounts).
+ * Workspace, organization or base-URL field for API providers that need one
+ * next to their key (OpenAI API project ID, LiteLLM base URL, and so on).
+ * Renders nothing for other providers.
  */
-export function OpenAiExtras({ providerId = "codex", t }: Props) {
+export function OpenAiExtras({ providerId = "openaiapi", t }: Props) {
   const [projectId, setProjectId] = useState("");
   const [savedProjectId, setSavedProjectId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -94,17 +88,7 @@ export function OpenAiExtras({ providerId = "codex", t }: Props) {
     );
   }
 
-  return (
-    <section className="provider-detail-section">
-      <h4>{t("CredentialsSectionTitle")}</h4>
-      <div className="provider-detail-helper">
-        {t("ProviderCodexHistoryHelp")}
-      </div>
-      <div className="provider-detail-helper">
-        {t("CredsOpenAiHistoryHelp")}
-      </div>
-    </section>
-  );
+  return null;
 }
 
 const WORKSPACE_EXTRA_IDS: Record<string, true> = {
@@ -119,6 +103,8 @@ const WORKSPACE_EXTRA_IDS: Record<string, true> = {
   xai: true,
   fireworks: true,
   gitkraken: true,
+  exa: true,
+  cosmic: true,
 };
 
 function extraConfig(providerId: string, t: Props["t"]) {
@@ -199,6 +185,20 @@ function extraConfig(providerId: string, t: Props["t"]) {
         label: "Organization ID (optional)",
         placeholder: "organization-id",
         help: "Adds the organization ID to shared-pool usage requests. Or set GITKRAKEN_ORG_ID.",
+      };
+    case "exa":
+      return {
+        title: t("ExaApiTitle"),
+        label: t("ExaApiKeyIdLabel"),
+        placeholder: t("ExaApiKeyIdPlaceholder"),
+        help: t("ExaApiKeyIdHelp"),
+      };
+    case "cosmic":
+      return {
+        title: t("CosmicProjectIdTitle"),
+        label: t("CosmicProjectIdLabel"),
+        placeholder: t("CosmicProjectIdPlaceholder"),
+        help: t("CosmicProjectIdHelp"),
       };
     default:
       return null;

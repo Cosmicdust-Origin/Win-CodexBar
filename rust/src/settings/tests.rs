@@ -61,6 +61,61 @@ fn groq_cookie_source_defaults_to_automatic_session_import() {
 }
 
 #[test]
+fn langdock_cookie_source_defaults_to_automatic_session_import() {
+    // Upstream has no Langdock source picker (it reads one Edge profile), so
+    // Windows defaults to automatic browser import.
+    let mut settings = Settings::default();
+    assert_eq!(settings.cookie_source(ProviderId::Langdock), "auto");
+    settings.set_cookie_source(ProviderId::Langdock, "off");
+    assert_eq!(settings.cookie_source(ProviderId::Langdock), "off");
+}
+
+#[test]
+fn lithosai_cookie_source_defaults_to_automatic_session_import() {
+    // Upstream's LithosAI cookie source falls back to `.auto`.
+    let mut settings = Settings::default();
+    assert_eq!(settings.cookie_source(ProviderId::LithosAI), "auto");
+    settings.set_cookie_source(ProviderId::LithosAI, "off");
+    assert_eq!(settings.cookie_source(ProviderId::LithosAI), "off");
+}
+
+#[test]
+fn museai_cookie_source_defaults_to_automatic_session_import() {
+    // Upstream's Muse (muse.ai) cookie source falls back to `.auto`.
+    let mut settings = Settings::default();
+    assert_eq!(settings.cookie_source(ProviderId::MuseAI), "auto");
+    settings.set_cookie_source(ProviderId::MuseAI, "off");
+    assert_eq!(settings.cookie_source(ProviderId::MuseAI), "off");
+}
+
+#[test]
+fn workbuddy_cookie_source_defaults_to_automatic_session_import() {
+    // Upstream's WorkBuddy cookie source falls back to `.auto`.
+    let mut settings = Settings::default();
+    assert_eq!(settings.cookie_source(ProviderId::WorkBuddy), "auto");
+    settings.set_cookie_source(ProviderId::WorkBuddy, "off");
+    assert_eq!(settings.cookie_source(ProviderId::WorkBuddy), "off");
+}
+
+#[test]
+fn tinyapi_cookie_source_defaults_to_automatic_session_import() {
+    // Upstream's TinyApi cookie source falls back to `.auto`.
+    let mut settings = Settings::default();
+    assert_eq!(settings.cookie_source(ProviderId::TinyApi), "auto");
+    settings.set_cookie_source(ProviderId::TinyApi, "off");
+    assert_eq!(settings.cookie_source(ProviderId::TinyApi), "off");
+}
+
+#[test]
+fn xapi_cookie_source_defaults_to_automatic_session_import() {
+    // X API cookie source falls back to `.auto`.
+    let mut settings = Settings::default();
+    assert_eq!(settings.cookie_source(ProviderId::Xapi), "auto");
+    settings.set_cookie_source(ProviderId::Xapi, "off");
+    assert_eq!(settings.cookie_source(ProviderId::Xapi), "off");
+}
+
+#[test]
 fn preferred_currency_defaults_validates_and_round_trips() {
     let legacy: Settings = serde_json::from_str(r#"{"enabled_providers": []}"#)
         .expect("legacy settings without a preferred currency remain valid");
@@ -306,21 +361,26 @@ fn new_warning_and_reset_settings_are_backward_compatible() {
     assert!(!loaded.credential_expiry_notifications_enabled);
 }
 
+fn load_settings_json(json: &str) -> Settings {
+    serde_json::from_str(json).expect("parse settings")
+}
+
+fn custom(high: Option<f64>, critical: Option<f64>) -> QuotaWarningWindow {
+    QuotaWarningWindow {
+        enabled: None,
+        high,
+        critical,
+    }
+}
+
 #[test]
-fn usage_thresholds_inherit_from_window_provider_and_global_levels() {
+fn custom_quota_warnings_win_over_global_thresholds() {
     let mut settings = Settings::default();
-    settings.provider_usage_thresholds.insert(
-        "codex".into(),
-        UsageThresholdOverride {
-            high: Some(75.0),
-            critical: None,
-        },
-    );
-    settings.provider_usage_thresholds.insert(
-        "codex:weekly".into(),
-        UsageThresholdOverride {
-            high: None,
-            critical: Some(95.0),
+    settings.set_quota_warnings(
+        ProviderId::Codex,
+        ProviderQuotaWarnings {
+            session: QuotaWarningWindow::default(),
+            weekly: custom(Some(75.0), Some(95.0)),
         },
     );
 
@@ -331,6 +391,14 @@ fn usage_thresholds_inherit_from_window_provider_and_global_levels() {
             critical: 95.0,
         }
     );
+    // Global window and another provider keep the global values.
+    assert_eq!(
+        settings.usage_thresholds(ProviderId::Codex, "session"),
+        UsageThresholds {
+            high: 70.0,
+            critical: 90.0,
+        }
+    );
     assert_eq!(
         settings.usage_thresholds(ProviderId::Claude, "session"),
         UsageThresholds {
@@ -338,27 +406,181 @@ fn usage_thresholds_inherit_from_window_provider_and_global_levels() {
             critical: 90.0,
         }
     );
+    // A partial Custom value inherits the missing one from global.
+    settings.set_quota_warnings(
+        ProviderId::Claude,
+        ProviderQuotaWarnings {
+            session: custom(None, Some(98.0)),
+            weekly: QuotaWarningWindow::default(),
+        },
+    );
+    assert_eq!(
+        settings.usage_thresholds(ProviderId::Claude, "session"),
+        UsageThresholds {
+            high: 70.0,
+            critical: 98.0,
+        }
+    );
 }
 
 #[test]
-fn empty_and_out_of_range_threshold_overrides_are_normalized_on_load() {
-    let loaded: Settings = serde_json::from_str(
+fn quota_warning_off_is_per_window_and_keeps_saved_values() {
+    let mut settings = Settings::default();
+    assert!(settings.quota_warning_enabled(ProviderId::Codex, "session"));
+    settings.set_quota_warnings(
+        ProviderId::Codex,
+        ProviderQuotaWarnings {
+            session: QuotaWarningWindow {
+                enabled: Some(false),
+                high: Some(60.0),
+                critical: Some(80.0),
+            },
+            weekly: QuotaWarningWindow::default(),
+        },
+    );
+    assert!(!settings.quota_warning_enabled(ProviderId::Codex, "session"));
+    assert!(settings.quota_warning_enabled(ProviderId::Codex, "weekly"));
+    assert!(settings.quota_warning_enabled(ProviderId::Claude, "session"));
+
+    let reloaded = load_settings_json(&serde_json::to_string(&settings).expect("serialize"));
+    let session = reloaded.quota_warnings(ProviderId::Codex).session;
+    assert_eq!(session.enabled, Some(false));
+    assert_eq!(session.high, Some(60.0));
+    assert_eq!(session.critical, Some(80.0));
+}
+
+#[test]
+fn global_quota_warnings_are_not_serialized() {
+    let mut settings = Settings::default();
+    settings.set_quota_warnings(ProviderId::Codex, ProviderQuotaWarnings::default());
+    let value = serde_json::to_value(&settings).expect("serialize");
+    assert!(
+        value["provider_configs"]["codex"]
+            .get("quota_warnings")
+            .is_none()
+    );
+}
+
+#[test]
+fn migration_moves_a_window_key_into_quota_warnings() {
+    let loaded = load_settings_json(
+        r#"{ "provider_usage_thresholds": { "codex:session": { "high": 80.0 } } }"#,
+    );
+    let codex = loaded.quota_warnings(ProviderId::Codex);
+    assert_eq!(codex.session, custom(Some(80.0), None));
+    assert!(codex.weekly.is_global());
+    assert_eq!(
+        loaded.usage_thresholds(ProviderId::Codex, "session"),
+        UsageThresholds {
+            high: 80.0,
+            critical: 90.0,
+        }
+    );
+    // Only the new key is written back.
+    let saved = serde_json::to_value(&loaded).expect("serialize");
+    assert!(saved.get("provider_usage_thresholds").is_none());
+    assert_eq!(
+        saved["provider_configs"]["codex"]["quota_warnings"]["session"]["high"],
+        serde_json::json!(80.0)
+    );
+}
+
+#[test]
+fn migration_spreads_a_provider_key_over_both_windows() {
+    let loaded = load_settings_json(
+        r#"{ "provider_usage_thresholds": { "claude": { "high": 65.0, "critical": 85.0 } } }"#,
+    );
+    let claude = loaded.quota_warnings(ProviderId::Claude);
+    assert_eq!(claude.session, custom(Some(65.0), Some(85.0)));
+    assert_eq!(claude.weekly, custom(Some(65.0), Some(85.0)));
+}
+
+#[test]
+fn migration_merges_window_and_provider_keys_per_field() {
+    let loaded = load_settings_json(
         r#"{
             "provider_usage_thresholds": {
-                "codex": {"high": 120.0},
-                "claude": {},
-                "codex:weekly": {"critical": -10.0}
+                "codex": { "high": 75.0 },
+                "codex:weekly": { "critical": 95.0 }
             }
         }"#,
-    )
-    .expect("parse settings");
-
-    assert_eq!(loaded.provider_usage_thresholds.len(), 2);
-    assert_eq!(loaded.provider_usage_thresholds["codex"].high, Some(100.0));
-    assert_eq!(
-        loaded.provider_usage_thresholds["codex:weekly"].critical,
-        Some(0.0)
     );
+    let codex = loaded.quota_warnings(ProviderId::Codex);
+    assert_eq!(codex.weekly, custom(Some(75.0), Some(95.0)));
+    assert_eq!(codex.session, custom(Some(75.0), None));
+}
+
+#[test]
+fn migration_without_legacy_keys_leaves_every_window_global() {
+    let loaded = load_settings_json(r#"{ "provider_usage_thresholds": {} }"#);
+    assert!(
+        loaded
+            .provider_configs
+            .values()
+            .all(|config| config.quota_warnings.is_empty())
+    );
+    let loaded = load_settings_json(r#"{ "refresh_interval_secs": 300 }"#);
+    assert!(loaded.quota_warnings(ProviderId::Codex).is_empty());
+}
+
+#[test]
+fn migration_keeps_existing_quota_warnings() {
+    let loaded = load_settings_json(
+        r#"{
+            "provider_usage_thresholds": { "codex": { "high": 50.0 } },
+            "provider_configs": {
+                "codex": { "quota_warnings": { "session": { "enabled": false } } }
+            }
+        }"#,
+    );
+    let codex = loaded.quota_warnings(ProviderId::Codex);
+    assert_eq!(
+        codex.session,
+        QuotaWarningWindow {
+            enabled: Some(false),
+            high: None,
+            critical: None,
+        }
+    );
+    assert_eq!(codex.weekly, custom(Some(50.0), None));
+}
+
+#[test]
+fn migration_normalizes_out_of_range_and_unknown_entries() {
+    let loaded = load_settings_json(
+        r#"{
+            "provider_usage_thresholds": {
+                "codex": { "high": 120.0 },
+                "claude": {},
+                "codex:weekly": { "critical": -10.0 },
+                "codex:monthly": { "high": 10.0 },
+                "future-provider": { "high": 10.0 }
+            },
+            "provider_configs": {
+                "zai": { "quota_warnings": { "weekly": { "high": 140.0 } } }
+            }
+        }"#,
+    );
+    let codex = loaded.quota_warnings(ProviderId::Codex);
+    assert_eq!(codex.session, custom(Some(100.0), None));
+    assert_eq!(codex.weekly, custom(Some(100.0), Some(0.0)));
+    assert!(loaded.quota_warnings(ProviderId::Claude).is_empty());
+    assert_eq!(
+        loaded.quota_warnings(ProviderId::Zai).weekly,
+        custom(Some(100.0), None)
+    );
+}
+
+#[test]
+fn codex_option_toggles_round_trip_through_settings_json() {
+    let mut settings = Settings::default();
+    settings.set_local_session_cost_ledger_enabled(ProviderId::Codex, true);
+    settings.set_openai_web_battery_saver_enabled(ProviderId::Codex, true);
+    let reloaded = load_settings_json(&serde_json::to_string(&settings).expect("serialize"));
+    assert!(reloaded.local_session_cost_ledger_enabled(ProviderId::Codex));
+    assert!(reloaded.openai_web_battery_saver_enabled(ProviderId::Codex));
+    assert!(!Settings::default().local_session_cost_ledger_enabled(ProviderId::Codex));
+    assert!(!Settings::default().openai_web_battery_saver_enabled(ProviderId::Codex));
 }
 
 #[test]
@@ -838,6 +1060,64 @@ fn test_start_at_login_repairs_legacy_desktop_command_after_update() {
 fn test_language_defaults_to_english() {
     let settings = Settings::default();
     assert_eq!(settings.ui_language, Language::English);
+}
+
+#[test]
+fn new_install_language_follows_the_system() {
+    // No settings file: a new install, which follows the Windows display language.
+    let settings = Settings::load_from_path(None);
+    assert!(settings.ui_language_follows_system);
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let missing = dir.path().join("settings.json");
+    assert!(Settings::load_from_path(Some(&missing)).ui_language_follows_system);
+}
+
+#[test]
+fn legacy_settings_file_keeps_its_chosen_language() {
+    // A file written before "System" existed keeps the language it chose.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("settings.json");
+    std::fs::write(&path, r#"{ "ui_language": "japanese" }"#).expect("write");
+    let mut settings = Settings::load_from_path(Some(&path));
+    assert!(!settings.ui_language_follows_system);
+    assert!(!settings.resolve_system_language_with(Language::Korean));
+    assert_eq!(settings.ui_language, Language::Japanese);
+
+    std::fs::write(&path, "{}").expect("write");
+    let settings = Settings::load_from_path(Some(&path));
+    assert!(!settings.ui_language_follows_system);
+    assert_eq!(settings.ui_language, Language::English);
+}
+
+#[test]
+fn full_legacy_settings_file_keeps_its_chosen_language() {
+    // A complete file as the previous release wrote it: every field, but no
+    // `ui_language_follows_system` key.
+    let mut legacy = serde_json::to_value(Settings::default()).expect("json");
+    let object = legacy.as_object_mut().expect("settings object");
+    assert!(object.remove("ui_language_follows_system").is_some());
+    object.insert("ui_language".into(), serde_json::json!("japanese"));
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("settings.json");
+    std::fs::write(&path, serde_json::to_string_pretty(&legacy).expect("json")).expect("write");
+
+    let mut settings = Settings::load_from_path(Some(&path));
+    assert!(!settings.ui_language_follows_system);
+    assert!(!settings.resolve_system_language_with(Language::Turkish));
+    assert_eq!(settings.ui_language, Language::Japanese);
+}
+
+#[test]
+fn following_the_system_round_trips_through_the_file() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("settings.json");
+    let following = Settings::default();
+    std::fs::write(&path, serde_json::to_string(&following).expect("json")).expect("write");
+    let mut loaded = Settings::load_from_path(Some(&path));
+    assert!(loaded.ui_language_follows_system);
+    assert!(loaded.resolve_system_language_with(Language::Turkish));
+    assert_eq!(loaded.ui_language, Language::Turkish);
 }
 
 #[test]
@@ -1620,6 +1900,21 @@ fn adaptive_refresh_defaults_on_for_new_installs_only() {
     assert!(!explicit_off.adaptive_refresh);
 }
 
+/// Upstream `SettingsStore.swift:737`: `statusChecksEnabled ?? true`.
+#[test]
+fn status_checks_default_on_for_new_and_legacy_settings() {
+    assert!(Settings::default().status_checks_enabled);
+    let dir = tempfile::tempdir().expect("temp dir");
+    let path = dir.path().join("settings.json");
+    std::fs::write(&path, r#"{ "refresh_interval_secs": 600 }"#).expect("write legacy settings");
+    let legacy = Settings::load_from_path(Some(&path));
+    assert!(legacy.status_checks_enabled);
+    assert_eq!(legacy.refresh_interval_secs, 600);
+
+    std::fs::write(&path, r#"{ "status_checks_enabled": false }"#).expect("write explicit off");
+    assert!(!Settings::load_from_path(Some(&path)).status_checks_enabled);
+}
+
 // ── Mac parity PR 3: Menu Bar / Menu pane keys ──────────────────────────
 
 #[test]
@@ -1901,4 +2196,210 @@ fn stacked_tray_mode_survives_load_with_the_new_keys() {
     assert_eq!(reloaded.tray_icon_mode, TrayIconMode::Stacked);
     assert_eq!(reloaded.menu_bar_icon_style, MenuBarIconStyle::Percent);
     assert_eq!(reloaded.workday_tick_style, WorkdayTickStyle::HighContrast);
+}
+
+/// PR 4 / Q10: "Track costs" is on for new installs, and a file written before
+/// the key existed keeps scanning cost logs as it always did.
+#[test]
+fn cost_usage_enabled_defaults_on_for_new_installs_and_legacy_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let new_install = dir.path().join("missing.json");
+    let without_key = dir.path().join("settings.json");
+    std::fs::write(&without_key, r#"{ "enabled_providers": ["codex"] }"#).unwrap();
+
+    assert!(Settings::default().cost_usage_enabled);
+    assert!(Settings::load_from_path(Some(&new_install)).cost_usage_enabled);
+    assert!(Settings::load_from_path(Some(&without_key)).cost_usage_enabled);
+}
+
+#[test]
+fn cost_usage_enabled_off_round_trips_through_settings_persistence() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("settings.json");
+    let settings = Settings {
+        cost_usage_enabled: false,
+        ..Settings::default()
+    };
+    settings.save_to_path(&path).unwrap();
+    assert!(!Settings::load_from_path(Some(&path)).cost_usage_enabled);
+}
+
+/// A file without `spend_dashboard_period` copies the menu period, so the
+/// dashboard keeps showing the range it showed before the split.
+#[test]
+fn spend_dashboard_period_copies_cost_reporting_period_when_missing() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("settings.json");
+    std::fs::write(
+        &path,
+        r#"{ "enabled_providers": [], "cost_reporting_period": "month-to-date" }"#,
+    )
+    .unwrap();
+    let loaded = Settings::load_from_path(Some(&path));
+    assert_eq!(
+        loaded.spend_dashboard_period,
+        CostReportingPeriod::MonthToDate
+    );
+    assert_eq!(
+        loaded.cost_reporting_period,
+        CostReportingPeriod::MonthToDate
+    );
+
+    let null_key: Settings = serde_json::from_str(
+        r#"{ "cost_reporting_period": "all", "spend_dashboard_period": null }"#,
+    )
+    .unwrap();
+    assert_eq!(
+        null_key.spend_dashboard_period,
+        CostReportingPeriod::AllAvailable
+    );
+
+    assert_eq!(
+        Settings::default().spend_dashboard_period,
+        CostReportingPeriod::Rolling(30)
+    );
+}
+
+#[test]
+fn spend_dashboard_period_round_trips_apart_from_cost_reporting_period() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("settings.json");
+    for period in [
+        CostReportingPeriod::Rolling(7),
+        CostReportingPeriod::Rolling(90),
+        CostReportingPeriod::MonthToDate,
+        CostReportingPeriod::AllAvailable,
+    ] {
+        let settings = Settings {
+            cost_reporting_period: CostReportingPeriod::Rolling(30),
+            spend_dashboard_period: period,
+            ..Settings::default()
+        };
+        settings.save_to_path(&path).unwrap();
+        let loaded = Settings::load_from_path(Some(&path));
+        assert_eq!(loaded.spend_dashboard_period, period);
+        assert_eq!(
+            loaded.cost_reporting_period,
+            CostReportingPeriod::Rolling(30)
+        );
+    }
+}
+
+/// An unreadable saved dashboard period reads as the default (`rolling:30`),
+/// like `cost_reporting_period`; it does not copy the menu period.
+#[test]
+fn unreadable_spend_dashboard_period_loads_as_the_default() {
+    let loaded: Settings = serde_json::from_str(
+        r#"{ "cost_reporting_period": "all", "spend_dashboard_period": "weekly" }"#,
+    )
+    .expect("an unreadable period must not fail the whole settings file");
+    assert_eq!(
+        loaded.spend_dashboard_period,
+        CostReportingPeriod::Rolling(30)
+    );
+}
+
+#[test]
+fn spend_dashboard_hidden_sources_default_empty_normalize_and_round_trip() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("settings.json");
+    std::fs::write(&path, r#"{ "enabled_providers": [] }"#).unwrap();
+    assert!(
+        Settings::load_from_path(Some(&path))
+            .spend_dashboard_hidden_source_ids
+            .is_empty()
+    );
+    assert!(
+        Settings::default()
+            .spend_dashboard_hidden_source_ids
+            .is_empty()
+    );
+
+    std::fs::write(
+        &path,
+        r#"{ "spend_dashboard_hidden_source_ids": ["pi", " Codex", "", "pi"] }"#,
+    )
+    .unwrap();
+    let loaded = Settings::load_from_path(Some(&path));
+    assert_eq!(loaded.spend_dashboard_hidden_source_ids, ["codex", "pi"]);
+
+    loaded.save_to_path(&path).unwrap();
+    assert_eq!(
+        Settings::load_from_path(Some(&path)).spend_dashboard_hidden_source_ids,
+        ["codex", "pi"]
+    );
+}
+
+#[test]
+fn quota_warning_migration_saves_a_legacy_file_once_without_the_old_key() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("settings.json");
+    std::fs::write(
+        &path,
+        r#"{ "provider_usage_thresholds": { "codex:session": { "high": 80.0 } } }"#,
+    )
+    .expect("seed legacy file");
+    let mut settings = Settings::load_from_path(Some(&path));
+    assert!(settings.legacy_usage_thresholds_pending);
+
+    let mut saves = 0;
+    settings.apply_quota_warning_migration_with(|s| {
+        saves += 1;
+        s.save_to_path(&path)
+    });
+    assert_eq!(saves, 1);
+    assert!(!settings.legacy_usage_thresholds_pending);
+    let saved: serde_json::Value =
+        serde_json::from_str(&crate::secure_file::read_string(&path).expect("read back"))
+            .expect("saved json");
+    assert!(saved.get("provider_usage_thresholds").is_none());
+    assert_eq!(
+        saved["provider_configs"]["codex"]["quota_warnings"]["session"]["high"],
+        serde_json::json!(80.0)
+    );
+
+    // The rewritten file no longer asks for a save.
+    let mut reloaded = Settings::load_from_path(Some(&path));
+    assert!(!reloaded.legacy_usage_thresholds_pending);
+    reloaded.apply_quota_warning_migration_with(|_| {
+        saves += 1;
+        Ok(())
+    });
+    assert_eq!(saves, 1);
+}
+
+#[test]
+fn quota_warning_migration_retries_after_a_failed_save() {
+    let mut settings = load_settings_json(r#"{ "provider_usage_thresholds": { "claude": {} } }"#);
+    assert!(settings.legacy_usage_thresholds_pending);
+    settings.apply_quota_warning_migration_with(|_| Err(anyhow::anyhow!("disk full")));
+    assert!(settings.legacy_usage_thresholds_pending);
+    assert!(!Settings::default().legacy_usage_thresholds_pending);
+}
+
+#[test]
+fn custom_quota_warnings_with_explicit_enabled_round_trip() {
+    let mut settings = Settings::default();
+    let window = QuotaWarningWindow {
+        enabled: Some(true),
+        high: Some(55.0),
+        critical: Some(85.0),
+    };
+    settings.set_quota_warnings(
+        ProviderId::Codex,
+        ProviderQuotaWarnings {
+            session: window,
+            weekly: QuotaWarningWindow::default(),
+        },
+    );
+    let reloaded = load_settings_json(&serde_json::to_string(&settings).expect("serialize"));
+    assert_eq!(reloaded.quota_warnings(ProviderId::Codex).session, window);
+    assert!(reloaded.quota_warning_enabled(ProviderId::Codex, "session"));
+    assert_eq!(
+        reloaded.usage_thresholds(ProviderId::Codex, "session"),
+        UsageThresholds {
+            high: 55.0,
+            critical: 85.0,
+        }
+    );
 }

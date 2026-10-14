@@ -65,7 +65,7 @@ describe("UsageItemVisibilitySection", () => {
       },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "WindowRestore" }));
+    fireEvent.click(screen.getByRole("button", { name: "ProviderRestoreDefaults" }));
     expect(onChange).toHaveBeenLastCalledWith({
       providerHiddenUsageItemIds: { codex: [] },
     });

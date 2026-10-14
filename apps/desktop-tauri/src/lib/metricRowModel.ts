@@ -3,10 +3,10 @@ import type { LocaleKey } from "../i18n/keys";
 import type {
   PaceStage,
   RateWindowSnapshot,
-  SettingsSnapshot,
   WindowPaceSnapshot,
   WorkdayTickStyle,
 } from "../types/bridge";
+import { type QuotaWarningSettings, resolveQuotaWarning } from "./quotaWarnings";
 import { resetDescriptionFallback } from "./usageWindows";
 
 type Translate = (key: LocaleKey) => string;
@@ -15,10 +15,7 @@ export type MetricLane = "primary" | "secondary" | "tertiary" | "extra";
 
 type PaceKind = "session" | "weekly";
 
-export type UsageThresholdSettings = Pick<
-  SettingsSnapshot,
-  "highUsageThreshold" | "criticalUsageThreshold" | "providerUsageThresholds"
->;
+export type UsageThresholdSettings = QuotaWarningSettings;
 
 interface LanePolicy {
   thresholdWindow: "session" | "weekly" | null;
@@ -35,6 +32,11 @@ const LANE_POLICY: Record<MetricLane, LanePolicy> = {
   tertiary: { thresholdWindow: "weekly", workdayTicks: false, pace: "never" },
   extra: { thresholdWindow: null, workdayTicks: false, pace: "exactWindow" },
 };
+
+/** The quota warning window a lane follows (`null` for extra windows), as notifications do. */
+export function quotaWarningWindowForLane(lane: MetricLane): "session" | "weekly" | null {
+  return LANE_POLICY[lane].thresholdWindow;
+}
 
 const PACE_DIRECTION: Record<PaceStage, "onPace" | "deficit" | "reserve"> = {
   on_track: "onPace",
@@ -179,6 +181,23 @@ function absoluteResetDescription(target: Date, now: Date, t: Translate): string
   }).format(target);
 }
 
+/**
+ * Upstream `UsageFormatter.resetCountdownDescription`: the unlocalized "in 2d 3h"
+ * countdown that `syntheticRegenDetail` puts inside "Regenerates %@", always relative.
+ */
+function regenCountdown(seconds: number): string {
+  const parts = countdownParts(seconds);
+  if (!parts) return "now";
+  const { days, hours, minutes } = parts;
+  if (days > 0) {
+    if (hours > 0) return `in ${days}d ${hours}h`;
+    if (minutes > 0) return `in ${days}d ${minutes}m`;
+    return `in ${days}d`;
+  }
+  if (hours > 0) return minutes > 0 ? `in ${hours}h ${minutes}m` : `in ${hours}h`;
+  return `in ${minutes}m`;
+}
+
 export function metricResetText(
   snap: RateWindowSnapshot,
   relative: boolean,
@@ -189,13 +208,19 @@ export function metricResetText(
   if (!Number.isFinite(target)) {
     return normalizeResetDescription(resetDescriptionFallback(snap), t);
   }
+  if (snap.resetRegenerates) {
+    return fill(t("RegeneratesCountdown"), regenCountdown((target - now) / 1000));
+  }
   if (!relative) {
     return fill(t("ResetsAtLabel"), absoluteResetDescription(new Date(target), new Date(now), t));
   }
   return formatCountdown((target - now) / 1000, RESET_KEYS, t) ?? t("ProviderTextResetsNow");
 }
 
-function paceKind(lane: MetricLane, windowMinutes: number | null): PaceKind | null {
+function paceKind(lane: MetricLane, windowMinutes: number | null, resetWindow: boolean): PaceKind | null {
+  // Reset-window pace is weekly pace on every card lane, as on the Mac;
+  // extra windows keep their exact-window rule.
+  if (resetWindow && lane !== "extra") return "weekly";
   const rule = LANE_POLICY[lane].pace;
   if (rule === "never" || windowMinutes == null) return null;
   if (rule === "exactWindow") {
@@ -209,8 +234,12 @@ function visiblePace(input: MetricRowInput): { pace: WindowPaceSnapshot; kind: P
   const { snap } = input;
   const pace = snap.pace;
   if (!input.paceEnabled || !pace || !(snap.usedPercent < 100)) return null;
+  // A regenerating window shows its regen line instead of pace, as upstream
+  // MenuCardView+ModelHelpers.swift:179-186 and MenuCardView.swift:1407-1415
+  // do. The window keeps its length, so workday ticks and the tray still use it.
+  if (snap.resetRegenerates) return null;
   if (!Number.isFinite(pace.expectedUsedPercent) || !Number.isFinite(pace.actualUsedPercent)) return null;
-  const kind = paceKind(input.lane, snap.windowMinutes);
+  const kind = paceKind(input.lane, snap.windowMinutes, pace.resetWindow === true);
   if (!kind) return null;
   const expectsEnough = pace.expectedUsedPercent >= 3;
   if (kind === "session" ? !expectsEnough : !expectsEnough && pace.etaSeconds !== 0) return null;
@@ -238,20 +267,6 @@ function paceMetaText(pace: WindowPaceSnapshot, kind: PaceKind, t: Translate): s
   return right ? `${left} · ${right}` : left;
 }
 
-function threshold(
-  settings: UsageThresholdSettings,
-  providerId: string,
-  window: "session" | "weekly",
-  field: "high" | "critical",
-): number {
-  const overrides = settings.providerUsageThresholds ?? {};
-  return (
-    overrides[`${providerId}:${window}`]?.[field] ??
-    overrides[providerId]?.[field] ??
-    (field === "high" ? settings.highUsageThreshold : settings.criticalUsageThreshold)
-  );
-}
-
 function normalizedMarkerPercents(values: number[]): number[] {
   const kept: number[] = [];
   for (const value of values.map(clampPercent)) {
@@ -266,13 +281,17 @@ function barMarkers(input: MetricRowInput): UsageBarMarker[] {
   const policy = LANE_POLICY[input.lane];
   const window = policy.thresholdWindow;
   const settings = input.usageThresholds;
-  const warnings =
+  // A window set to Off for this provider shows no warning markers (Mac parity).
+  const resolved =
     window && settings && input.quotaWarningMarkersVisible
+      ? resolveQuotaWarning(settings, input.providerId, window)
+      : null;
+  const warnings =
+    resolved?.enabled
       ? normalizedMarkerPercents(
-          (["high", "critical"] as const).map((field) => {
-            const usedThreshold = threshold(settings, input.providerId, window, field);
-            return input.showAsUsed ? usedThreshold : 100 - usedThreshold;
-          }),
+          [resolved.high, resolved.critical].map((usedThreshold) =>
+            input.showAsUsed ? usedThreshold : 100 - usedThreshold,
+          ),
         )
       : [];
   const workDays = input.weeklyProgressWorkDays;

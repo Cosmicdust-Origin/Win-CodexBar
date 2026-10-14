@@ -83,6 +83,9 @@ pub struct UsageSpendSummary {
     pub reporting_period: String,
     pub reporting_day: String,
     pub dashboard_timezone: String,
+    /// False when "Track costs" is off: nothing was scanned and the summary
+    /// is empty, so the pane shows "Cost tracking is off".
+    pub cost_tracking_enabled: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -218,10 +221,14 @@ pub async fn get_usage_spend_summary(
     };
 
     // An explicit `period` wins; otherwise use the saved History window.
-    let period = CostReportingPeriod::resolve_request(
-        period.as_deref(),
-        codexbar::settings::Settings::load().cost_reporting_period,
-    );
+    let settings = codexbar::settings::Settings::load();
+    let period =
+        CostReportingPeriod::resolve_request(period.as_deref(), settings.cost_reporting_period);
+    // Checked before any cache read, so a summary built while tracking was on
+    // is never served after it is turned off.
+    if !settings.cost_usage_enabled {
+        return Ok(cost_tracking_off_summary(period));
+    }
     let force_refresh = force_refresh.unwrap_or(false);
     refresh_opencodex_pricing_before_build(&cached, period, force_refresh).await;
     let built = tauri::async_runtime::spawn_blocking(move || {
@@ -775,6 +782,22 @@ fn build_usage_spend_summary(
         reporting_period: period.raw(),
         reporting_day,
         dashboard_timezone,
+        cost_tracking_enabled: true,
+    }
+}
+
+/// The summary while "Track costs" is off: no rows, no scan.
+fn cost_tracking_off_summary(period: CostReportingPeriod) -> UsageSpendSummary {
+    UsageSpendSummary {
+        rows: Vec::new(),
+        contract: SpendContract::empty("codex", period),
+        reporting_period: period.raw(),
+        reporting_day: chrono::Local::now()
+            .date_naive()
+            .format("%Y-%m-%d")
+            .to_string(),
+        dashboard_timezone: codexbar::core::local_timezone_name(),
+        cost_tracking_enabled: false,
     }
 }
 
@@ -1046,7 +1069,20 @@ mod cache_key_tests {
             },
             reporting_day: "2026-10-01".to_string(),
             dashboard_timezone: "UTC".to_string(),
+            cost_tracking_enabled: true,
         }
+    }
+
+    #[test]
+    fn cost_tracking_off_summary_is_empty_and_flagged() {
+        let summary = cost_tracking_off_summary(CostReportingPeriod::MonthToDate);
+        assert!(!summary.cost_tracking_enabled);
+        assert!(summary.rows.is_empty());
+        assert_eq!(summary.reporting_period, "month-to-date");
+        assert_eq!(summary.contract.known_cost_usd, None);
+        assert!(summary.contract.daily.is_empty());
+        let json = serde_json::to_value(&summary).expect("serialize");
+        assert_eq!(json["costTrackingEnabled"], serde_json::json!(false));
     }
 
     #[test]

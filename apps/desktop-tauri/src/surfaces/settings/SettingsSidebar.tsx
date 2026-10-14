@@ -7,12 +7,14 @@ import type {
   SettingsUpdate,
 } from "../../types/bridge";
 import { useLocale } from "../../hooks/useLocale";
+import { useProviderStatuses } from "../../hooks/useProviderStatuses";
 import { reorderProviders } from "../../lib/tauri";
 import codexbarIcon from "../../assets/codexbar-icon.png";
 import {
   SIDEBAR_PANES,
   canReorderProviders,
   filterProvidersByQuery,
+  nextEnabledProviders,
   sortProvidersAlphabetically,
   type SidebarPane,
 } from "./settingsTabs";
@@ -80,6 +82,13 @@ const PANE_GLYPHS: Record<Exclude<SettingsTabId, "providers" | "about">, ReactEl
       <circle cx="11.5" cy="4" r="1.4" />
       <circle cx="8.5" cy="8" r="1.4" />
       <circle cx="13" cy="12" r="1.4" />
+    </Glyph>
+  ),
+  // macOS `bolt.horizontal.circle.fill`.
+  hooks: (
+    <Glyph>
+      <circle cx="8" cy="8" r="6.2" />
+      <path d="M3.8 8.6 7.4 5.6 7.4 7.4H12.2L8.6 10.4 8.6 8.6Z" />
     </Glyph>
   ),
 };
@@ -155,9 +164,13 @@ export function SettingsSidebar({
   const sorted = settings.providersSortedAlphabetically;
   const enabled = useMemo(() => new Set(settings.enabledProviders), [settings.enabledProviders]);
   const enabledCount = ordered.filter((p) => enabled.has(p.id)).length;
+  const serviceStatuses = useProviderStatuses();
 
   const rows: ProviderSidebarRow[] = useMemo(() => {
     const snapshotMap = new Map(snapshots.map((s) => [s.providerId, s]));
+    const serviceMap = new Map(
+      serviceStatuses.map((e) => [e.providerId, e.status?.indicator ?? "unknown"] as const),
+    );
     const shown = filterProvidersByQuery(
       sorted ? sortProvidersAlphabetically(ordered, enabled) : ordered,
       searchText,
@@ -169,15 +182,13 @@ export function SettingsSidebar({
         displayName: p.displayName,
         enabled: isOn,
         status: deriveProviderStatus(isOn, snapshotMap.get(p.id) ?? null),
+        service: isOn ? serviceMap.get(p.id) : undefined,
       };
     });
-  }, [enabled, ordered, searchText, snapshots, sorted]);
+  }, [enabled, ordered, searchText, serviceStatuses, snapshots, sorted]);
 
   const toggleEnabled = (id: string, on: boolean) => {
-    const next = new Set(enabled);
-    if (on) next.add(id);
-    else next.delete(id);
-    set({ enabledProviders: ordered.filter((p) => next.has(p.id)).map((p) => p.id) });
+    set({ enabledProviders: nextEnabledProviders(ordered, enabled, id, on) });
   };
 
   const handleReorder = (ids: string[]) => {

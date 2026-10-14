@@ -87,6 +87,12 @@
   --provider-status-error: #ff453a; /* macOS NSColor.systemRed */
   --provider-status-disabled: rgba(235, 235, 245, 0.28);
   --provider-status-loading: #60a5fa;
+  /* Service-status dot: macOS system colors (PreferencesSidebar.swift:236-244). */
+  --service-status-none: #30d158;
+  --service-status-minor: #ffd60a;
+  --service-status-major: #ff9f0a;
+  --service-status-critical: #ff453a;
+  --service-status-gray: #8e8e93;
   --provider-icon-ring: rgba(255, 255, 255, 0.06);
   --provider-icon-bg: rgba(255, 255, 255, 0.04);
 
@@ -189,6 +195,12 @@
   --provider-status-error: #ff453a; /* macOS NSColor.systemRed */
   --provider-status-disabled: rgba(235, 235, 245, 0.28);
   --provider-status-loading: #60a5fa;
+  /* Service-status dot: macOS system colors (PreferencesSidebar.swift:236-244). */
+  --service-status-none: #30d158;
+  --service-status-minor: #ffd60a;
+  --service-status-major: #ff9f0a;
+  --service-status-critical: #ff453a;
+  --service-status-gray: #8e8e93;
   --provider-icon-ring: rgba(255, 255, 255, 0.06);
   --provider-icon-bg: rgba(255, 255, 255, 0.04);
 
@@ -258,6 +270,11 @@
   --provider-status-error: #b91c1c;
   --provider-status-disabled: rgba(60, 60, 67, 0.28);
   --provider-status-loading: #007aff;
+  --service-status-none: #34c759;
+  --service-status-minor: #ffcc00;
+  --service-status-major: #ff9500;
+  --service-status-critical: #ff3b30;
+  --service-status-gray: #8e8e93;
   --provider-icon-ring: rgba(0, 0, 0, 0.08);
   --provider-icon-bg: rgba(0, 0, 0, 0.04);
 
@@ -1819,32 +1836,6 @@ body:has(.tray-panel-reveal),
   }
 }
 
-.provider-usage-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin-bottom: 8px;
-}
-
-.provider-usage-bar__header {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.72rem;
-}
-
-.provider-usage-bar__label {
-  color: var(--text-secondary);
-}
-
-.provider-usage-bar__pct {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.provider-usage-bar__status {
-  color: var(--text-secondary);
-}
-
 .provider-usage-bar__track {
   height: 5px;
   border-radius: 3px;
@@ -1857,12 +1848,6 @@ body:has(.tray-panel-reveal),
   border-radius: 3px;
   background: var(--accent);
   transition: width 0.3s;
-}
-
-.provider-usage-bar__reset,
-.provider-usage-bar__detail {
-  font-size: 0.68rem;
-  color: var(--text-muted);
 }
 
 .provider-detail-actions {
@@ -1939,6 +1924,32 @@ body:has(.tray-panel-reveal),
 .providers-sidebar__status--loading {
   background: var(--provider-status-loading);
   animation: provider-sidebar-pulse 1.4s ease-in-out infinite;
+}
+
+/* Service-status dot: shown instead of the fetch-status dot while
+   "Check provider status" is on and the provider has a status page. */
+.providers-sidebar__service {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--service-status-gray);
+}
+
+.providers-sidebar__service--none {
+  background: var(--service-status-none);
+}
+
+.providers-sidebar__service--minor {
+  background: var(--service-status-minor);
+}
+
+.providers-sidebar__service--major {
+  background: var(--service-status-major);
+}
+
+.providers-sidebar__service--critical {
+  background: var(--service-status-critical);
 }
 
 @keyframes provider-sidebar-pulse {
@@ -2039,32 +2050,6 @@ body:has(.tray-panel-reveal),
   flex-shrink: 0;
   flex-wrap: nowrap;
   white-space: nowrap;
-}
-
-.provider-detail-pace__stage {
-  font-size: 0.86rem;
-  font-weight: 600;
-  color: var(--provider-row-text-primary);
-}
-
-.provider-detail-pace__stage[data-stage="far_behind"],
-.provider-detail-pace__stage[data-stage="behind"] {
-  color: var(--provider-status-error);
-}
-
-.provider-detail-pace__stage[data-stage="far_ahead"],
-.provider-detail-pace__stage[data-stage="ahead"] {
-  color: var(--provider-status-stale);
-}
-
-.provider-detail-pace__aux {
-  font-size: 0.78rem;
-  color: var(--provider-row-text-secondary);
-  margin-top: 2px;
-}
-
-.provider-usage-bar__pct[data-exhausted="true"] {
-  color: var(--provider-status-error);
 }
 
 .provider-usage-bar__fill[data-exhausted="true"] {
@@ -3713,6 +3698,13 @@ html:has(.menu-surface--tray) {
 .menu-surface__footer-row:disabled {
   color: var(--mac-text-3);
   cursor: default;
+}
+.menu-surface__footer-note {
+  margin: 0;
+  padding: 2px var(--mac-row-pl);
+  color: var(--mac-text-2);
+  font: var(--mac-text-menu);
+  overflow-wrap: anywhere;
 }
 .menu-surface__footer-icon {
   display: inline-flex;

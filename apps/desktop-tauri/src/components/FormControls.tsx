@@ -168,15 +168,18 @@ export function SettingsGroup({
   title,
   footer,
   children,
+  className,
 }: {
   title?: string;
   footer?: React.ReactNode;
   children: React.ReactNode;
+  /** Extra classes on the `section` (e.g. a dimmed or provider-detail variant). */
+  className?: string;
 }) {
   const id = useId();
   return (
     <section
-      className="settings-group"
+      className={className ? `settings-group ${className}` : "settings-group"}
       aria-labelledby={title ? `${id}-title` : undefined}
     >
       {title && (

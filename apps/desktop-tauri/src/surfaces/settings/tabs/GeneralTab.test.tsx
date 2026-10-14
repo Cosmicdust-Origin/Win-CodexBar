@@ -46,6 +46,7 @@ const settings: SettingsSnapshot = {
   refreshIntervalSecs: 300,
     adaptiveRefresh: false,
   refreshAllProvidersOnMenuOpen: false,
+  statusChecksEnabled: true,
   lowPowerMode: false,
   startAtLogin: false,
   startMinimized: false,
@@ -93,6 +94,7 @@ const settings: SettingsSnapshot = {
   codexCustomSessionsDirs: [],
   updateChannel: "stable",
   uiLanguage: "english",
+  uiLanguageFollowsSystem: false,
   theme: "dark",
   claudeAvoidKeychainPrompts: true,
   codexSparkUsageVisible: true,
@@ -126,6 +128,32 @@ describe("GeneralTab running version", () => {
 });
 
 describe("GeneralTab language picker", () => {
+  it("lists System first and shows it while following the system", () => {
+    render(
+      <GeneralTab
+        settings={{ ...settings, uiLanguage: "korean", uiLanguageFollowsSystem: true }}
+        set={vi.fn()}
+        saving={false}
+      />,
+    );
+
+    const select = screen.getByDisplayValue("System") as HTMLSelectElement;
+    expect(select.value).toBe("system");
+    expect(select.querySelectorAll("option")[0].textContent).toBe("System");
+  });
+
+  it("picking System follows the system; picking a language stops following", () => {
+    const set = vi.fn();
+    render(<GeneralTab settings={settings} set={set} saving={false} />);
+
+    const select = screen.getByDisplayValue("English");
+    fireEvent.change(select, { target: { value: "system" } });
+    expect(set).toHaveBeenLastCalledWith({ uiLanguageFollowsSystem: true });
+
+    fireEvent.change(select, { target: { value: "japanese" } });
+    expect(set).toHaveBeenLastCalledWith({ uiLanguage: "japanese" });
+  });
+
   it("renders all supported language options", () => {
     render(<GeneralTab settings={settings} set={vi.fn()} saving={false} />);
 
@@ -225,6 +253,35 @@ describe("GeneralTab language picker", () => {
     expect(set).toHaveBeenCalledWith({ lowPowerModePreference: "automatic" });
   });
 
+  it("shows Check provider status on by default and saves turning it off", () => {
+    const set = vi.fn();
+    render(<GeneralTab settings={settings} set={set} saving={false} />);
+
+    const toggle = screen.getByRole("checkbox", { name: "CheckProviderStatus" });
+    expect(toggle).toBeChecked();
+    expect(screen.getByText("CheckProviderStatusHelper")).toBeInTheDocument();
+    fireEvent.click(toggle);
+
+    expect(set).toHaveBeenCalledWith({ statusChecksEnabled: false });
+  });
+
+  it("shows Check provider status off when saved off and saves turning it on", () => {
+    const set = vi.fn();
+    render(
+      <GeneralTab
+        settings={{ ...settings, statusChecksEnabled: false }}
+        set={set}
+        saving={false}
+      />,
+    );
+
+    const toggle = screen.getByRole("checkbox", { name: "CheckProviderStatus" });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+
+    expect(set).toHaveBeenCalledWith({ statusChecksEnabled: true });
+  });
+
   it("updates the default notification sound set", () => {
     const set = vi.fn();
     render(
@@ -259,6 +316,26 @@ describe("GeneralTab language picker", () => {
     expect(invoke).toHaveBeenCalledWith("play_notification_sound", {
       event: "sessionRestored",
     });
+  });
+
+  it("cancels the sound preview timer on unmount", () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = render(
+        <GeneralTab mode="notifications" settings={settings} set={vi.fn()} saving={false} />,
+      );
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "NotificationSoundEventHighUsage: NotificationTestSound",
+        }),
+      );
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("assigns and clears a custom WAV for one notification", async () => {
@@ -329,38 +406,12 @@ describe("GeneralTab language picker", () => {
     expect(preview).toBeEnabled();
   });
 
-  it("saves a window override on blur and clears it to resume inheritance", () => {
-    const set = vi.fn();
-    const { rerender } = render(
-      <GeneralTab mode="notifications" settings={settings} set={set} saving={false} />,
-    );
-    const input = screen.getByRole("spinbutton", {
-      name: "ProviderNameCodex · ProviderSession HighUsageAlert",
-    });
-
-    fireEvent.change(input, { target: { value: "80" } });
-    fireEvent.blur(input);
-    expect(set).toHaveBeenLastCalledWith({
-      providerUsageThresholds: { "codex:session": { high: 80 } },
-    });
-
-    rerender(
-      <GeneralTab
-        mode="notifications"
-        settings={{
-          ...settings,
-          providerUsageThresholds: { "codex:session": { high: 80 } },
-        }}
-        set={set}
-        saving={false}
-      />,
-    );
-    const saved = screen.getByRole("spinbutton", {
-      name: "ProviderNameCodex · ProviderSession HighUsageAlert",
-    });
-    fireEvent.change(saved, { target: { value: "" } });
-    fireEvent.blur(saved);
-    expect(set).toHaveBeenLastCalledWith({ providerUsageThresholds: {} });
+  it("no longer offers per-provider threshold overrides (they moved to Providers)", () => {
+    render(<GeneralTab mode="notifications" settings={settings} set={vi.fn()} saving={false} />);
+    expect(screen.queryByText("ThresholdOverridesTitle")).toBeNull();
+    expect(
+      screen.queryByRole("spinbutton", { name: /ProviderNameCodex · ProviderSession/ }),
+    ).toBeNull();
   });
 });
 
@@ -641,7 +692,7 @@ describe("GeneralTab notifications pane", () => {
     ).not.toBeChecked();
   });
 
-  it("locks credential and pace alerts and hides thresholds while usage warnings are off", () => {
+  it("locks credential and pace alerts but keeps the thresholds while usage warnings are off (#816)", () => {
     render(
       <GeneralTab
         mode="notifications"
@@ -662,18 +713,21 @@ describe("GeneralTab notifications pane", () => {
     expect(credential).toBeDisabled();
     expect(credential).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "SessionQuotaNotifications" })).toBeEnabled();
-    expect(screen.queryByText("WarningAtPercentUsed")).toBeNull();
+    // The thresholds also colour the usage bars and the float bar, so they stay editable.
+    expect(screen.getByText("WarningAtPercentUsed")).toBeInTheDocument();
+    expect(screen.getByText("CriticalAtPercentUsed")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("70")).toBeEnabled();
+    expect(screen.getByDisplayValue("90")).toBeEnabled();
     expect(screen.queryByText("ThresholdOverridesTitle")).toBeNull();
     expect(screen.getByRole("checkbox", { name: "SoundEnabled" })).toBeInTheDocument();
   });
 
-  it("shows % used thresholds and overrides while usage warnings are on", () => {
+  it("shows % used thresholds while usage warnings are on", () => {
     render(
       <GeneralTab mode="notifications" settings={settings} set={vi.fn()} saving={false} />,
     );
     expect(screen.getByText("WarningAtPercentUsed")).toBeInTheDocument();
     expect(screen.getByText("CriticalAtPercentUsed")).toBeInTheDocument();
-    expect(screen.getByText("ThresholdOverridesTitle")).toBeInTheDocument();
     expect(screen.getByText("ThresholdsCaption")).toBeInTheDocument();
   });
 

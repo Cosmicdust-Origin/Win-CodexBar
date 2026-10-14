@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   claudeReconciliationState: vi.fn(),
   getSettingsSnapshot: vi.fn(),
   getCurrencyRates: vi.fn(),
-  updateSettings: vi.fn(),
 }));
 const events = vi.hoisted(() => ({
   listen: vi.fn<(event: string, listener: () => void) => Promise<() => void>>(),
@@ -69,10 +68,7 @@ describe("ClaudeSwapAccountsSection", () => {
     vi.resetAllMocks();
     events.listen.mockResolvedValue(() => {});
     mocks.claudeReconciliationState.mockResolvedValue(null);
-    mocks.getSettingsSnapshot.mockResolvedValue({
-      claudeSwapEnabled: false,
-      claudeSwapExecutablePath: "",
-    });
+    mocks.getSettingsSnapshot.mockResolvedValue({});
     mocks.getCurrencyRates.mockResolvedValue({ rates: { USD: 1, TRY: 48.5 } });
     mocks.claudeSwapAccountsList.mockResolvedValue({
       enabled: false,
@@ -82,30 +78,45 @@ describe("ClaudeSwapAccountsSection", () => {
     });
   });
 
-  it("shows the disabled status and persists an explicit opt-in", async () => {
-    render(<ClaudeSwapAccountsSection t={t} />);
-    await screen.findByText("ClaudeSwapTitle");
-    expect((screen.getByRole("checkbox") as HTMLInputElement).checked).toBe(false);
-    mocks.updateSettings.mockResolvedValue(undefined);
-    mocks.claudeSwapAccountsList.mockResolvedValue(
-      enabledState([active, switchable]),
+  it("renders nothing while claude-swap is off and lists accounts once it is on", async () => {
+    const { container, rerender } = render(
+      <ClaudeSwapAccountsSection t={t} enabled={false} executablePath="" />,
     );
-    await act(async () => fireEvent.click(screen.getByRole("checkbox")));
-    expect(mocks.updateSettings).toHaveBeenCalledWith({ claudeSwapEnabled: true });
+    await act(async () => {});
+    expect(container.innerHTML).toBe("");
+    expect(mocks.claudeSwapAccountsList).not.toHaveBeenCalled();
+
+    mocks.claudeSwapAccountsList.mockResolvedValue(enabledState([active, switchable]));
+    rerender(<ClaudeSwapAccountsSection t={t} enabled executablePath="~/bin/cswap" />);
+    await screen.findByText("work@example.com");
+    expect(screen.getByText("ClaudeSwapTitle")).toBeTruthy();
+    expect(screen.getByText("ClaudeSwapStatusReady")).toBeTruthy();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
+  it("reloads the list when the executable path changes", async () => {
+    mocks.claudeSwapAccountsList.mockResolvedValue({
+      enabled: true, executableConfigured: false, accounts: [], error: null,
+    });
+    const { rerender } = render(
+      <ClaudeSwapAccountsSection t={t} enabled executablePath="" />,
+    );
+    await screen.findByText("ClaudeSwapStatusNoExecutable");
+    mocks.claudeSwapAccountsList.mockResolvedValue(enabledState([active]));
+    rerender(<ClaudeSwapAccountsSection t={t} enabled executablePath="C:/tools/cswap.exe" />);
+    await screen.findByText("work@example.com");
+    expect(mocks.claudeSwapAccountsList).toHaveBeenCalledTimes(2);
   });
 
   it("switches only actionable inactive accounts and reports success", async () => {
-    mocks.getSettingsSnapshot.mockResolvedValue({
-      claudeSwapEnabled: true,
-      claudeSwapExecutablePath: "~/bin/cswap",
-    });
     mocks.claudeSwapAccountsList.mockResolvedValue(
       enabledState([active, switchable, blocked]),
     );
     mocks.claudeSwapAccountSwitch.mockResolvedValue({
       generation: 1, status: "succeeded", providerRefreshGeneration: 1, detail: "published",
     });
-    render(<ClaudeSwapAccountsSection t={t} />);
+    render(<ClaudeSwapAccountsSection t={t} enabled executablePath="~/bin/cswap" />);
     await screen.findByText("work@example.com");
 
     expect(screen.getByText("TokenAccountActive")).toBeTruthy();
@@ -121,10 +132,6 @@ describe("ClaudeSwapAccountsSection", () => {
   });
 
   it("renders no action button when the adapter is read-only", async () => {
-    mocks.getSettingsSnapshot.mockResolvedValue({
-      claudeSwapEnabled: true,
-      claudeSwapExecutablePath: "~/bin/cswap",
-    });
     // Read-only adapters project `action: null` for every row, including
     // inactive rows that would otherwise be switchable.
     mocks.claudeSwapAccountsList.mockResolvedValue(
@@ -134,7 +141,7 @@ describe("ClaudeSwapAccountsSection", () => {
         { ...active, id: "claude-swap:4", slot: 4, label: "foreign@example.com", status: "foreign_credential", action: null },
       ]),
     );
-    render(<ClaudeSwapAccountsSection t={t} />);
+    render(<ClaudeSwapAccountsSection t={t} enabled executablePath="~/bin/cswap" />);
     await screen.findByText("work@example.com");
 
     expect(screen.getByText("personal@example.com")).toBeTruthy();
@@ -146,51 +153,25 @@ describe("ClaudeSwapAccountsSection", () => {
   });
 
   it("surfaces adapter errors without offering a switch", async () => {
-    mocks.getSettingsSnapshot.mockResolvedValue({
-      claudeSwapEnabled: true,
-      claudeSwapExecutablePath: "~/bin/cswap",
-    });
     mocks.claudeSwapAccountsList.mockResolvedValue({
       enabled: true,
       executableConfigured: true,
       accounts: [],
       error: "claude-swap did not respond within 30 seconds.",
     });
-    render(<ClaudeSwapAccountsSection t={t} />);
+    render(<ClaudeSwapAccountsSection t={t} enabled executablePath="~/bin/cswap" />);
     await waitFor(() =>
       expect(screen.getByRole("alert").textContent).toContain("did not respond"),
     );
     expect(screen.queryByText("ClaudeSwapSwitchButton")).toBeNull();
   });
 
-  it("allows retrying the same executable path after a failed save", async () => {
-    render(<ClaudeSwapAccountsSection t={t} />);
-    await act(async () => {});
-    const input = screen.getByRole("textbox");
-    mocks.updateSettings.mockRejectedValueOnce("Save failed.");
-    await act(async () => {
-      fireEvent.change(input, { target: { value: "C:/tools/cswap.exe" } });
-      fireEvent.blur(input);
-    });
-    expect(screen.getByRole("alert").textContent).toContain("Save failed.");
-    mocks.updateSettings.mockResolvedValueOnce(undefined);
-    await act(async () => fireEvent.blur(input));
-    expect(mocks.updateSettings).toHaveBeenCalledTimes(2);
-    expect(mocks.updateSettings).toHaveBeenLastCalledWith({
-      claudeSwapExecutablePath: "C:/tools/cswap.exe",
-    });
-  });
-
   it("shows a switch failure without claiming success", async () => {
-    mocks.getSettingsSnapshot.mockResolvedValue({
-      claudeSwapEnabled: true,
-      claudeSwapExecutablePath: "~/bin/cswap",
-    });
     mocks.claudeSwapAccountsList.mockResolvedValue(
       enabledState([active, switchable]),
     );
     mocks.claudeSwapAccountSwitch.mockRejectedValue("cswap failed.");
-    render(<ClaudeSwapAccountsSection t={t} />);
+    render(<ClaudeSwapAccountsSection t={t} enabled executablePath="~/bin/cswap" />);
     await screen.findByText("personal@example.com");
     await act(async () =>
       fireEvent.click(screen.getByText("ClaudeSwapSwitchButton")),
@@ -206,15 +187,11 @@ describe("ClaudeSwapAccountsSection", () => {
       action: "reauthenticate",
       error: "claude-swap reports the live credential belongs to a different account.",
     };
-    mocks.getSettingsSnapshot.mockResolvedValue({
-      claudeSwapEnabled: true,
-      claudeSwapExecutablePath: "~/bin/cswap",
-    });
     mocks.claudeSwapAccountsList.mockResolvedValue(enabledState([foreign]));
     mocks.claudeSwapAccountReauthenticate.mockResolvedValue({
       generation: 2, status: "succeeded", providerRefreshGeneration: 2, detail: "published",
     });
-    render(<ClaudeSwapAccountsSection t={t} />);
+    render(<ClaudeSwapAccountsSection t={t} enabled executablePath="~/bin/cswap" />);
     await screen.findByText("work@example.com");
     await act(async () =>
       fireEvent.click(screen.getByText("ClaudeSwapReauthenticateButton")),
@@ -250,15 +227,11 @@ describe("ClaudeSwapAccountsSection", () => {
         provenance: "source_reported_last_good",
       },
     };
-    mocks.getSettingsSnapshot.mockResolvedValue({
-      claudeSwapEnabled: true,
-      claudeSwapExecutablePath: "~/bin/cswap",
-      preferredCurrencyCode: "TRY",
-    });
+    mocks.getSettingsSnapshot.mockResolvedValue({ preferredCurrencyCode: "TRY" });
     mocks.claudeSwapAccountsList.mockResolvedValue(enabledState([account]));
     render(
       <CurrencyProvider>
-        <ClaudeSwapAccountsSection t={t} />
+        <ClaudeSwapAccountsSection t={t} enabled executablePath="~/bin/cswap" />
       </CurrencyProvider>,
     );
     await screen.findByText("personal@example.com");

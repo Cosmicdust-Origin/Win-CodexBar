@@ -26,6 +26,11 @@ const OLLAMA_VALIDATION_URL: &str = "https://ollama.com/api/web_search";
 const OLLAMA_MONTHLY_WINDOW_MINUTES: u32 = 30 * 24 * 60;
 const OLLAMA_MONTHLY_USAGE_LABEL: &str = "Monthly usage";
 
+/// Reset-window pace (upstream `OllamaProviderDescriptor.pace`, v0.70.0):
+/// `.calendarMonthResetWindow`.
+pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
+    crate::core::ProviderPaceCapability::CALENDAR_MONTH_RESET_WINDOW;
+
 /// Ollama provider
 pub struct OllamaProvider {
     metadata: ProviderMetadata,

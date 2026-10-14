@@ -298,6 +298,12 @@ impl NotificationManager {
         used_percent: f64,
         settings: &Settings,
     ) {
+        if !settings.quota_warning_enabled(provider, window) {
+            // Quota warnings set to Off for this provider window: forget its
+            // sent state so turning them back on starts fresh (Mac parity).
+            self.clear_threshold_toasts(provider, account, window);
+            return;
+        }
         if !settings.show_notifications {
             return;
         }
@@ -313,9 +319,7 @@ impl NotificationManager {
             // Clear only this provider+account+window's threshold toasts so a cool
             // session on one account cannot re-arm another account's weekly (or
             // another window on the same account) on the next poll.
-            self.sent_notifications.retain(|(p, a, w, t)| {
-                *p != provider || a != account || w != window || !t.is_threshold_toast()
-            });
+            self.clear_threshold_toasts(provider, account, window);
             None
         };
 
@@ -331,6 +335,12 @@ impl NotificationManager {
                 self.sent_notifications.insert(key);
             }
         }
+    }
+
+    fn clear_threshold_toasts(&mut self, provider: ProviderId, account: &str, window: &str) {
+        self.sent_notifications.retain(|(p, a, w, t)| {
+            *p != provider || a != account || w != window || !t.is_threshold_toast()
+        });
     }
 
     /// Observe a session lane across all session consumers. Informational
@@ -968,6 +978,89 @@ mod tests {
             &risk,
         ));
         assert_eq!(manager.predictive_warning_keys.len(), 2);
+    }
+
+    #[test]
+    fn quota_warnings_off_suppresses_threshold_toasts_for_that_window_only() {
+        use crate::settings::{ProviderQuotaWarnings, QuotaWarningWindow};
+        let mut manager = NotificationManager::new();
+        let mut settings = Settings::default();
+        let account = "";
+        let key = |window: &str, kind| {
+            (
+                ProviderId::Claude,
+                account.to_string(),
+                window.to_string(),
+                kind,
+            )
+        };
+
+        manager.check_and_notify(ProviderId::Claude, account, "session", 80.0, &settings);
+        assert!(
+            manager
+                .sent_notifications
+                .contains(&key("session", NotificationType::HighUsage))
+        );
+
+        settings.set_quota_warnings(
+            ProviderId::Claude,
+            ProviderQuotaWarnings {
+                session: QuotaWarningWindow {
+                    enabled: Some(false),
+                    high: None,
+                    critical: None,
+                },
+                weekly: QuotaWarningWindow::default(),
+            },
+        );
+        manager.check_and_notify(ProviderId::Claude, account, "session", 95.0, &settings);
+        manager.check_and_notify(ProviderId::Claude, account, "weekly", 80.0, &settings);
+        assert!(
+            !manager
+                .sent_notifications
+                .iter()
+                .any(|(_, _, window, _)| window == "session"),
+            "Off clears and suppresses the session window"
+        );
+        assert!(
+            manager
+                .sent_notifications
+                .contains(&key("weekly", NotificationType::HighUsage)),
+            "the Global weekly window still warns"
+        );
+    }
+
+    #[test]
+    fn custom_quota_warning_threshold_decides_when_a_toast_fires() {
+        use crate::settings::{ProviderQuotaWarnings, QuotaWarningWindow};
+        let mut manager = NotificationManager::new();
+        let mut settings = Settings::default();
+        settings.set_quota_warnings(
+            ProviderId::Codex,
+            ProviderQuotaWarnings {
+                session: QuotaWarningWindow {
+                    enabled: None,
+                    high: Some(40.0),
+                    critical: Some(60.0),
+                },
+                weekly: QuotaWarningWindow::default(),
+            },
+        );
+        manager.check_and_notify(ProviderId::Codex, "", "session", 45.0, &settings);
+        assert!(manager.sent_notifications.contains(&(
+            ProviderId::Codex,
+            String::new(),
+            "session".to_string(),
+            NotificationType::HighUsage,
+        )));
+        // 45% is below the global 70% high threshold, so weekly stays quiet.
+        manager.check_and_notify(ProviderId::Codex, "", "weekly", 45.0, &settings);
+        assert!(
+            !manager
+                .sent_notifications
+                .iter()
+                .any(|(_, _, window, _)| window == "weekly")
+        );
     }
 
     #[test]

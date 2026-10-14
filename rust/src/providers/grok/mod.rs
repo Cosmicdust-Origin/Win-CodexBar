@@ -37,6 +37,13 @@ const CLI_SETTINGS_ENDPOINT: &str = "https://cli-chat-proxy.grok.com/v1/settings
 const RESET_CREDITS_TIMEOUT: Duration = Duration::from_secs(2);
 const RESET_CREDITS_JOIN_GRACE: Duration = Duration::from_millis(250);
 
+/// Reset-window pace (upstream `GrokProviderDescriptor.pace`, v0.70.0): weekly
+/// windows inside their length, see [`reset_window_pace_matches`].
+pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
+    crate::core::ProviderPaceCapability::reset_window(crate::core::PaceWindowRule::Custom(
+        reset_window_pace_matches,
+    ));
+
 pub struct GrokProvider {
     metadata: ProviderMetadata,
     client: Client,
@@ -757,6 +764,44 @@ fn primary_label_for_cycle_minutes(minutes: u32) -> Option<&'static str> {
     } else {
         None
     }
+}
+
+/// Upstream `GrokProviderDescriptor.primaryLabel(window:now:)`: the label of
+/// the window's duration, or of the distance to its reset when the duration
+/// is unknown.
+fn primary_label_for_window(window: &RateWindow, now: DateTime<Utc>) -> Option<&'static str> {
+    if let Some(minutes) = window.window_minutes {
+        return primary_label_for_cycle_minutes(minutes);
+    }
+    let resets_at = window.resets_at?;
+    let seconds = (resets_at - now).num_milliseconds() as f64 / 1_000.0;
+    if seconds <= 3_600.0 {
+        return None;
+    }
+    let days = (seconds / 86_400.0).round();
+    if (4.0..=12.0).contains(&days) {
+        Some("Weekly")
+    } else if (20.0..=45.0).contains(&days) {
+        Some("Monthly")
+    } else {
+        None
+    }
+}
+
+/// Upstream Grok `ProviderPaceCapability.resetWindowPace`: a window labelled
+/// "Weekly" whose reset falls inside its length (7 days when unknown).
+pub(crate) fn reset_window_pace_matches(window: &RateWindow, now: DateTime<Utc>) -> bool {
+    if primary_label_for_window(window, now) != Some("Weekly") {
+        return false;
+    }
+    let Some(resets_at) = window.resets_at else {
+        return false;
+    };
+    let window_minutes = window.window_minutes.unwrap_or(7 * 24 * 60);
+    let until_reset = resets_at - now;
+    window_minutes > 0
+        && until_reset > chrono::Duration::zero()
+        && until_reset <= chrono::Duration::minutes(i64::from(window_minutes))
 }
 
 fn result_from_cookie_billing(billing: GrokBillingSnapshot) -> ProviderFetchResult {

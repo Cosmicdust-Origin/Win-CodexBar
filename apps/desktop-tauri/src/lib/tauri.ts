@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  HooksConfigSave,
+  HooksConfigSnapshot,
   ClaudeAccount,
   ClaudeReconciliationSnapshot,
   GrokAccount,
@@ -16,6 +18,7 @@ import type {
   LocaleStrings,
   NotificationSoundEvent,
   ProviderCatalogEntry,
+  ProviderStatusEntry,
   ProviderChartData,
   ProviderDetail,
   ProviderLocalUsageSummary,
@@ -82,6 +85,10 @@ export function getProviderCatalog(): Promise<ProviderCatalogEntry[]> {
   return invoke<ProviderCatalogEntry[]>("get_provider_catalog");
 }
 
+export function getProviderStatuses(): Promise<ProviderStatusEntry[]> {
+  return invoke<ProviderStatusEntry[]>("get_provider_statuses");
+}
+
 export function reorderProviders(ids: string[]): Promise<ProviderSummary[]> {
   return invoke<ProviderSummary[]>("reorder_providers", { ids });
 }
@@ -96,6 +103,14 @@ export function getCurrencyRates(preferredCurrencyCode: string): Promise<Currenc
 
 export function getStayAwakeStatus(): Promise<boolean> {
   return invoke<boolean>("get_stay_awake_status");
+}
+
+export function getHooksConfig(): Promise<HooksConfigSnapshot> {
+  return invoke<HooksConfigSnapshot>("get_hooks_config");
+}
+
+export function saveHooksConfig(request: HooksConfigSave): Promise<HooksConfigSnapshot> {
+  return invoke<HooksConfigSnapshot>("save_hooks_config", { request });
 }
 
 export function updateSettings(

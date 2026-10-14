@@ -7,6 +7,7 @@ import type {
 } from "../../../../types/bridge";
 import type { LocaleKey } from "../../../../i18n/keys";
 import { localizeWindowLabel } from "../../../../lib/windowLabels";
+import { Field, Select, SettingsGroup } from "../../../../components/FormControls";
 
 interface Props {
   provider: ProviderDetail;
@@ -50,29 +51,26 @@ export function MenuBarMetricSection({
     }
   };
 
+  // Mac shows the picker only when there is a choice to make; a saved choice
+  // the provider no longer offers adds an option, so it stays visible then.
+  if (options.length <= 1) return null;
+
   return (
-    <section className="provider-detail-section provider-detail-menu-metric">
-      <h4>{t("TrayDisplayTitle")}</h4>
-      <label className="provider-detail-field">
-        <span className="provider-detail-field__label">
-          {t("MenuBarMetric")}
-        </span>
-        <select
-          className="provider-detail-select"
+    <SettingsGroup
+      className="provider-detail-group provider-metric-group"
+      footer={t("MenuBarMetricHelper")}
+    >
+      <Field label={t("MenuBarMetric")}>
+        <Select
+          variant="menu"
           value={selected}
+          options={options}
           disabled={disabled}
-          onChange={(e) => handleChange(e.target.value as MetricPreference)}
-        >
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <p className="provider-detail-helper">{t("MenuBarMetricHelper")}</p>
-      {error && <p className="provider-detail-error">{error}</p>}
-    </section>
+          onChange={(value) => handleChange(value as MetricPreference)}
+        />
+      </Field>
+      {error && <p className="provider-option-error">{error}</p>}
+    </SettingsGroup>
   );
 }
 

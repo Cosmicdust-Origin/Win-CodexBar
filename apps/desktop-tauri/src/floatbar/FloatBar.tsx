@@ -24,14 +24,42 @@ import { costPeriodShortLabel } from "../lib/costPeriod";
 import { describeProviderState } from "../lib/providerState";
 import { resetDescriptionFallback, windowDetailText } from "../lib/usageWindows";
 import { localizeProviderText } from "../lib/providerText";
+import { type MetricLane, quotaWarningWindowForLane } from "../lib/metricRowModel";
+import { type QuotaWarningSettings, resolveQuotaWarning } from "../lib/quotaWarnings";
 import type {
   BootstrapState,
   ProviderLocalUsageSummary,
   ProviderUsageSnapshot,
+  RateWindowSnapshot,
   SettingsSnapshot,
 } from "../types/bridge";
 import { FLOAT_BAR_CONFIG_CHANGED_EVENT, resizeFloatBar } from "./api";
 import "./FloatBar.css";
+
+function sameWindow(a: RateWindowSnapshot, b: RateWindowSnapshot): boolean {
+  return (
+    a.usedPercent === b.usedPercent &&
+    a.windowMinutes === b.windowMinutes &&
+    a.resetsAt === b.resetsAt &&
+    a.resetDescription === b.resetDescription &&
+    a.isExhausted === b.isExhausted &&
+    a.isInformational === b.isInformational
+  );
+}
+
+/**
+ * The card lane the selected metric came from, so the pill tone follows the
+ * same quota warning window as the card markers and the toasts (primary is
+ * Session, secondary and tertiary are Weekly). `null` for a window that is not
+ * one of the three lanes, such as an icon fallback extra window.
+ */
+function selectedMetricLane(provider: ProviderUsageSnapshot): MetricLane | null {
+  const selected = provider.selectedMetric;
+  if (sameWindow(selected, provider.primary)) return "primary";
+  if (provider.secondary && sameWindow(selected, provider.secondary)) return "secondary";
+  if (provider.tertiary && sameWindow(selected, provider.tertiary)) return "tertiary";
+  return null;
+}
 
 function ResetIcon({ size }: { size: number }) {
   return (
@@ -199,8 +227,7 @@ function brandStyle(brand: string): CSSProperties {
  */
 function ProviderPill({
   provider,
-  highRemaining,
-  critRemaining,
+  thresholds,
   showAsUsed,
   scale,
   showResetInline,
@@ -210,8 +237,7 @@ function ProviderPill({
   stateLabel,
 }: {
   provider: ProviderUsageSnapshot;
-  highRemaining: number;
-  critRemaining: number;
+  thresholds: QuotaWarningSettings;
   showAsUsed: boolean;
   scale: number;
   showResetInline: boolean;
@@ -228,6 +254,20 @@ function ProviderPill({
   const displayPercent = showAsUsed ? used : remaining;
   const displaySuffix = showAsUsed ? usedSuffix : remainingSuffix;
   const state = describeProviderState(provider.errorState);
+  // Tone follows this provider's quota warning thresholds for the shown lane;
+  // a window outside the lanes keeps the global thresholds.
+  const lane = selectedMetricLane(provider);
+  const warningWindow = lane ? quotaWarningWindowForLane(lane) : null;
+  const warning = warningWindow
+    ? resolveQuotaWarning(thresholds, provider.providerId, warningWindow)
+    : {
+        enabled: true,
+        high: thresholds.highUsageThreshold,
+        critical: thresholds.criticalUsageThreshold,
+      };
+  // A window set to Off keeps only the exhausted tone.
+  const highRemaining = warning.enabled ? 100 - warning.high : -1;
+  const critRemaining = warning.enabled ? 100 - warning.critical : -1;
   let tone: "ok" | "warn" | "crit" = "ok";
   if (state.isProblem) tone = "crit";
   else if (!informational) {
@@ -440,8 +480,8 @@ export default function FloatBar({ state }: { state: BootstrapState }) {
     return () => {
       cancelled = true;
     };
-    // A History window change re-reads the local usage summaries.
-  }, [visibleCostTargets, settings.costReportingPeriod]);
+    // A History window or "Track costs" change re-reads the local usage summaries.
+  }, [visibleCostTargets, settings.costReportingPeriod, settings.costUsageEnabled]);
 
   const visibleCosts = visible
     .map((provider) => localCosts[providerCostKey(provider)])
@@ -513,8 +553,6 @@ export default function FloatBar({ state }: { state: BootstrapState }) {
     [],
   );
 
-  const highRemaining = 100 - settings.highUsageThreshold;
-  const critRemaining = 100 - settings.criticalUsageThreshold;
   const opacityFraction = Math.max(0.3, Math.min(1, settings.floatBarOpacity / 100));
 
   return (
@@ -543,8 +581,7 @@ export default function FloatBar({ state }: { state: BootstrapState }) {
             <ProviderPill
               key={providerCostKey(p)}
               provider={p}
-              highRemaining={highRemaining}
-              critRemaining={critRemaining}
+              thresholds={settings}
               showAsUsed={settings.showAsUsed}
               scale={scale}
               showResetInline={showResetInline}

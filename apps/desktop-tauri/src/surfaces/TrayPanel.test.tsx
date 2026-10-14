@@ -36,6 +36,7 @@ const tauriMocks = vi.hoisted(() => ({
   getProviderDetail: vi.fn(),
   openProviderDashboard: vi.fn(),
   openProviderStatusPage: vi.fn(),
+  getProviderStatuses: vi.fn(),
   getProviderChartData: vi.fn(),
   getCurrentSurfaceState: vi.fn(),
   getLocaleStrings: vi.fn(),
@@ -132,6 +133,7 @@ function settings(overrides: Partial<SettingsSnapshot> = {}): SettingsSnapshot {
     refreshIntervalSecs: 300,
     adaptiveRefresh: false,
     refreshAllProvidersOnMenuOpen: false,
+    statusChecksEnabled: true,
   lowPowerMode: false,
     startAtLogin: false,
     startMinimized: false,
@@ -176,6 +178,7 @@ function settings(overrides: Partial<SettingsSnapshot> = {}): SettingsSnapshot {
     switcherShortcuts: {},
     codexCustomSessionsDirs: [],
     uiLanguage: "english",
+    uiLanguageFollowsSystem: false,
     theme: "dark",
     windowScalePercent: 125,
     trayScalePercent: 100,
@@ -285,6 +288,7 @@ describe("TrayPanel provider grid", () => {
     });
     tauriMocks.openProviderDashboard.mockResolvedValue(undefined);
     tauriMocks.openProviderStatusPage.mockResolvedValue(undefined);
+    tauriMocks.getProviderStatuses.mockResolvedValue([]);
     tauriMocks.openSettingsWindow.mockResolvedValue(undefined);
     tauriMocks.refreshProviders.mockResolvedValue(undefined);
     tauriMocks.refreshProvidersIfStale.mockResolvedValue(undefined);
@@ -338,6 +342,8 @@ describe("TrayPanel provider grid", () => {
         PanelShowAllProviders: "Show all providers",
         PanelShowFewerProviders: "Show fewer providers",
         PanelUsedSuffix: "used",
+        ServiceStatusPartialOutage: "Partial outage",
+        UpdatedMinutesAgo: "{} minutes ago",
       }),
     );
     eventMocks.listen.mockImplementation(
@@ -431,6 +437,90 @@ describe("TrayPanel provider grid", () => {
     expect(screen.queryByRole("button", { name: "UsageSpendShare" })).not.toBeInTheDocument();
   });
 
+  it("hides overview spend when Track costs is off", async () => {
+    tauriMocks.getUsageSpendSummary.mockResolvedValue({
+      contract: {},
+      reportingPeriod: "rolling:30",
+      reportingDay: "2026-09-19",
+      dashboardTimezone: "UTC",
+      costTrackingEnabled: false,
+      rows: [
+        {
+          providerId: "codex",
+          displayName: "Codex",
+          sevenDay: 1,
+          thirtyDay: 2,
+          periodCost: 2,
+          periodTokens: null,
+          currency: "USD",
+          source: "local",
+          includedInOverview: true,
+        },
+      ],
+    });
+
+    const { container } = renderTrayPanel([provider("codex", "Codex", 35)]);
+
+    await waitFor(() => {
+      expect(container.querySelector(".tray-panel-reveal--ready")).not.toBeNull();
+    });
+    await waitFor(() => expect(tauriMocks.getUsageSpendSummary).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(screen.queryByText(/providers have spend/)).not.toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/\$2\.00/);
+  });
+
+  it("follows Track costs live: off hides Overview spend and re-reads the cards, on restores them", async () => {
+    const onSummary = {
+      contract: {},
+      reportingPeriod: "rolling:30",
+      reportingDay: "2026-09-19",
+      dashboardTimezone: "UTC",
+      costTrackingEnabled: true,
+      rows: [
+        {
+          providerId: "codex",
+          displayName: "Codex",
+          sevenDay: 1,
+          thirtyDay: 2,
+          periodCost: 2,
+          periodTokens: null,
+          currency: "USD",
+          source: "local",
+          includedInOverview: true,
+        },
+      ],
+    };
+    tauriMocks.getUsageSpendSummary.mockResolvedValue(onSummary);
+    const { container } = renderTrayPanel([provider("codex", "Codex", 35)], { costUsageEnabled: true });
+    const total = new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 2,
+    }).format(2);
+    const shown = () =>
+      /providers have spend/.test(container.textContent ?? "")
+      && [...container.querySelectorAll("strong")].some((e) => e.textContent?.includes(total));
+
+    await waitFor(() => expect(shown()).toBe(true));
+    await waitFor(() => expect(tauriMocks.getProviderChartData).toHaveBeenCalledTimes(1));
+    const summaryCalls = tauriMocks.getUsageSpendSummary.mock.calls.length;
+
+    // Track costs turned off in the Settings window: the flyout only hears settings-changed.
+    tauriMocks.getSettingsSnapshot.mockResolvedValue(settings({ costUsageEnabled: false }));
+    await act(async () => emitEvent("settings-changed", null));
+    await waitFor(() => expect(shown()).toBe(false));
+    await waitFor(() => expect(tauriMocks.getProviderChartData).toHaveBeenCalledTimes(2));
+    expect(tauriMocks.getUsageSpendSummary.mock.calls.length).toBe(summaryCalls);
+
+    // Turned on again: the summary and the card chart are read again.
+    tauriMocks.getSettingsSnapshot.mockResolvedValue(settings({ costUsageEnabled: true }));
+    await act(async () => emitEvent("settings-changed", null));
+    await waitFor(() => expect(shown()).toBe(true));
+    await waitFor(() => expect(tauriMocks.getProviderChartData).toHaveBeenCalledTimes(3));
+    expect(tauriMocks.getUsageSpendSummary.mock.calls.length).toBe(summaryCalls + 1);
+  });
+
   it("dismisses the tray panel on unmodified Escape", async () => {
     const { container } = renderTrayPanel([provider("claude", "Claude", 35)]);
 
@@ -502,6 +592,91 @@ describe("TrayPanel provider grid", () => {
     expect(tauriMocks.openProviderDashboard).toHaveBeenLastCalledWith("codex");
     fireEvent.click(screen.getByRole("button", { name: "Status Page" }));
     expect(tauriMocks.openProviderStatusPage).toHaveBeenLastCalledWith("codex");
+  });
+
+  it("shows the target provider's incident as a status line above the app rows", async () => {
+    const { container } = renderTrayPanel([
+      provider("claude", "Claude", 35),
+      provider("codex", "Codex", 45),
+    ]);
+    await waitFor(() => {
+      expect(container.querySelector(".tray-panel-reveal--ready")).not.toBeNull();
+    });
+    const note = () => container.querySelector(".menu-surface__footer-note");
+    expect(note()).toBeNull();
+
+    act(() => {
+      emitEvent("provider-statuses-updated", [
+        {
+          providerId: "codex",
+          status: {
+            indicator: "major",
+            description: "  Elevated error rates ",
+            updatedAt: Date.now() - 5 * 60_000 - 1_000,
+          },
+        },
+        { providerId: "claude", status: { indicator: "none", description: null, updatedAt: null } },
+      ]);
+    });
+    // Overview: the first provider in order (Codex) is the target, as on macOS.
+    expect(note()).toHaveTextContent("Elevated error rates — 5 minutes ago");
+    const footer = container.querySelector(".menu-surface__footer")!;
+    expect(Array.from(footer.children, (el) => el.className)).toEqual([
+      "menu-surface__footer-sep",
+      "menu-surface__footer-note",
+      "menu-surface__footer-sep",
+      "menu-surface__footer-row menu-surface__footer-row--refresh",
+      "menu-surface__footer-row",
+      "menu-surface__footer-row",
+      "menu-surface__footer-row",
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Claude$/ }));
+    expect(note()).toBeNull();
+
+    act(() => {
+      emitEvent("provider-statuses-updated", [
+        { providerId: "claude", status: { indicator: "minor", description: null, updatedAt: null } },
+      ]);
+    });
+    expect(note()).toHaveTextContent(/^Partial outage$/);
+
+    act(() => {
+      emitEvent("provider-statuses-updated", []);
+    });
+    expect(note()).toBeNull();
+  });
+
+  it("targets the first enabled provider for the overview status line, as on macOS", async () => {
+    const codexIncident = [
+      {
+        providerId: "codex",
+        status: { indicator: "major", description: "Codex is down", updatedAt: null },
+      },
+    ];
+    // Overview: macOS targets the first enabled provider (Claude here), not
+    // the first provider that already has a snapshot.
+    const overview = renderTrayPanel([provider("codex", "Codex", 45)], {
+      enabledProviders: ["claude", "codex"],
+      providerOrder: ["claude", "codex"],
+    });
+    await waitFor(() => {
+      expect(overview.container.querySelector(".tray-panel-reveal--ready")).not.toBeNull();
+    });
+    act(() => {
+      emitEvent("provider-statuses-updated", codexIncident);
+    });
+    expect(overview.container.querySelector(".menu-surface__footer-note")).toBeNull();
+
+    act(() => {
+      emitEvent("provider-statuses-updated", [
+        ...codexIncident,
+        { providerId: "claude", status: { indicator: "minor", description: null, updatedAt: null } },
+      ]);
+    });
+    expect(overview.container.querySelector(".menu-surface__footer-note")).toHaveTextContent(
+      /^Partial outage$/,
+    );
   });
 
   it("offers the only provider's rows without selecting its tab", async () => {
@@ -924,7 +1099,7 @@ describe("TrayPanel provider grid", () => {
       showAsUsed: false,
       highUsageThreshold: 75,
       criticalUsageThreshold: 90,
-      providerUsageThresholds: { "claude:session": { critical: 95 } },
+      providerQuotaWarnings: { claude: { session: { critical: 95 } } },
     });
 
     await waitFor(() => {

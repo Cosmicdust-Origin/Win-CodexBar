@@ -49,7 +49,7 @@ function input(overrides: Partial<MetricRowInput> = {}): MetricRowInput {
     showAsUsed: false,
     showResetWhenExhausted: false,
     paceEnabled: true,
-    usageThresholds: { highUsageThreshold: 70, criticalUsageThreshold: 90, providerUsageThresholds: {} },
+    usageThresholds: { highUsageThreshold: 70, criticalUsageThreshold: 90, providerQuotaWarnings: {} },
     weeklyProgressWorkDays: null,
     quotaWarningMarkersVisible: true,
     workdayTickStyle: "subtle",
@@ -107,6 +107,33 @@ describe("metricResetText", () => {
       ),
     ).toBeNull();
     expect(metricResetText(rateWindow({ resetsAt: "not a date" }), true, NOW, en)).toBeNull();
+  });
+
+  // Upstream `syntheticRegenDetail`: "Regenerates %@" around the unlocalized
+  // `resetCountdownDescription`, relative even under the absolute reset style.
+  it.each([
+    [45 * MINUTE, true, "Regenerates in 45m"],
+    [45 * MINUTE, false, "Regenerates in 45m"],
+    [2 * HOUR + 5 * MINUTE, true, "Regenerates in 2h 5m"],
+    [DAY + 3 * HOUR, true, "Regenerates in 1d 3h"],
+    [2 * DAY, true, "Regenerates in 2d"],
+    [500, true, "Regenerates now"],
+  ])("counts a regen lane %d ms down to %j (relative %s)", (ms, relative, expected) => {
+    const snap = rateWindow({
+      resetsAt: new Date(NOW + ms).toISOString(),
+      resetDescription: "76% after next regen · Full in ~3 regens",
+      descriptionIsDetail: true,
+      resetRegenerates: true,
+    });
+    expect(metricResetText(snap, relative, NOW, en)).toBe(expected);
+  });
+
+  it("uses the Mac translation of Regenerates around the English countdown", () => {
+    const snap = rateWindow({
+      resetsAt: new Date(NOW + 45 * MINUTE).toISOString(),
+      resetRegenerates: true,
+    });
+    expect(metricResetText(snap, true, NOW, fromFtl("ja-JP.ftl"))).toBe("in 45m に再生成");
   });
 });
 
@@ -264,6 +291,76 @@ describe("metricRowPresentation pace", () => {
     expect(row.metaText).toBe("23% in reserve · Lasts until reset");
   });
 
+  // Upstream MenuCardView+ModelHelpers.swift:179-186 and
+  // MenuCardView.swift:1407-1415: a regenerating window keeps its length but
+  // shows the regen line instead of pace. Workday ticks stay (:1433-1437).
+  it("hides pace on a regenerating window that keeps its length", () => {
+    const session = rateWindow({ windowMinutes: 300, resetRegenerates: true, pace: pace() });
+    const sessionRow = metricRowPresentation(input({ snap: session }), en);
+    expect(sessionRow.metaText).toBeNull();
+    expect(sessionRow.bar.pacePercent).toBeNull();
+    expect(sessionRow.bar.paceDeficit).toBe(false);
+
+    const week = weekly({ resetRegenerates: true });
+    const weekRow = metricRowPresentation(
+      input({ lane: "secondary", snap: week, weeklyProgressWorkDays: 5, usageThresholds: null }),
+      en,
+    );
+    expect(weekRow.metaText).toBeNull();
+    expect(weekRow.bar.pacePercent).toBeNull();
+    expect(weekRow.bar.markers).toEqual([
+      { percent: 20, kind: "workday" },
+      { percent: 40, kind: "workday" },
+      { percent: 60, kind: "workday" },
+      { percent: 80, kind: "workday" },
+    ]);
+  });
+
+  describe("reset-window pace (upstream ProviderPaceCapability)", () => {
+    // Copilot premium requests: no window length, 60% used half way through
+    // a 28-day cycle, scored by the bridge against the resolved month.
+    const copilot = (overrides: Partial<WindowPaceSnapshot> = {}) =>
+      rateWindow({
+        usedPercent: 60,
+        remainingPercent: 40,
+        windowMinutes: null,
+        pace: pace({
+          stage: "ahead",
+          deltaPercent: 10,
+          expectedUsedPercent: 50,
+          actualUsedPercent: 60,
+          etaSeconds: 806_400,
+          willLastToReset: false,
+          resetWindow: true,
+          ...overrides,
+        }),
+      });
+
+    it("shows weekly pace on a primary window with no length", () => {
+      const row = metricRowPresentation(input({ providerId: "copilot", snap: copilot() }), en);
+      expect(row.metaText).toBe("10% in deficit · Runs out in 9d 8h");
+      expect(row.bar.pacePercent).toBe(50);
+      expect(row.bar.paceDeficit).toBe(true);
+    });
+
+    it("shows pace on the tertiary lane", () => {
+      const snap = { ...copilot(), windowMinutes: 40_320 };
+      const row = metricRowPresentation(input({ providerId: "cursor", lane: "tertiary", snap }), en);
+      expect(row.metaText).toBe("10% in deficit · Runs out in 9d 8h");
+    });
+
+    it("keeps the 3% expected floor", () => {
+      const snap = copilot({ expectedUsedPercent: 2, etaSeconds: 3600 });
+      expect(metricRowPresentation(input({ providerId: "copilot", snap }), en).metaText).toBeNull();
+    });
+
+    it("leaves extra lanes on their exact-window rule", () => {
+      const snap = { ...copilot(), windowMinutes: 40_320 };
+      const row = metricRowPresentation(input({ providerId: "copilot", lane: "extra", snap }), en);
+      expect(row.metaText).toBeNull();
+    });
+  });
+
   it("hides the pace line in compact rows but keeps the bar marker", () => {
     const row = metricRowPresentation(input({ lane: "secondary", snap: weekly(), compact: true }), en);
     expect(row.metaText).toBeNull();
@@ -299,13 +396,12 @@ describe("metricRowPresentation bar", () => {
     ]);
   });
 
-  it("resolves window, provider and global thresholds per field", () => {
-    const providerUsageThresholds = {
-      claude: { high: 75 },
-      "claude:weekly": { critical: 95 },
-      codex: { high: 50, critical: 60 },
+  it("resolves Custom quota warnings per window and field, falling back to global", () => {
+    const providerQuotaWarnings = {
+      claude: { session: { high: 75 }, weekly: { high: 75, critical: 95 } },
+      codex: { session: { high: 50, critical: 60 } },
     };
-    const usageThresholds = { ...thresholds(70), providerUsageThresholds };
+    const usageThresholds = { ...thresholds(70), providerQuotaWarnings };
     const weeklyRow = metricRowPresentation(
       input({ lane: "secondary", snap: weekly(), showAsUsed: true, usageThresholds }),
       en,
@@ -318,6 +414,23 @@ describe("metricRowPresentation bar", () => {
       en,
     );
     expect(tertiaryRow.bar.markers.map((m) => m.percent)).toEqual([75, 95]);
+  });
+
+  it("hides warning markers for a window whose quota warnings are Off", () => {
+    const usageThresholds = {
+      ...thresholds(70),
+      providerQuotaWarnings: { claude: { session: { enabled: false, high: 40, critical: 60 } } },
+    };
+    expect(
+      metricRowPresentation(input({ showAsUsed: true, usageThresholds }), en).bar.markers,
+    ).toEqual([]);
+    const weeklyRow = metricRowPresentation(
+      input({ lane: "secondary", snap: weekly(), showAsUsed: true, usageThresholds }),
+      en,
+    );
+    expect(weeklyRow.bar.markers.filter((m) => m.kind === "warning").map((m) => m.percent)).toEqual([
+      70, 90,
+    ]);
   });
 
   it("drops edge and duplicate thresholds and never marks extra lanes", () => {

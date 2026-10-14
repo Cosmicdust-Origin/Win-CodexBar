@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale } from "../../../hooks/useLocale";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -25,13 +25,15 @@ import type {
   NotificationSoundPaths,
   NotificationSoundTheme,
   ThemePreference,
-  UsageThresholdOverride,
 } from "../../../types/bridge";
 import type { LocaleKey } from "../../../i18n/keys";
 import { CURRENCY_PICKER_OPTIONS } from "../../../lib/currency";
 import type { TabProps } from "../settingsTabs";
 import PreferencesTransferSection from "./PreferencesTransferSection";
 import SwitcherShortcutsDialog from "../SwitcherShortcutsDialog";
+
+/** Select value for Language "System" (follow the Windows display language). */
+const SYSTEM_LANGUAGE = "system";
 
 const FALLBACK_LANGUAGE_OPTIONS: LanguageOption[] = [
   { value: "english", display: "English" },
@@ -133,75 +135,8 @@ function fileName(path: string): string {
   return path.split(/[\\/]/).pop() ?? path;
 }
 
-function blurOnEnter(event: { key: string; currentTarget: { blur: () => void } }) {
-  if (event.key === "Enter") event.currentTarget.blur();
-}
-
 function isNotificationSoundTheme(v: string): v is NotificationSoundTheme {
   return v === "windows" || v === "codexBar";
-}
-
-function ThresholdOverrideInputs({
-  label,
-  value,
-  inheritedHigh,
-  inheritedCritical,
-  highLabel,
-  criticalLabel,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  value: UsageThresholdOverride;
-  inheritedHigh: number;
-  inheritedCritical: number;
-  highLabel: string;
-  criticalLabel: string;
-  disabled: boolean;
-  onChange: (value: UsageThresholdOverride) => void;
-}) {
-  const [high, setHigh] = useState(() => value.high?.toString() ?? "");
-  const [critical, setCritical] = useState(() => value.critical?.toString() ?? "");
-  useEffect(() => setHigh(value.high?.toString() ?? ""), [value.high]);
-  useEffect(() => setCritical(value.critical?.toString() ?? ""), [value.critical]);
-  const commit = () =>
-    onChange({
-      high: high === "" ? undefined : Math.min(100, Math.max(0, Number(high))),
-      critical:
-        critical === "" ? undefined : Math.min(100, Math.max(0, Number(critical))),
-    });
-  return (
-    <Field label={label}>
-      <div className="settings-inline-fields">
-        <input
-          className="number-input"
-          type="number"
-          value={high}
-          min={0}
-          max={100}
-          disabled={disabled}
-          placeholder={String(inheritedHigh)}
-          aria-label={`${label} ${highLabel}`}
-          onChange={(event) => setHigh(event.target.value)}
-          onBlur={commit}
-          onKeyDown={blurOnEnter}
-        />
-        <input
-          className="number-input"
-          type="number"
-          value={critical}
-          min={0}
-          max={100}
-          disabled={disabled}
-          placeholder={String(inheritedCritical)}
-          aria-label={`${label} ${criticalLabel}`}
-          onChange={(event) => setCritical(event.target.value)}
-          onBlur={commit}
-          onKeyDown={blurOnEnter}
-        />
-      </div>
-    </Field>
-  );
 }
 
 export default function GeneralTab({
@@ -233,15 +168,33 @@ export default function GeneralTab({
       .catch(() => {}); // version row degrades to absent, never blocks the tab
   }, []);
 
+  const soundPreviewTimeoutRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (soundPreviewTimeoutRef.current !== null) {
+        window.clearTimeout(soundPreviewTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
   const handleTestSound = useCallback((event: NotificationSoundEvent) => {
     setSoundError(null);
     setPlayingSound(event);
-    const timeoutId = window.setTimeout(
-      () => setPlayingSound(null),
-      NOTIFICATION_SOUND_PREVIEW_DURATION_MS,
-    );
+    if (soundPreviewTimeoutRef.current !== null) {
+      window.clearTimeout(soundPreviewTimeoutRef.current);
+    }
+    const timeoutId = window.setTimeout(() => {
+      soundPreviewTimeoutRef.current = null;
+      setPlayingSound(null);
+    }, NOTIFICATION_SOUND_PREVIEW_DURATION_MS);
+    soundPreviewTimeoutRef.current = timeoutId;
     void playNotificationSound(event).catch((error: unknown) => {
       window.clearTimeout(timeoutId);
+      if (soundPreviewTimeoutRef.current === timeoutId) {
+        soundPreviewTimeoutRef.current = null;
+      }
       setPlayingSound(null);
       setSoundError(error instanceof Error ? error.message : String(error));
     });
@@ -345,13 +298,24 @@ export default function GeneralTab({
         <Field label={t("InterfaceLanguage")} description={t("GeneralLanguageHelper")}>
           <Select
             variant="menu"
-            value={settings.uiLanguage}
+            value={settings.uiLanguageFollowsSystem ? SYSTEM_LANGUAGE : settings.uiLanguage}
             disabled={saving}
-            options={languageOptions.map((opt) => ({
-              value: opt.value,
-              label: opt.display,
-            }))}
-            onChange={(v) => set({ uiLanguage: v as Language })}
+            ariaLabel={t("InterfaceLanguage")}
+            options={[
+              // Mac PreferencesGeneralPane.swift:6 lists "System" first, labelled in English.
+              { value: SYSTEM_LANGUAGE, label: "System" },
+              ...languageOptions.map((opt) => ({
+                value: opt.value,
+                label: opt.display,
+              })),
+            ]}
+            onChange={(v) =>
+              set(
+                v === SYSTEM_LANGUAGE
+                  ? { uiLanguageFollowsSystem: true }
+                  : { uiLanguage: v as Language },
+              )
+            }
           />
         </Field>
         <Field label={t("PreferredCurrencyLabel")} description={t("PreferredCurrencyHelper")}>
@@ -443,6 +407,17 @@ export default function GeneralTab({
             })}
           />
         </Field>
+        <Field
+          label={t("CheckProviderStatus")}
+          description={t("CheckProviderStatusHelper")}
+        >
+          <Toggle
+            variant="switch"
+            checked={settings.statusChecksEnabled}
+            disabled={saving}
+            onChange={(v) => set({ statusChecksEnabled: v })}
+          />
+        </Field>
       </SettingsGroup>
 
       <PreferencesTransferSection onOpenSwitcherShortcuts={() => setSwitcherOpen(true)} />
@@ -517,7 +492,6 @@ function NotificationsPane({
   // backend, so their switches lock (keeping their saved state) while
   // threshold warnings are off. Quota depleted & restored has its own key.
   const alertsMuted = !settings.showNotifications;
-  const values = settings.providerUsageThresholds ?? {};
 
   return (
     <>
@@ -571,30 +545,30 @@ function NotificationsPane({
         </Field>
       </SettingsGroup>
 
-      {settings.showNotifications && (
-        <SettingsGroup footer={<p>{t("ThresholdsCaption")}</p>}>
-          <Field label={t("WarningAtPercentUsed")}>
-            <NumberInput
-              value={settings.highUsageThreshold}
-              min={0}
-              max={100}
-              step={5}
-              disabled={saving}
-              onChange={(v) => set({ highUsageThreshold: v })}
-            />
-          </Field>
-          <Field label={t("CriticalAtPercentUsed")}>
-            <NumberInput
-              value={settings.criticalUsageThreshold}
-              min={0}
-              max={100}
-              step={5}
-              disabled={saving}
-              onChange={(v) => set({ criticalUsageThreshold: v })}
-            />
-          </Field>
-        </SettingsGroup>
-      )}
+      {/* The thresholds stay visible while threshold warnings are off: they also set
+          the usage-bar and float-bar colours (#816). The Mac hides them. */}
+      <SettingsGroup footer={<p>{t("ThresholdsCaption")}</p>}>
+        <Field label={t("WarningAtPercentUsed")}>
+          <NumberInput
+            value={settings.highUsageThreshold}
+            min={0}
+            max={100}
+            step={5}
+            disabled={saving}
+            onChange={(v) => set({ highUsageThreshold: v })}
+          />
+        </Field>
+        <Field label={t("CriticalAtPercentUsed")}>
+          <NumberInput
+            value={settings.criticalUsageThreshold}
+            min={0}
+            max={100}
+            step={5}
+            disabled={saving}
+            onChange={(v) => set({ criticalUsageThreshold: v })}
+          />
+        </Field>
+      </SettingsGroup>
 
       <SettingsGroup>
         <Field label={t("SoundEnabled")} description={t("SoundEnabledHelper")}>
@@ -679,59 +653,6 @@ function NotificationsPane({
         )}
       </SettingsGroup>
 
-      {settings.showNotifications && (
-        <SettingsGroup
-          title={t("ThresholdOverridesTitle")}
-          footer={<p>{t("ThresholdOverridesCaption")}</p>}
-        >
-          {(["codex", "claude"] as const).flatMap((provider) =>
-            (["provider", "session", "weekly"] as const).map((window) => {
-              const key = window === "provider" ? provider : `${provider}:${window}`;
-              const providerLabel =
-                provider === "codex"
-                  ? t("ProviderNameCodex")
-                  : t("ProviderNameClaude");
-              return (
-                <ThresholdOverrideInputs
-                  key={key}
-                  label={
-                    window === "provider"
-                      ? providerLabel
-                      : `${providerLabel} · ${t(window === "session" ? "ProviderSession" : "ProviderWeekly")}`
-                  }
-                  value={values[key] ?? {}}
-                  inheritedHigh={
-                    window === "provider"
-                      ? settings.highUsageThreshold
-                      : values[provider]?.high ?? settings.highUsageThreshold
-                  }
-                  inheritedCritical={
-                    window === "provider"
-                      ? settings.criticalUsageThreshold
-                      : values[provider]?.critical ?? settings.criticalUsageThreshold
-                  }
-                  highLabel={t("HighUsageAlert")}
-                  criticalLabel={t("CriticalUsageAlert")}
-                  disabled={saving}
-                  onChange={(value) => {
-                    const next = { ...values };
-                    if (value.high === undefined && value.critical === undefined) {
-                      set({
-                        providerUsageThresholds: Object.fromEntries(
-                          Object.entries(next).filter(([entry]) => entry !== key),
-                        ),
-                      });
-                    } else {
-                      next[key] = value;
-                      set({ providerUsageThresholds: next });
-                    }
-                  }}
-                />
-              );
-            }),
-          )}
-        </SettingsGroup>
-      )}
     </>
   );
 }

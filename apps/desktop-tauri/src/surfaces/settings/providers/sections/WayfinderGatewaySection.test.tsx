@@ -27,6 +27,7 @@ describe("WayfinderGatewaySection", () => {
     ["wayfinder", "WayfinderGatewayTitle", "WayfinderGatewayLabel", "WayfinderGatewayHelp"],
     ["bifrost", "BifrostGatewayTitle", "WayfinderGatewayLabel", "BifrostGatewayHelp"],
     ["aixy", "AixyGatewayTitle", "AixyGatewayLabel", "AixyGatewayHelp"],
+    ["clawrouter", "ClawRouterGatewayTitle", "AixyGatewayLabel", "ClawRouterGatewayHelp"],
   ] as const)("uses localized %s copy", (providerId, title, label, help) => {
     renderSection(providerId);
 
@@ -45,6 +46,7 @@ describe("WayfinderGatewaySection", () => {
 
   it("recognizes only gateway providers", () => {
     expect(isGatewayProviderId("aixy")).toBe(true);
+    expect(isGatewayProviderId("clawrouter")).toBe(true);
     expect(isGatewayProviderId("bifrost")).toBe(true);
     expect(isGatewayProviderId("wayfinder")).toBe(true);
     expect(isGatewayProviderId("codex")).toBe(false);

@@ -1354,7 +1354,7 @@ fn usage_item_descriptors_keep_raw_ids_and_redact_titles() {
         last_good_owner: None,
     };
     let mut snapshot =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::Codex, &metadata, &result, None);
+        ProviderUsageSnapshot::from_fetch_result(ProviderId::Codex, &metadata, &result, None, None);
     snapshot.primary_label = Some("Account owner@example.com".to_string());
     snapshot.extra_rate_windows = vec![NamedRateWindowSnapshot {
         id: "credits".to_string(),
@@ -1373,9 +1373,9 @@ fn usage_item_descriptors_keep_raw_ids_and_redact_titles() {
     let items = super::usage_item_descriptors(Some(&snapshot), &settings, ProviderId::Codex);
 
     assert_eq!(items[0].id, "metric:primary");
-    assert_eq!(items[0].title, "Account Hidden");
+    assert_eq!(items[0].title, "Account");
     assert_eq!(items[1].id, "metric:extra-credits");
-    assert_eq!(items[1].title, "Credits Hidden");
+    assert_eq!(items[1].title, "Credits");
     assert_eq!(items[2].id, "metric:extra-missing");
     assert!(!items[2].available);
 }
@@ -1405,7 +1405,7 @@ fn usage_item_descriptors_include_detail_sections() {
         last_good_owner: None,
     };
     let snapshot =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::Codex, &metadata, &result, None);
+        ProviderUsageSnapshot::from_fetch_result(ProviderId::Codex, &metadata, &result, None, None);
 
     let mut settings = Settings {
         hide_personal_info: true,
@@ -1434,7 +1434,74 @@ fn usage_item_descriptors_include_detail_sections() {
         .find(|item| item.id.starts_with("detailSection:") && !item.available)
         .expect("hidden detail placeholder");
     assert!(hidden.id.contains("owner@example.com quota"));
-    assert_eq!(hidden.title, "Hidden quota");
+    assert_eq!(hidden.title, "quota");
+}
+
+#[test]
+fn usage_item_descriptors_skip_card_hidden_windows() {
+    let metadata = instantiate_provider(ProviderId::Codex).metadata().clone();
+    let result = ProviderFetchResult {
+        usage: codexbar::core::UsageSnapshot::new(
+            codexbar::core::RateWindow::informational("$1.00").hidden_on_card(),
+        )
+        .with_secondary(codexbar::core::RateWindow::new(20.0)),
+        cost: None,
+        wayfinder_usage: None,
+        inventory: Vec::new(),
+        reset_credits: None,
+        display_details: vec![
+            codexbar::core::ProviderDisplayDetail::new("spend", "Spend", "$1.00")
+                .expect("valid detail"),
+        ],
+        source_label: "api".to_string(),
+        has_successful_claude_cli_quota: false,
+        pace_authoritative: true,
+        account_identity: None,
+        open_ai_api_usage: None,
+        last_good_owner: None,
+    };
+    let mut snapshot =
+        ProviderUsageSnapshot::from_fetch_result(ProviderId::Codex, &metadata, &result, None, None);
+    let mut hidden_extra = snapshot.primary.clone();
+    hidden_extra.hidden_on_card = true;
+    snapshot.extra_rate_windows = vec![NamedRateWindowSnapshot {
+        id: "hidden".to_string(),
+        title: "Hidden".to_string(),
+        window: hidden_extra,
+        fallback_lane: false,
+        icon_fallback: None,
+    }];
+
+    let items =
+        super::usage_item_descriptors(Some(&snapshot), &Settings::default(), ProviderId::Codex);
+    let ids: Vec<&str> = items.iter().map(|item| item.id.as_str()).collect();
+
+    assert_eq!(ids, ["detailSection:Spend", "metric:secondary"]);
+
+    // A saved hidden ID for a card-hidden window gets no placeholder, while
+    // one for a window the snapshot no longer reports still does.
+    let mut settings = Settings::default();
+    settings.set_hidden_usage_item_ids(
+        ProviderId::Codex,
+        vec![
+            "metric:primary".to_string(),
+            "metric:extra-hidden".to_string(),
+            "metric:tertiary".to_string(),
+        ],
+    );
+    let items = super::usage_item_descriptors(Some(&snapshot), &settings, ProviderId::Codex);
+    let ids: Vec<(&str, bool)> = items
+        .iter()
+        .map(|item| (item.id.as_str(), item.available))
+        .collect();
+    assert_eq!(
+        ids,
+        [
+            ("detailSection:Spend", true),
+            ("metric:secondary", true),
+            ("metric:tertiary", false),
+        ]
+    );
 }
 
 #[test]
@@ -1492,8 +1559,13 @@ fn local_opencodego_estimates_keep_quota_windows_but_drop_derived_pace() {
     let metadata = instantiate_provider(ProviderId::OpenCodeGo)
         .metadata()
         .clone();
-    let snapshot =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::OpenCodeGo, &metadata, &result, None);
+    let snapshot = ProviderUsageSnapshot::from_fetch_result(
+        ProviderId::OpenCodeGo,
+        &metadata,
+        &result,
+        None,
+        None,
+    );
 
     assert_eq!(snapshot.source_label, "local estimate");
     assert_eq!(snapshot.primary.used_percent, 12.0);
@@ -1534,7 +1606,7 @@ fn provider_inventory_maps_to_the_bridge_without_token_ids() {
     );
     let metadata = instantiate_provider(ProviderId::Grok).metadata().clone();
     let snapshot =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::Grok, &metadata, &result, None);
+        ProviderUsageSnapshot::from_fetch_result(ProviderId::Grok, &metadata, &result, None, None);
 
     assert_eq!(snapshot.inventory.len(), 1);
     assert_eq!(snapshot.inventory[0].available_count, 2);
@@ -1659,7 +1731,7 @@ fn provider_cache_upsert_replaces_existing_provider() {
         last_good_owner: None,
     };
     let mut first =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::Codex, &metadata, &result, None);
+        ProviderUsageSnapshot::from_fetch_result(ProviderId::Codex, &metadata, &result, None, None);
     let mut second = first.clone();
     first.error = Some("old".to_string());
     second.error = Some("new".to_string());
@@ -1690,10 +1762,15 @@ fn provider_cache_prunes_disabled_providers() {
         last_good_owner: None,
     };
     let codex =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::Codex, &metadata, &result, None);
+        ProviderUsageSnapshot::from_fetch_result(ProviderId::Codex, &metadata, &result, None, None);
     let claude_meta = instantiate_provider(ProviderId::Claude).metadata().clone();
-    let claude =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::Claude, &claude_meta, &result, None);
+    let claude = ProviderUsageSnapshot::from_fetch_result(
+        ProviderId::Claude,
+        &claude_meta,
+        &result,
+        None,
+        None,
+    );
 
     let mut cache = vec![codex, claude];
     super::prune_provider_cache_to_enabled(&mut cache, &[ProviderId::Codex]);
@@ -1728,8 +1805,13 @@ fn claude_transient_auth_failure_preserves_first_last_good_snapshot() {
         account_identity: None,
         last_good_owner: None,
     };
-    let good =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::Claude, &metadata, &result, None);
+    let good = ProviderUsageSnapshot::from_fetch_result(
+        ProviderId::Claude,
+        &metadata,
+        &result,
+        None,
+        None,
+    );
     let snapshot = ProviderUsageSnapshot::from_error(
         ProviderId::Claude,
         &metadata,
@@ -1769,7 +1851,7 @@ fn codex_transient_transport_failure_helper_uses_typed_policy() {
         last_good_owner: None,
     };
     let good =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::Codex, &metadata, &result, None);
+        ProviderUsageSnapshot::from_fetch_result(ProviderId::Codex, &metadata, &result, None, None);
     let snapshot = ProviderUsageSnapshot::from_error(
         ProviderId::Codex,
         &metadata,
@@ -1807,8 +1889,13 @@ fn claude_repeated_auth_failure_surfaces_error() {
         account_identity: None,
         last_good_owner: None,
     };
-    let good =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::Claude, &metadata, &result, None);
+    let good = ProviderUsageSnapshot::from_fetch_result(
+        ProviderId::Claude,
+        &metadata,
+        &result,
+        None,
+        None,
+    );
     let first_error = ProviderUsageSnapshot::from_error(
         ProviderId::Claude,
         &metadata,
@@ -1853,8 +1940,13 @@ fn claude_cloudflare_challenge_retains_prior_usage_while_surfaceing_guidance() {
         account_identity: None,
         last_good_owner: None,
     };
-    let good =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::Claude, &metadata, &result, None);
+    let good = ProviderUsageSnapshot::from_fetch_result(
+        ProviderId::Claude,
+        &metadata,
+        &result,
+        None,
+        None,
+    );
     let challenge = codexbar::providers::claude::CLOUDFLARE_CHALLENGE_MESSAGE;
     let error = ProviderUsageSnapshot::from_error(
         ProviderId::Claude,
@@ -1910,8 +2002,13 @@ fn claude_cloudflare_challenge_keeps_prior_usage_when_guidance_surfaces() {
         account_identity: None,
         last_good_owner: None,
     };
-    let mut good =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::Claude, &metadata, &result, None);
+    let mut good = ProviderUsageSnapshot::from_fetch_result(
+        ProviderId::Claude,
+        &metadata,
+        &result,
+        None,
+        None,
+    );
     good.updated_at = "2026-09-01T00:00:00Z".to_string();
     let error = ProviderUsageSnapshot::from_error(
         ProviderId::Claude,
@@ -1964,8 +2061,13 @@ fn claude_cli_parse_failure_keeps_last_good_every_time() {
         account_identity: None,
         last_good_owner: None,
     };
-    let good =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::Claude, &metadata, &result, None);
+    let good = ProviderUsageSnapshot::from_fetch_result(
+        ProviderId::Claude,
+        &metadata,
+        &result,
+        None,
+        None,
+    );
     let err = ProviderUsageSnapshot::from_error(
         ProviderId::Claude,
         &metadata,
@@ -2014,8 +2116,13 @@ fn claude_hard_credentials_missing_does_not_preserve_stale() {
         account_identity: None,
         last_good_owner: None,
     };
-    let good =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::Claude, &metadata, &result, None);
+    let good = ProviderUsageSnapshot::from_fetch_result(
+        ProviderId::Claude,
+        &metadata,
+        &result,
+        None,
+        None,
+    );
     let err = ProviderUsageSnapshot::from_error(
         ProviderId::Claude,
         &metadata,
@@ -2225,8 +2332,13 @@ fn japanese_provider_snapshot_localizes_weekly_label() {
         last_good_owner: None,
     };
 
-    let snapshot =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::Claude, &metadata, &result, None);
+    let snapshot = ProviderUsageSnapshot::from_fetch_result(
+        ProviderId::Claude,
+        &metadata,
+        &result,
+        None,
+        None,
+    );
 
     // Secondary label stays raw; localization happens at render time.
     assert_eq!(snapshot.secondary_label, Some("Weekly".to_string()));
@@ -2262,8 +2374,13 @@ fn japanese_provider_snapshot_localizes_pace_reserve_description() {
         last_good_owner: None,
     };
 
-    let snapshot =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::Claude, &metadata, &result, None);
+    let snapshot = ProviderUsageSnapshot::from_fetch_result(
+        ProviderId::Claude,
+        &metadata,
+        &result,
+        None,
+        None,
+    );
 
     // Reserve data stays raw; localization happens at render time.
     let secondary = snapshot.secondary.as_ref().expect("secondary window");

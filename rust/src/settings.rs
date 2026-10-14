@@ -36,7 +36,9 @@ mod optional_details;
 mod preferences_document;
 mod provider_workspace;
 mod raw;
+mod spend_dashboard;
 mod status;
+mod system_language;
 mod types;
 
 pub use api_keys::*;
@@ -50,6 +52,7 @@ pub use optional_details::provider_has_optional_details;
 pub use preferences_document::*;
 pub use provider_workspace::*;
 use raw::RawSettings;
+pub use spend_dashboard::*;
 pub use status::*;
 pub use types::*;
 
@@ -115,6 +118,11 @@ pub struct Settings {
     #[serde(default)]
     pub refresh_all_providers_on_menu_open: bool,
 
+    /// Poll provider status pages and surface incidents (upstream
+    /// `statusChecksEnabled`, default on).
+    #[serde(default = "default_true")]
+    pub status_checks_enabled: bool,
+
     /// Off/On/Automatic background-work power preference (upstream 0.53).
     #[serde(default)]
     pub low_power_mode_preference: LowPowerModePreference,
@@ -144,8 +152,6 @@ pub struct Settings {
 
     /// Critical usage threshold for alerts (percentage)
     pub critical_usage_threshold: f64,
-
-    pub provider_usage_thresholds: HashMap<String, UsageThresholdOverride>,
 
     /// Merge mode: show all enabled providers in a single tray icon
     pub merge_tray_icons: bool,
@@ -334,6 +340,13 @@ pub struct Settings {
     #[serde(default)]
     pub ui_language: Language,
 
+    /// Language "System": `ui_language` follows the Windows display
+    /// language (Mac `AppLanguage.system`). True for new installs; false
+    /// for files written before this setting existed, so their chosen
+    /// language stays put.
+    #[serde(default)]
+    pub ui_language_follows_system: bool,
+
     /// UI theme preference (Phase 12). Defaults to Auto (prefers-color-scheme).
     #[serde(default)]
     pub theme: ThemePreference,
@@ -457,6 +470,29 @@ pub struct Settings {
     /// zone (upstream 0.67.0 `tokenCostUsageBucketTimeZone`).
     #[serde(default)]
     pub cost_usage_bucket_time_zone: String,
+
+    /// "Track costs" in Usage & Spend (Mac `costUsageEnabled`). Off stops the
+    /// local cost-log scan, which blanks cost on the dashboard, cards and float
+    /// bar. True for new installs and for files written before the key existed.
+    #[serde(default = "default_true")]
+    pub cost_usage_enabled: bool,
+
+    /// Time range of the Usage & Spend dashboard, kept apart from
+    /// `cost_reporting_period` (menu, float bar, share exports). A file without
+    /// the key copies `cost_reporting_period`.
+    #[serde(default)]
+    pub spend_dashboard_period: CostReportingPeriod,
+
+    /// Usage & Spend sources (provider ids) left out of the stat strip, charts,
+    /// Copy JSON and Export JSON. Sorted and unique.
+    #[serde(default)]
+    pub spend_dashboard_hidden_source_ids: Vec<String>,
+
+    /// Set when the loaded file still carried legacy `provider_usage_thresholds`;
+    /// the desktop shell saves once at startup so only the new key stays on disk.
+    /// Public only so other crates can build `Settings { .., ..Settings::default() }`.
+    #[serde(skip)]
+    pub legacy_usage_thresholds_pending: bool,
 }
 
 fn default_window_scale_percent() -> u16 {
@@ -626,6 +662,7 @@ impl Default for Settings {
             // keep the fixed interval through the field default in `RawSettings`.
             adaptive_refresh: true,
             refresh_all_providers_on_menu_open: false,
+            status_checks_enabled: true,
             low_power_mode_preference: LowPowerModePreference::Off,
             start_minimized: false,
             start_at_login: false,
@@ -635,7 +672,6 @@ impl Default for Settings {
             notification_sound_theme: NotificationSoundTheme::default(),
             high_usage_threshold: 70.0,
             critical_usage_threshold: 90.0,
-            provider_usage_thresholds: HashMap::new(),
             merge_tray_icons: false, // Show single provider by default
             tray_icon_mode: TrayIconMode::default(), // Single icon by default
             stacked_tray_top_provider: None,
@@ -679,7 +715,8 @@ impl Default for Settings {
             http_proxy_password: String::new(),
             auto_download_updates: false, // Require explicit opt-in for background downloads
             install_updates_on_quit: false, // Don't auto-install on quit by default
-            ui_language: Language::default(), // English by default
+            ui_language: Language::default(), // English until the system language resolves
+            ui_language_follows_system: true,
             theme: ThemePreference::default(), // Auto (follows prefers-color-scheme)
             window_scale_percent: default_window_scale_percent(),
             tray_scale_percent: default_tray_scale_percent(),
@@ -701,11 +738,15 @@ impl Default for Settings {
             weekly_progress_work_days: None,
             alibaba_token_plan_region: default_alibaba_token_plan_region(),
             codex_external_oauth_sources_allowed: false,
+            legacy_usage_thresholds_pending: false,
             cost_summary_display_style: CostSummaryDisplayStyle::default(),
             open_codex_usage_logs_enabled: false,
             hide_native_codex_cost_when_open_codex_present: false,
             cost_reporting_period: CostReportingPeriod::default(),
             cost_usage_bucket_time_zone: String::new(),
+            cost_usage_enabled: true,
+            spend_dashboard_period: CostReportingPeriod::default(),
+            spend_dashboard_hidden_source_ids: Vec::new(),
         }
     }
 }
@@ -754,6 +795,8 @@ impl Settings {
         // from the pre-0.62 per-provider visibility flags. After this the list
         // is the sole source of truth and the flags stay untouched.
         settings.migrate_legacy_usage_item_flags();
+
+        settings.resolve_system_language();
 
         settings
     }
@@ -887,6 +930,28 @@ impl Settings {
             if let Err(error) = std::fs::write(marker, b"1") {
                 tracing::warn!("Failed to write display mode fold marker: {error}");
             }
+        }
+    }
+
+    /// Migration #5 write-back: when the loaded file still had legacy
+    /// `provider_usage_thresholds` (already folded into `quota_warnings` on
+    /// read), save once so the file holds only the new key. The desktop shell
+    /// calls this at startup; tests and helpers that only load never write.
+    pub fn apply_quota_warning_migration(&mut self) {
+        self.apply_quota_warning_migration_with(Self::save);
+    }
+
+    fn apply_quota_warning_migration_with(
+        &mut self,
+        persist: impl FnOnce(&Self) -> anyhow::Result<()>,
+    ) {
+        if !self.legacy_usage_thresholds_pending {
+            return;
+        }
+        match persist(self) {
+            Ok(()) => self.legacy_usage_thresholds_pending = false,
+            // The legacy key stays readable, so the write retries next launch.
+            Err(error) => tracing::warn!("Failed to persist quota warning migration: {error}"),
         }
     }
 
@@ -1138,7 +1203,15 @@ impl Settings {
             .get(&id)
             .and_then(|c| c.cookie_source.as_deref())
             .unwrap_or(match id {
-                ProviderId::Kimi | ProviderId::Hyper | ProviderId::Groq => "auto",
+                ProviderId::Kimi
+                | ProviderId::Hyper
+                | ProviderId::Groq
+                | ProviderId::Langdock
+                | ProviderId::LithosAI
+                | ProviderId::MuseAI
+                | ProviderId::WorkBuddy
+                | ProviderId::TinyApi
+                | ProviderId::Xapi => "auto",
                 _ => DEFAULT_COOKIE_SOURCE,
             })
     }
@@ -1362,6 +1435,30 @@ impl Settings {
 
     pub fn set_historical_tracking(&mut self, id: ProviderId, value: bool) {
         self.provider_config_mut(id).historical_tracking = value;
+    }
+
+    /// Codex "Local session cost estimates" option (persisted only).
+    pub fn local_session_cost_ledger_enabled(&self, id: ProviderId) -> bool {
+        self.provider_configs
+            .get(&id)
+            .is_some_and(|c| c.local_session_cost_ledger_enabled)
+    }
+
+    pub fn set_local_session_cost_ledger_enabled(&mut self, id: ProviderId, value: bool) {
+        self.provider_config_mut(id)
+            .local_session_cost_ledger_enabled = value;
+    }
+
+    /// Codex OpenAI web battery saver option (persisted only).
+    pub fn openai_web_battery_saver_enabled(&self, id: ProviderId) -> bool {
+        self.provider_configs
+            .get(&id)
+            .is_some_and(|c| c.openai_web_battery_saver_enabled)
+    }
+
+    pub fn set_openai_web_battery_saver_enabled(&mut self, id: ProviderId, value: bool) {
+        self.provider_config_mut(id)
+            .openai_web_battery_saver_enabled = value;
     }
 
     /// Per-provider "avoid keychain prompts" toggle (currently claude-only).

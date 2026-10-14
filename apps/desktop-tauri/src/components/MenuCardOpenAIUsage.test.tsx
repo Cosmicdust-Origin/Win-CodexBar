@@ -178,12 +178,22 @@ describe("describeCard", () => {
     });
   });
 
-  it("keeps compact Overview to quota rows", () => {
+  // Upstream `showsOverviewSupplementalContent(compact:)` is `!compact || metrics.isEmpty`
+  // (MenuCardView+ModelHelpers.swift:378-380).
+  it("keeps compact Overview to quota rows, or details when there are none", () => {
     const snap = snapshot("openaiapi", usage());
     snap.displayDetails = [
       { id: "d", sectionTitle: null, title: "Plan", value: "Pro", secondaryValue: null, progress: null },
     ];
-    expect(describeCard(snap, null, [], "detailed", false).hasDetails).toBe(true);
-    expect(describeCard(snap, null, [], "detailed", true).hasDetails).toBe(false);
+    const metrics = [{ id: "primary", label: "Session", snap: snap.primary, lane: "primary" as const }];
+    expect(describeCard(snap, null, metrics, "detailed", false).showsDetailSections).toBe(true);
+    expect(describeCard(snap, null, metrics, "detailed", true)).toMatchObject({
+      hasDetails: true,
+      showsDetailSections: false,
+    });
+    expect(describeCard(snap, null, [], "detailed", true)).toMatchObject({
+      hasDetails: true,
+      showsDetailSections: true,
+    });
   });
 });

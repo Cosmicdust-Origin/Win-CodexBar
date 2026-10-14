@@ -174,6 +174,12 @@ impl Provider for CodexProvider {
         false
     }
 
+    /// Upstream `menuBarPaceWindow` paces Codex on its weekly lane, which
+    /// `normalize_named_windows` puts in the secondary slot.
+    fn menu_bar_pace_lane(&self) -> Option<crate::core::IconLane> {
+        Some(crate::core::IconLane::Secondary)
+    }
+
     fn id(&self) -> ProviderId {
         ProviderId::Codex
     }

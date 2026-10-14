@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useReducer, useState } from "react";
 import type {
+  ProviderCatalogEntry,
   ProviderUsageSnapshot,
   SettingsSnapshot,
   SettingsUpdate,
 } from "../../../types/bridge";
+import { SettingsGroup } from "../../../components/FormControls";
+import { formatRelativeUpdated } from "../../../lib/relativeTime";
+import { nextEnabledProviders } from "../settingsTabs";
 import { useLocale } from "../../../hooks/useLocale";
 import { providerAllowsPace } from "../../../lib/providerPace";
+import { providerBarAccent } from "../../../components/providers/providerIcons";
 import {
   getCredentialStorageStatus,
   getProviderCookieSourceOptions,
@@ -30,9 +35,6 @@ import { buildSubtitle } from "./providerDetailFormat";
 import { IdentitySection } from "./sections/IdentitySection";
 import { UsageSection } from "./sections/UsageSection";
 import { UsageItemVisibilitySection } from "./sections/UsageItemVisibilitySection";
-import { AutoResumeSection } from "./sections/AutoResumeSection";
-import { OptionalDetailsSection } from "./sections/OptionalDetailsSection";
-import { PaceSection } from "./sections/PaceSection";
 import { UsageDetailsSection } from "./sections/UsageDetailsSection";
 import { CostSection } from "./sections/CostSection";
 import { QuickActionsSection } from "./sections/QuickActionsSection";
@@ -41,7 +43,6 @@ import { CookieSourceSection } from "./sections/CookieSourceSection";
 import { UsageSourceSection } from "./sections/UsageSourceSection";
 import { shouldShowCookieSource } from "./sections/usageSourcePolicy";
 import { RegionSection } from "./sections/RegionSection";
-import { CopilotSeatCreditOptions } from "./sections/credentials/CopilotSeatCreditOptions";
 import { CodexAccountsSection } from "./sections/credentials/CodexAccountsSection";
 import { ClaudeAccountsSection } from "./sections/credentials/ClaudeAccountsSection";
 import { GrokAccountsSection } from "./sections/credentials/GrokAccountsSection";
@@ -59,9 +60,16 @@ import {
 } from "./sections/WayfinderGatewaySection";
 import { AzureApiVersionSection } from "./sections/AzureApiVersionSection";
 import { MuseBrowserTeamSection } from "./sections/MuseBrowserTeamSection";
+import { QuotaWarningsSection } from "./sections/QuotaWarningsSection";
+import { OptionsSection } from "./sections/OptionsSection";
+import { ClaudeSwapPathField } from "./sections/credentials/ClaudeSwapPathField";
 
 interface Props {
   providerId: string | null;
+  /** Full settings snapshot: header switch, Quota warnings and Options read from it. */
+  settings: SettingsSnapshot;
+  /** Provider catalog, for writing `enabledProviders` in catalog order. */
+  catalog: readonly Pick<ProviderCatalogEntry, "id">[];
   /** Live tray snapshot for `providerId`; feeds the details moved out of the tray card. */
   liveSnapshot?: ProviderUsageSnapshot | null;
   cookieDomain?: string | null;
@@ -79,14 +87,16 @@ interface Props {
 }
 
 /**
- * Orchestrates the Settings → Providers right-hand detail pane.
- *
- * Top-level port of
- * `rust/src/native_ui/preferences.rs::render_provider_detail_panel`
- * (lines 4301–6698).
+ * Settings > Providers detail pane, in the macOS order
+ * (`PreferencesProviderDetailView`): header, Usage, Visible usage items,
+ * Error, Menu bar metric, Connection, Token accounts (then the Windows-only
+ * credential storage), Fields, Accounts, Accent color, Quota warnings and
+ * Options. Groups whose sections render nothing are hidden by CSS.
  */
 export function ProviderDetailPane({
   providerId,
+  settings,
+  catalog,
   liveSnapshot = null,
   cookieDomain = null,
   resetTimeRelative,
@@ -327,6 +337,24 @@ export function ProviderDetailPane({
     }
   };
 
+  const enabled = settings.enabledProviders.includes(detail.id);
+  const handleToggleEnabled = (on: boolean) =>
+    onSettingsChange({
+      enabledProviders: nextEnabledProviders(catalog, settings.enabledProviders, detail.id, on),
+    });
+  // macOS shows the error group only for a recorded fetch error; every
+  // snapshot carries an errorState, including "ready" after a good fetch.
+  const hasFetchError = Boolean(detail.lastError?.trim());
+  const updatedMs = detail.lastUpdated ? Date.parse(detail.lastUpdated) : Number.NaN;
+  const updatedText = Number.isFinite(updatedMs)
+    ? formatRelativeUpdated(updatedMs, t)
+    : busy
+      ? t("SectionRefreshing")
+      : hasFetchError
+        ? t("ProviderTextUnavailable")
+        : t("ProviderNotFetchedYetTitle");
+  const showClaudeSwapPath = detail.id === "claude" && (settings.claudeSwapEnabled ?? false);
+
   return (
     <div className="provider-detail">
       <IdentitySection
@@ -334,74 +362,67 @@ export function ProviderDetailPane({
         subtitle={subtitle}
         t={t}
         hidePersonalInfo={hidePersonalInfo}
+        updatedText={updatedText}
+        enabled={enabled}
+        onToggleEnabled={handleToggleEnabled}
+        onRefresh={() => void handleRefresh()}
+        busy={busy}
       />
 
-      {detail.id === "codex" && (
-        <CodexAccountsSection t={t} hidePersonalInfo={hidePersonalInfo} />
-      )}
-      {detail.id === "claude" && (
-        <ClaudeAccountsSection
-          t={t}
-          language={language}
-          hidePersonalInfo={hidePersonalInfo}
-          showAsUsed={showAsUsed}
+      <SettingsGroup
+        className="provider-detail-group provider-usage-group"
+        title={t("ProviderUsage")}
+      >
+        <UsageSection
+          provider={detail}
           resetTimeRelative={resetTimeRelative}
-        />
-      )}
-      {detail.id === "grok" && (
-        <GrokAccountsSection
+          display={{
+            showResetWhenExhausted: settings.showResetWhenExhausted,
+            showPace:
+              (settings.showPace ?? true) &&
+              providerAllowsPace(detail.id, detail.sourceLabel),
+            showAsUsed,
+            usageThresholds: settings,
+            quotaWarningMarkersVisible: settings.quotaWarningMarkersVisible ?? true,
+            weeklyProgressWorkDays: settings.weeklyProgressWorkDays ?? null,
+            workdayTickStyle: settings.workdayTickStyle ?? "subtle",
+          }}
+          accentColor={providerBarAccent(detail.id, providerAccentColors[detail.id])}
           t={t}
-          hidePersonalInfo={hidePersonalInfo}
-          resetTimeRelative={resetTimeRelative}
         />
-      )}
+        <CostSection cost={detail.cost} t={t} />
+        <UsageDetailsSection
+          provider={liveSnapshot?.providerId === detail.id ? liveSnapshot : null}
+        />
+        <ChartsSection
+          providerId={detail.id}
+          accountEmail={detail.email}
+          accentColor={providerAccentColors[detail.id]}
+          openAiApiUsage={detail.openAiApiUsage}
+          t={t}
+        />
+        <QuickActionsSection
+          provider={detail}
+          busy={busy}
+          onSwitchAccount={handleSwitchAccount}
+          onOpenDashboard={handleOpenDashboard}
+          onOpenStatusPage={handleOpenStatusPage}
+          onBuyCredits={handleBuyCredits}
+          t={t}
+        />
+      </SettingsGroup>
 
-      {detail.lastError && (
-        <ProviderIssueNotice detail={detail} t={t} />
-      )}
-
-      <UsageSection
-        provider={detail}
-        resetTimeRelative={resetTimeRelative}
-        t={t}
-      />
       <UsageItemVisibilitySection
         provider={detail}
         disabled={settingsDisabled}
         t={t}
         onChange={onSettingsChange}
       />
-      <AutoResumeSection
-        providerId={detail.id}
-        enabled={detail.autoResumeAfterQuotaReset}
-        available={detail.autoResumeSupported}
-        disabled={settingsDisabled}
-        t={t}
-        onChanged={reload}
-      />
-      <OptionalDetailsSection
-        providerId={detail.id}
-        enabled={detail.optionalDetailsEnabled}
-        available={detail.optionalDetailsSupported}
-        disabled={settingsDisabled}
-        t={t}
-        onChanged={reload}
-      />
-      {isGatewayProviderId(detail.id) &&
-        gatewayLoadedProviderId === detail.id && (
-        <WayfinderGatewaySection
-          providerId={detail.id}
-          draft={gatewayDraft}
-          error={gatewayError}
-          busy={busy}
-          disabled={settingsDisabled}
-          onDraftChange={(draft) =>
-            dispatch({ type: "SET_GATEWAY_DRAFT", draft })
-          }
-          onSave={() => void saveGateway()}
-          t={t}
-        />
+
+      {hasFetchError && (
+        <ProviderIssueNotice detail={detail} t={t} hidePersonalInfo={hidePersonalInfo} />
       )}
+
       <MenuBarMetricSection
         provider={detail}
         providerMetrics={providerMetrics}
@@ -409,103 +430,151 @@ export function ProviderDetailPane({
         t={t}
         onChange={onSettingsChange}
       />
+
+      <SettingsGroup
+        className="provider-detail-group provider-connection-group"
+        title={t("ProviderSectionConnection")}
+      >
+        <UsageSourceSection
+          providerId={detail.id}
+          currentValue={detail.usageSource}
+          t={t}
+          onChanged={reload}
+        />
+        {shouldShowCookieSource(detail.id, detail.usageSource) && (
+          <CookieSourceSection
+            providerId={detail.id}
+            currentValue={detail.cookieSource}
+            options={cookieOptions}
+            manualCookieMissing={detail.manualCookieMissing}
+            t={t}
+            onChanged={reload}
+          />
+        )}
+        {detail.id === "muse" && (
+          <MuseBrowserTeamSection
+            providerId={detail.id}
+            details={detail.displayDetails}
+            disabled={settingsDisabled}
+            t={t}
+            onChanged={reload}
+          />
+        )}
+        <RegionSection
+          providerId={detail.id}
+          currentValue={detail.region}
+          options={regionOptions}
+          t={t}
+          onChanged={reload}
+        />
+        {detail.id === "azureopenai" && (
+          <AzureApiVersionSection
+            providerId={detail.id}
+            disabled={settingsDisabled}
+            onChanged={reload}
+          />
+        )}
+        {isGatewayProviderId(detail.id) &&
+          gatewayLoadedProviderId === detail.id && (
+          <WayfinderGatewaySection
+            providerId={detail.id}
+            draft={gatewayDraft}
+            error={gatewayError}
+            busy={busy}
+            disabled={settingsDisabled}
+            onDraftChange={(draft) =>
+              dispatch({ type: "SET_GATEWAY_DRAFT", draft })
+            }
+            onSave={() => void saveGateway()}
+            t={t}
+          />
+        )}
+      </SettingsGroup>
+
+      <SettingsGroup className="provider-detail-group provider-token-accounts-group">
+        {tokenProviderIds.has(detail.id) && (
+          <TokenAccountsPanel
+            key={`token-${credKey}`}
+            providerId={detail.id}
+            compact
+          />
+        )}
+      </SettingsGroup>
+      <SettingsGroup className="provider-detail-group provider-credential-storage-group">
+        <CredentialStorageSection
+          status={credentialStatus}
+          busy={busy}
+          onRevoke={handleRevokeCredentials}
+          t={t}
+        />
+      </SettingsGroup>
+
+      <SettingsGroup className="provider-detail-group provider-fields-group">
+        <CredentialsDispatcher providerId={detail.id} t={t} />
+        <ApiKeySection key={`api-${credKey}`} providerId={detail.id} />
+        <CookieSection
+          key={`cookie-${credKey}`}
+          providerId={detail.id}
+          cookieDomain={cookieDomain}
+          onChanged={reload}
+        />
+        {showClaudeSwapPath && (
+          <ClaudeSwapPathField
+            value={settings.claudeSwapExecutablePath ?? ""}
+            disabled={settingsDisabled}
+            t={t}
+            onSettingsChange={onSettingsChange}
+          />
+        )}
+      </SettingsGroup>
+
+      <SettingsGroup className="provider-detail-group provider-accounts-group">
+        {detail.id === "codex" && (
+          <CodexAccountsSection t={t} hidePersonalInfo={hidePersonalInfo} />
+        )}
+        {detail.id === "claude" && (
+          <ClaudeAccountsSection
+            t={t}
+            language={language}
+            hidePersonalInfo={hidePersonalInfo}
+            showAsUsed={showAsUsed}
+            resetTimeRelative={resetTimeRelative}
+            claudeSwapEnabled={settings.claudeSwapEnabled ?? false}
+            claudeSwapExecutablePath={settings.claudeSwapExecutablePath ?? ""}
+          />
+        )}
+        {detail.id === "grok" && (
+          <GrokAccountsSection
+            t={t}
+            hidePersonalInfo={hidePersonalInfo}
+            resetTimeRelative={resetTimeRelative}
+          />
+        )}
+      </SettingsGroup>
+
       <AccentColorSection
         providerId={detail.id}
         accentColor={providerAccentColors[detail.id] ?? null}
+        disabled={settingsDisabled}
         t={t}
         onChange={onSettingsChange}
       />
-      <PaceSection
-        pace={
-          providerAllowsPace(detail.id, detail.sourceLabel)
-            ? detail.pace
-            : null
-        }
-        t={t}
-      />
-      <UsageDetailsSection
-        provider={liveSnapshot?.providerId === detail.id ? liveSnapshot : null}
-      />
-      <CostSection cost={detail.cost} t={t} />
 
-      <UsageSourceSection
+      <QuotaWarningsSection
         providerId={detail.id}
-        currentValue={detail.usageSource}
+        settings={settings}
+        disabled={settingsDisabled}
         t={t}
-        onChanged={reload}
-      />
-      {shouldShowCookieSource(detail.id, detail.usageSource) && (
-        <CookieSourceSection
-          providerId={detail.id}
-          currentValue={detail.cookieSource}
-          options={cookieOptions}
-          manualCookieMissing={detail.manualCookieMissing}
-          t={t}
-          onChanged={reload}
-        />
-      )}
-      {detail.id === "muse" && (
-        <MuseBrowserTeamSection
-          providerId={detail.id}
-          details={detail.displayDetails}
-          disabled={settingsDisabled}
-          t={t}
-          onChanged={reload}
-        />
-      )}
-      <RegionSection
-        providerId={detail.id}
-        currentValue={detail.region}
-        options={regionOptions}
-        t={t}
-        onChanged={reload}
-      />
-      {detail.id === "azureopenai" && (
-        <AzureApiVersionSection
-          providerId={detail.id}
-          disabled={settingsDisabled}
-          onChanged={reload}
-        />
-      )}
-      <CredentialsDispatcher providerId={detail.id} t={t} />
-
-      <CredentialStorageSection
-        status={credentialStatus}
-        busy={busy}
-        onRevoke={handleRevokeCredentials}
-        t={t}
-      />
-      {tokenProviderIds.has(detail.id) && (
-        <TokenAccountsPanel
-          key={`token-${credKey}`}
-          providerId={detail.id}
-          compact
-        />
-      )}
-      <ApiKeySection key={`api-${credKey}`} providerId={detail.id} />
-      <CookieSection
-        key={`cookie-${credKey}`}
-        providerId={detail.id}
-        cookieDomain={cookieDomain}
-        onChanged={reload}
-      />
-      <ChartsSection
-        providerId={detail.id}
-        accountEmail={detail.email}
-        accentColor={providerAccentColors[detail.id]}
-        openAiApiUsage={detail.openAiApiUsage}
-        t={t}
+        onChange={onSettingsChange}
       />
 
-      <QuickActionsSection
-        provider={detail}
-        busy={busy}
-        onRefresh={handleRefresh}
-        onSwitchAccount={handleSwitchAccount}
-        onOpenDashboard={handleOpenDashboard}
-        onOpenStatusPage={handleOpenStatusPage}
-        onBuyCredits={handleBuyCredits}
+      <OptionsSection
+        detail={detail}
+        settings={settings}
+        disabled={settingsDisabled}
         t={t}
+        onSettingsChange={onSettingsChange}
+        onReload={reload}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { LocaleKey } from "../../../../i18n/keys";
 import { setProviderAutoResumeAfterQuotaReset } from "../../../../lib/tauri";
+import { Field, Toggle } from "../../../../components/FormControls";
 
 interface Props {
   providerId: string;
@@ -11,7 +12,10 @@ interface Props {
   onChanged: () => void;
 }
 
-/** Opt-in control for reopening the exact local Codex or Claude CLI session. */
+/**
+ * Opt-in switch for reopening the exact local Codex or Claude CLI session.
+ * Windows-only; renders as a row of the provider's Options group.
+ */
 export function AutoResumeSection({
   providerId,
   enabled,
@@ -40,25 +44,19 @@ export function AutoResumeSection({
   };
 
   return (
-    <section className="provider-detail-section">
-      <h4>{t("ProviderAutoResumeTitle")}</h4>
-      <label className="provider-detail-toggle">
-        <input
-          type="checkbox"
+    <>
+      <Field
+        label={t("ProviderAutoResumeAfterQuotaReset")}
+        description={t("ProviderAutoResumeAfterQuotaResetHelper")}
+      >
+        <Toggle
+          variant="switch"
           checked={enabled}
           disabled={disabled || busy}
-          onChange={(event) => void handleChange(event.target.checked)}
+          onChange={(next) => void handleChange(next)}
         />
-        <span>
-          <span className="provider-detail-toggle__label">
-            {t("ProviderAutoResumeAfterQuotaReset")}
-          </span>
-          <span className="provider-detail-toggle__helper">
-            {t("ProviderAutoResumeAfterQuotaResetHelper")}
-          </span>
-        </span>
-      </label>
-      {error && <div className="provider-detail-error">{error}</div>}
-    </section>
+      </Field>
+      {error && <p className="provider-option-error">{error}</p>}
+    </>
   );
 }

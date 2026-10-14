@@ -8,7 +8,7 @@
 use crate::commands::bridge::RateWindowSnapshot;
 use crate::state::AppState;
 use chrono::{DateTime, Utc};
-use codexbar::core::{OpenAIDashboardCacheStore, RateWindow};
+use codexbar::core::OpenAIDashboardCacheStore;
 use codexbar::cost_reporting_period::{CostReportingPeriod, CostTimeZone};
 use codexbar::cost_scanner::{
     CostScanner, CostSummary, TodayUsage, get_daily_cost_history, get_daily_token_history,
@@ -209,7 +209,21 @@ fn build_provider_chart_data_with_cancel(
     cancel: Option<Arc<AtomicBool>>,
     weekly_window: Option<RateWindowSnapshot>,
 ) -> ProviderChartData {
-    let live_window = weekly_window.as_ref().map(rate_window_from_snapshot);
+    if !cost_tracking_enabled() {
+        // Track costs off: no local log scan, so no cost, token, local-usage or
+        // quota-window history (all read local logs). OpenAI dashboard data is
+        // fetched from the web and stays.
+        let (credits_history, usage_breakdown) =
+            load_openai_dashboard_chart_data(&provider_id, account_email.as_deref());
+        return ProviderChartData {
+            credits_history,
+            usage_breakdown,
+            ..ProviderChartData::empty(provider_id)
+        };
+    }
+    let live_window = weekly_window
+        .as_ref()
+        .map(RateWindowSnapshot::to_rate_window);
     let build_snapshot = || {
         codexbar::providers::chart::build_chart_snapshot(
             &provider_id,
@@ -401,6 +415,11 @@ fn map_quota_window_history(
     }
 }
 
+/// "Track costs" (Usage & Spend). Off means no local cost-log scan at all.
+fn cost_tracking_enabled() -> bool {
+    codexbar::settings::Settings::load().cost_usage_enabled
+}
+
 /// The History window the desktop is configured to report.
 fn current_reporting_period() -> CostReportingPeriod {
     codexbar::settings::Settings::load().cost_reporting_period
@@ -449,20 +468,6 @@ fn local_usage_summary_from_cost_summary(
     })
 }
 
-fn rate_window_from_snapshot(snapshot: &RateWindowSnapshot) -> RateWindow {
-    let resets_at = snapshot
-        .resets_at
-        .as_deref()
-        .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
-        .map(|value| value.with_timezone(&Utc));
-    RateWindow::with_details(
-        snapshot.used_percent,
-        snapshot.window_minutes,
-        resets_at,
-        snapshot.reset_description.clone(),
-    )
-}
-
 fn active_chart_scans() -> &'static Mutex<HashMap<String, Arc<AtomicBool>>> {
     static ACTIVE: OnceLock<Mutex<HashMap<String, Arc<AtomicBool>>>> = OnceLock::new();
     ACTIVE.get_or_init(|| Mutex::new(HashMap::new()))
@@ -489,6 +494,9 @@ fn load_local_usage_summary_with_unknown_models(
     provider_id: &str,
     cancel: Option<&AtomicBool>,
 ) -> (Option<ProviderLocalUsageSummary>, HashSet<String>) {
+    if !cost_tracking_enabled() {
+        return (None, HashSet::new());
+    }
     let period = current_reporting_period();
     if provider_id == "muse" {
         let summary = if cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
@@ -688,7 +696,7 @@ pub(crate) async fn refresh_provider_local_usage_cache(provider_ids: Vec<String>
             .await
             .unwrap_or(summary);
         }
-        store_local_usage_summary(&provider_id, summary);
+        store_local_usage_summary_if_tracking(&provider_id, summary);
     }
 }
 
@@ -704,6 +712,11 @@ fn load_local_usage_summary_cached(
     provider_id: &str,
     cancel: Option<&AtomicBool>,
 ) -> Option<ProviderLocalUsageSummary> {
+    // Checked before the cache so an entry from before "Track costs" was
+    // turned off is never served.
+    if !cost_tracking_enabled() {
+        return None;
+    }
     let cache = local_usage_cache();
     let period_identity = local_usage_period_identity();
     if let Ok(guard) = cache.lock()
@@ -723,8 +736,29 @@ fn load_local_usage_summary_cached(
         return None;
     }
 
-    store_local_usage_summary(provider_id, summary.clone());
+    store_local_usage_summary_if_tracking(provider_id, summary.clone());
     summary
+}
+
+/// A scan can outlive a "Track costs" off switch, which clears the cache; drop
+/// its result rather than refill the cache that the PowerToys pipe reads.
+fn store_local_usage_summary_if_tracking(
+    provider_id: &str,
+    summary: Option<ProviderLocalUsageSummary>,
+) {
+    let tracking = summary.is_none() || cost_tracking_enabled();
+    store_scanned_local_usage_summary(provider_id, summary, tracking);
+}
+
+fn store_scanned_local_usage_summary(
+    provider_id: &str,
+    summary: Option<ProviderLocalUsageSummary>,
+    cost_tracking_enabled: bool,
+) {
+    if summary.is_some() && !cost_tracking_enabled {
+        return;
+    }
+    store_local_usage_summary(provider_id, summary);
 }
 
 fn store_local_usage_summary(provider_id: &str, summary: Option<ProviderLocalUsageSummary>) {

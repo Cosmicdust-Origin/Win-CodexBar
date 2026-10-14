@@ -703,6 +703,7 @@
 .settings-sidebar__chip--blue { background: #0a84ff; }
 .settings-sidebar__chip--teal { background: #40c8e0; }
 .settings-sidebar__chip--purple { background: #bf5af2; }
+.settings-sidebar__chip--orange { background: #ff9f0a; }
 
 .settings-sidebar__app-icon {
   width: 20px;
@@ -855,4 +856,539 @@
 
 .cost-period-control .number-input {
   width: 72px;
+}
+
+/* ── Usage & Spend (macOS pane layout) ─────────────────────────────── */
+.usage-spend__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.usage-spend__refresh {
+  flex: none;
+}
+
+.usage-spend__segmented {
+  display: flex;
+  width: 100%;
+  margin: 4px 0 16px;
+}
+
+.usage-spend__segmented > .provider-detail-segmented__option {
+  flex: 1 1 0;
+  min-width: max-content;
+  font-size: 13px;
+}
+
+.usage-spend__failures {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--provider-status-error);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.usage-spend__failures strong {
+  color: var(--provider-status-error);
+}
+
+.usage-spend__off {
+  margin: 8px 0 20px;
+  padding: 16px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+}
+
+.usage-spend__off p {
+  margin: 4px 0 0;
+}
+
+.usage-spend__currency + .usage-spend__currency {
+  margin-top: 16px;
+}
+
+.usage-spend__currency-code {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.usage-spend__strip,
+.usage-spend__mix {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 0;
+}
+
+.usage-spend__strip {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.usage-spend__mix {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.usage-spend__stat {
+  min-width: 0;
+}
+
+.usage-spend__stat dt {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.usage-spend__stat dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.usage-spend__stat--large dd {
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.usage-spend__coverage {
+  margin-top: 12px;
+}
+
+.usage-spend__card {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--surface-elevated);
+}
+
+.usage-spend__card > .usage-spend__segmented {
+  margin: 0 0 12px;
+}
+
+.usage-spend-provider__detail {
+  display: block;
+  margin: 4px 0 0;
+}
+
+.usage-spend__row-button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.usage-spend__controls {
+  margin-top: 20px;
+}
+
+.usage-spend__controls > summary {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.usage-spend__sources {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--panel-border);
+}
+
+.usage-spend__sources legend {
+  float: left;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 0;
+}
+
+.usage-spend__exports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+.usage-spend__share {
+  margin-left: auto;
+}
+
+/* ── Provider detail pane (macOS PreferencesProviderDetailView) ──────
+   The pane is a stack of grouped boxes like the other Settings panes:
+   header, Usage, Visible usage items, Error, Menu bar metric,
+   Connection, Token accounts, credential storage, fields, accounts,
+   Accent color, Quota warnings and Options. */
+.settings-body--provider .provider-detail {
+  padding: 0 0 16px;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* Groups whose sections all render nothing disappear entirely. */
+.provider-detail > .settings-group:has(> .settings-group__box:empty) {
+  display: none;
+}
+
+/* Header: icon, name and subtitle, borderless Refresh, Enabled switch. */
+.provider-detail-header-group .provider-detail-header {
+  margin: 0;
+  padding: 12px 0;
+}
+
+.provider-detail-header-group .provider-detail-title-group {
+  flex: 1;
+}
+
+.provider-detail-header-group .provider-detail-title {
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.provider-detail-header-group .provider-detail-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.provider-detail-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.provider-detail-icon-btn:hover:not(:disabled) {
+  background: rgba(var(--surface-tint-rgb), 0.08);
+  color: var(--text-primary);
+}
+
+.provider-detail-icon-btn:focus-visible,
+.provider-detail-link-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.provider-detail-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.provider-info-row {
+  display: grid;
+  grid-template-columns: minmax(72px, max-content) minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.provider-info-row__label {
+  color: var(--text-secondary);
+}
+
+.provider-info-row__value {
+  min-width: 0;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Borderless link buttons: QuickActions links, Use default, Show details. */
+.provider-detail-link-btn {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.provider-detail-link-btn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.provider-detail-link-btn:disabled {
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.provider-detail-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 10px 0;
+}
+
+/* The group title already says "Usage". */
+.provider-usage-group .provider-usage-main > h4 {
+  display: none;
+}
+
+.provider-usage-group .provider-detail-section {
+  padding: 12px 0;
+}
+
+/* macOS: usage rows stack with 12px between them. */
+.provider-usage-main .menu-metric + .menu-metric {
+  margin-top: 12px;
+}
+
+/* Error group: a plain row in its box, red only on the title. */
+.provider-detail-error-group .provider-detail-error {
+  margin: 0;
+  padding: 10px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 13px;
+}
+
+.provider-detail-error-group .provider-detail-error p {
+  font-size: 12px;
+}
+
+.provider-detail-error-group .provider-detail-error__preview {
+  color: var(--text-primary);
+}
+
+.provider-detail-error-group .provider-detail-error__full {
+  white-space: pre-wrap;
+}
+
+/* Visible usage items: one switch row per window. */
+.provider-usage-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.provider-usage-item--disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.provider-usage-item__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.provider-usage-item__helper {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.provider-detail-group__actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 0;
+}
+
+/* Quota warnings: window label, Global / Custom / Off, then the values. */
+.quota-warning-row {
+  display: grid;
+  grid-template-columns: minmax(88px, max-content) max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 0;
+  font-size: 13px;
+}
+
+.quota-warning-row__detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  min-width: 0;
+}
+
+.quota-warning-row__inherited {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.quota-warning-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.quota-warning-field .number-input {
+  width: 64px;
+  font-variant-numeric: tabular-nums;
+}
+
+.provider-quota-warnings.is-dimmed .settings-group__box {
+  opacity: 0.45;
+}
+
+@media (max-width: 640px) {
+  .quota-warning-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Accent color: hex field, swatch, Use default. */
+.provider-accent-color-group .accent-color-row {
+  margin: 0;
+  padding: 10px 0;
+}
+
+.provider-accent-color-group .accent-color-input {
+  flex: 0 1 140px;
+}
+
+.provider-option-error {
+  margin: 0;
+  padding: 0 0 10px;
+  font-size: 12px;
+  color: var(--provider-status-error);
+}
+
+/* ── Hooks pane (macOS PreferencesHooksPane) ─────────────────────────── */
+.hooks-pane__caption {
+  margin: 0;
+  gap: 6px;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.hooks-pane__warning-icon {
+  flex: none;
+  margin-top: 1px;
+}
+
+.hooks-rule {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+.hooks-rule__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hooks-rule__header .select {
+  min-width: 0;
+  max-width: 40%;
+}
+
+.hooks-rule__spacer {
+  flex: 1;
+}
+
+.hooks-rule__threshold {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.hooks-rule__threshold .hooks-rule__threshold-input {
+  width: 60px;
+}
+
+.hooks-rule__mono {
+  width: 100%;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+}
+
+.hooks-rule__arguments {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hooks-rule__arguments-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.hooks-rule__argument {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hooks-pane__link-button,
+.hooks-pane__icon-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--accent, #0a84ff);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.hooks-pane__icon-button {
+  color: var(--text-secondary);
+}
+
+.hooks-pane__icon-button--destructive {
+  color: var(--provider-status-error, #ff453a);
+}
+
+.hooks-pane__link-button:disabled,
+.hooks-pane__icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.hooks-pane__link-button:focus-visible,
+.hooks-pane__icon-button:focus-visible {
+  outline: 2px solid var(--accent, #0a84ff);
+  outline-offset: 1px;
 }

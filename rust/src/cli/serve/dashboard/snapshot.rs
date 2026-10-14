@@ -207,6 +207,8 @@ pub struct SnapshotInput {
     /// None represents a caller with no fill preference. Dashboard output
     /// defaults that case to remaining quota.
     pub usage_bars_show_used: Option<bool>,
+    /// `Settings::weekly_progress_work_days` for weekly pace (None = linear).
+    pub weekly_work_days: Option<u8>,
 }
 
 /// Build the stable display-oriented snapshot (pure; no I/O).
@@ -331,6 +333,7 @@ fn build_provider(
                                 &envelope.session_label,
                                 &envelope.weekly_label,
                                 input.collection.generated_at,
+                                input.weekly_work_days,
                             )
                         })
                         .collect(),
@@ -373,12 +376,13 @@ fn build_account(
     session_label: &str,
     weekly_label: &str,
     generated_at: DateTime<Utc>,
+    weekly_work_days: Option<u8>,
 ) -> AccountPayload {
     let (identity, windows, pace, error, updated_at) = match &account.fetch {
         Ok(result) => (
             make_identity(&result.usage, identity_mode),
             make_windows(None, session_label, weekly_label, &result.usage),
-            make_pace(&result.usage),
+            make_pace(&result.usage, weekly_work_days),
             None,
             Some(result.usage.updated_at),
         ),
@@ -497,13 +501,13 @@ fn make_window(kind: &str, label: &str, window: &RateWindow) -> WindowPayload {
     make_window_with_idle(kind, label, window, false)
 }
 
-fn make_pace(usage: &UsageSnapshot) -> Option<ProviderPacePayload> {
+fn make_pace(usage: &UsageSnapshot, weekly_work_days: Option<u8>) -> Option<ProviderPacePayload> {
     let payload = ProviderPacePayload {
         primary: None,
         secondary: usage
             .secondary
             .as_ref()
-            .and_then(|window| UsagePace::weekly(window, None, 10080))
+            .and_then(|window| UsagePace::weekly(window, None, 10080, weekly_work_days))
             .map(|pace| pace_payload(&pace)),
         tertiary: None,
     };

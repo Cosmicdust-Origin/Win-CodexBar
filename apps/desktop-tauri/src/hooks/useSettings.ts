@@ -39,6 +39,15 @@ function applyPatch(current: SettingsSnapshot, patch: SettingsUpdate): SettingsS
   if (patch.providerMetrics) {
     next.providerMetrics = { ...current.providerMetrics, ...patch.providerMetrics };
   }
+  // Quota warnings replace one provider's value at a time; an empty value is Global.
+  if (patch.providerQuotaWarnings) {
+    const warnings = { ...current.providerQuotaWarnings };
+    for (const [id, value] of Object.entries(patch.providerQuotaWarnings)) {
+      if (Object.keys(value).length === 0) delete warnings[id];
+      else warnings[id] = value;
+    }
+    next.providerQuotaWarnings = warnings;
+  }
   return next as unknown as SettingsSnapshot;
 }
 

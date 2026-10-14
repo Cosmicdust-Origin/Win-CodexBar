@@ -1,4 +1,4 @@
-import type { SpendContract, SpendDailyPoint, SpendModelRow } from "../types/bridge";
+import type { SpendContract, SpendDailyPoint, SpendModelRow, UsageSpendRow } from "../types/bridge";
 
 /** Upstream 0.64.0 (#3353) `spendProviderModelDisplayLimit`. */
 export const PROVIDER_MODEL_DISPLAY_LIMIT = 6;
@@ -14,6 +14,10 @@ export interface SpendProviderGroup {
   /** True when model history is incomplete, so the model list is a partial view. */
   hasPartialModelHistory: boolean;
   models: SpendModelRow[];
+  /** Currency of `costUsd`; USD when absent. */
+  currency?: string;
+  /** The summary row behind this group (Providers view), for its 7 and 30 day detail. */
+  row?: UsageSpendRow;
 }
 
 /**
@@ -57,6 +61,34 @@ export function buildSpendProviderGroups(
     models: contract.models,
   };
   return [group].sort(compareSpendProviderGroups);
+}
+
+/**
+ * Providers view: one group per visible summary row with its selected-window
+ * cost and tokens. The detail contract's models nest under its provider; other
+ * providers have no model-level history yet (cross-provider contracts are a
+ * backend follow-up).
+ */
+export function buildSpendProviderRowGroups(
+  rows: readonly UsageSpendRow[],
+  contract: SpendContract,
+): SpendProviderGroup[] {
+  return rows
+    .map((row): SpendProviderGroup => {
+      const isContract = row.providerId === contract.providerId;
+      return {
+        providerId: row.providerId,
+        displayName: row.displayName,
+        costUsd: row.periodCost,
+        totalTokens: row.periodTokens,
+        costIsPartial: isContract && contract.priceCoverage.unpriced > 0,
+        hasPartialModelHistory: isContract && contract.models.length > 0 && !contract.historyCoverageEstablished,
+        models: isContract ? contract.models : [],
+        currency: row.currency || "USD",
+        row,
+      };
+    })
+    .sort(compareSpendProviderGroups);
 }
 
 /** The daily point for `day`, or null when that day is not in the current range. */

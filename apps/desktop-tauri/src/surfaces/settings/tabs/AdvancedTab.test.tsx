@@ -20,6 +20,7 @@ const settings: SettingsSnapshot = {
   refreshIntervalSecs: 300,
   adaptiveRefresh: false,
   refreshAllProvidersOnMenuOpen: false,
+  statusChecksEnabled: true,
   lowPowerMode: false,
   startAtLogin: false,
   startMinimized: false,
@@ -64,6 +65,7 @@ const settings: SettingsSnapshot = {
   codexCustomSessionsDirs: [],
   updateChannel: "stable",
   uiLanguage: "english",
+  uiLanguageFollowsSystem: false,
   theme: "dark",
   windowScalePercent: 125,
   trayScalePercent: 100,
@@ -174,22 +176,9 @@ describe("AdvancedTab", () => {
     });
   });
 
-  it("keeps the Windows Hooks settings surface to one master label and toggle", () => {
+  it("leaves Hooks to Settings > Hooks", () => {
     render(<AdvancedTab settings={settings} set={vi.fn()} saving={false} />);
-
-    const hooksSection = screen
-      .getByRole("heading", { name: "HooksTitle" })
-      .closest("section");
-
-    expect(hooksSection).not.toBeNull();
-    expect(hooksSection?.querySelectorAll(".settings-field__label")).toHaveLength(1);
-    expect(hooksSection?.querySelectorAll('input[type="checkbox"]')).toHaveLength(1);
-    expect(
-      hooksSection?.querySelectorAll(
-        'input[type="text"], input[type="number"], textarea',
-      ),
-    ).toHaveLength(0);
-    expect(screen.getAllByText("HooksEnableLabel")).toHaveLength(1);
+    expect(screen.queryByText("HooksEnableLabel")).toBeNull();
   });
 
   it("leaves Agent sessions to Settings > Menu", () => {
@@ -214,7 +203,6 @@ describe("AdvancedTab Mac grouped layout", () => {
       "CodexLocalLogsTitle",
       "SectionLocalIntegrations",
       "NetworkProxyTitle",
-      "HooksTitle",
       "DiagnosticsSectionHeading",
     ]);
     expect(screen.queryByText("SectionKeyboard")).toBeNull();
@@ -229,12 +217,13 @@ describe("AdvancedTab Mac grouped layout", () => {
     }
   });
 
-  it("locks the Claude keychain-prompt option while Credential Manager access is off", () => {
+  it("shows the credential-access footer while Credential Manager access is off", () => {
     const set = vi.fn();
     const { rerender } = render(
       <AdvancedTab settings={settings} set={set} saving={false} />,
     );
-    expect(screen.getByRole("checkbox", { name: "AvoidKeychainPromptsLabel" })).toBeEnabled();
+    // The Claude keychain-prompt option lives in Providers > Claude > Options (Mac parity).
+    expect(screen.queryByRole("checkbox", { name: "AvoidKeychainPromptsLabel" })).toBeNull();
     expect(screen.queryByText("CredentialAccessFooter")).toBeNull();
 
     fireEvent.click(screen.getByRole("checkbox", { name: "DisableAllKeychainLabel" }));
@@ -247,7 +236,6 @@ describe("AdvancedTab Mac grouped layout", () => {
         saving={false}
       />,
     );
-    expect(screen.getByRole("checkbox", { name: "AvoidKeychainPromptsLabel" })).toBeDisabled();
     expect(screen.getByText("CredentialAccessFooter")).toBeInTheDocument();
   });
 });

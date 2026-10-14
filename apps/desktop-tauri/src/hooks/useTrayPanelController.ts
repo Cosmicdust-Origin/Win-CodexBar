@@ -15,6 +15,7 @@ import {
   reorderProviders,
 } from "../lib/tauri";
 import { useProviders } from "./useProviders";
+import { useProviderStatuses } from "./useProviderStatuses";
 import { useSettings } from "./useSettings";
 import { useUpdateState } from "./useUpdateState";
 import { useLocale } from "./useLocale";
@@ -26,6 +27,7 @@ import { accountMenuAction } from "../lib/accountMenuRow";
 import { orderProviderSnapshots } from "../lib/providerOrder";
 import { clampTrayScalePercent } from "../lib/trayScale";
 import { selectOverviewProviders } from "../lib/overviewProviders";
+import { serviceStatusLine } from "../lib/serviceStatus";
 import {
   hydrateProviderSlots,
   orderedEnabledProviderSlots,
@@ -199,6 +201,14 @@ export function useTrayPanelController(state: BootstrapState) {
       cancelled = true;
     };
   }, [actionProviderId]);
+  const serviceStatuses = useProviderStatuses();
+  // macOS `MenuDescriptor.statusLine`: the selected provider, else the first
+  // enabled one, whether or not it has a usage snapshot yet.
+  const statusLine = serviceStatusLine(
+    serviceStatuses,
+    selectedProviderId ?? denseProviderSlots[0]?.id ?? null,
+    t,
+  );
   const links =
     providerLinks !== null && providerLinks.providerId === actionProviderId
       ? providerLinks
@@ -274,6 +284,7 @@ export function useTrayPanelController(state: BootstrapState) {
         hasLoadedCache ? "cache-ready" : "cache-pending",
         visibleProviders.map((provider) => provider.providerId).join(","),
         actionRowIds,
+        statusLine ?? "",
         trayScale,
       ].join("|"),
     [
@@ -287,6 +298,7 @@ export function useTrayPanelController(state: BootstrapState) {
       hasLoadedCache,
       visibleProviders,
       actionRowIds,
+      statusLine,
       trayScale,
     ],
   );
@@ -379,6 +391,7 @@ export function useTrayPanelController(state: BootstrapState) {
     layoutReady,
     requestLayout,
     footerGroups,
+    statusLine,
     updateState,
     checkNow,
     download,

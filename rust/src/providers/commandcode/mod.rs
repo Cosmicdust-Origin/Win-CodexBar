@@ -102,6 +102,11 @@ fn find_plan(plan_id: &str) -> Option<&'static CommandCodePlan> {
     PLANS.iter().find(|plan| plan.id == normalized)
 }
 
+/// Reset-window pace (upstream `CommandCodeProviderDescriptor.pace`, v0.70.0):
+/// `.calendarMonthResetWindow`.
+pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
+    crate::core::ProviderPaceCapability::CALENDAR_MONTH_RESET_WINDOW;
+
 pub struct CommandCodeProvider {
     metadata: ProviderMetadata,
     client: Client,

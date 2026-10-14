@@ -227,7 +227,12 @@ pub fn get_provider_detail(
             detail.pace = snapshot.pace.clone();
             detail.open_ai_api_usage = snapshot.open_ai_api_usage.clone();
         }
-        detail.last_error = snapshot.error.clone();
+        // Shown verbatim behind "Show details"; redact again so every cache
+        // path (refresh, seed, restore) reaches the pane scrubbed.
+        detail.last_error = snapshot
+            .error
+            .as_deref()
+            .map(codexbar::core::SecretRedactor::redact);
         detail.error_state = Some(snapshot.error_state);
         detail.has_snapshot = true;
     }

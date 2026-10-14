@@ -38,6 +38,7 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
     visibleProviders,
     requestLayout,
     footerGroups,
+    statusLine,
     updateState,
     checkNow,
     download,
@@ -93,6 +94,7 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
             quotaWarningMarkersVisible: settings.quotaWarningMarkersVisible ?? true,
             weeklyProgressWorkDays: settings.weeklyProgressWorkDays ?? null,
             workdayTickStyle: settings.workdayTickStyle ?? "subtle",
+            costTrackingEnabled: settings.costUsageEnabled ?? true,
           }}
           accentColor={settings.providerAccentColors[p.providerId]}
           onLayoutChange={requestLayout}
@@ -110,7 +112,8 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
   if (sorted.length === 0) {
     return (
       <div className={revealClassName} data-theme="light">
-        <MenuSurface banner={banner} footerGroups={footerGroups} style={surfaceStyle}>
+        <MenuSurface banner={banner} footerGroups={footerGroups}
+          statusLine={statusLine} style={surfaceStyle}>
           {stayAwakeStatus}
           {settings.agentSessionsEnabled && <AgentSessions />}
           <MenuEmpty
@@ -124,7 +127,8 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
 
   return (
     <div className={revealClassName} data-theme="light">
-      <MenuSurface banner={banner} footerGroups={footerGroups} style={surfaceStyle}>
+      <MenuSurface banner={banner} footerGroups={footerGroups}
+        statusLine={statusLine} style={surfaceStyle}>
         {stayAwakeStatus}
         {settings.agentSessionsEnabled && <AgentSessions />}
         <ProviderGrid
@@ -144,6 +148,7 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
           <OverviewSpendSummary
             providerIds={sorted.map((provider) => provider.providerId)}
             period={settings.costReportingPeriod}
+            costTrackingEnabled={settings.costUsageEnabled ?? true}
             t={t}
           />
         )}
@@ -182,11 +187,14 @@ export function splitSpendTitle(
 function OverviewSpendSummary({
   providerIds,
   period,
+  costTrackingEnabled = true,
   t,
 }: {
   providerIds: string[];
   /** Saved History window; a change rescans. Omitted means the backend default. */
   period?: string;
+  /** Settings "Track costs"; a change re-reads the summary (off hides it). */
+  costTrackingEnabled?: boolean;
   t: (key: LocaleKey) => string;
 }) {
   const { preferredCode, rates } = useCurrency();
@@ -194,16 +202,23 @@ function OverviewSpendSummary({
 
   useEffect(() => {
     let cancelled = false;
+    if (!costTrackingEnabled) {
+      setSummary(null);
+      return () => { cancelled = true; };
+    }
     // No explicit period: the backend resolves the saved History window.
     void getUsageSpendSummary()
       .then((value) => { if (!cancelled) setSummary(value); })
       .catch(() => { if (!cancelled) setSummary(null); });
     return () => { cancelled = true; };
-  }, [providerIds.join("|"), period]);
+  }, [providerIds.join("|"), period, costTrackingEnabled]);
 
   // Overview consumes the same backend spend catalog as Usage & Spend. Do not
   // restrict accounting to whichever cards happen to be rendered in this tray.
-  const overviewSummary = summary ? filterUsageSpendSummaryForOverview(summary) : null;
+  // Track costs off: no local estimates anywhere, so no Overview spend either.
+  const overviewSummary = summary && summary.costTrackingEnabled !== false
+    ? filterUsageSpendSummaryForOverview(summary)
+    : null;
 
   if (!overviewSummary) return null;
   // The summary names the History window its period columns cover.

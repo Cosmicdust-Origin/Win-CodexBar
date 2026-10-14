@@ -1,6 +1,6 @@
 import type { LocaleKey } from "../../../../i18n/keys";
 
-export type GatewayProviderId = "wayfinder" | "bifrost" | "aixy";
+export type GatewayProviderId = "wayfinder" | "bifrost" | "aixy" | "clawrouter";
 
 interface GatewayCopy {
   title: LocaleKey;
@@ -23,6 +23,11 @@ const GATEWAY_COPY: Record<GatewayProviderId, GatewayCopy> = {
     title: "AixyGatewayTitle",
     label: "AixyGatewayLabel",
     help: "AixyGatewayHelp",
+  },
+  clawrouter: {
+    title: "ClawRouterGatewayTitle",
+    label: "AixyGatewayLabel",
+    help: "ClawRouterGatewayHelp",
   },
 };
 

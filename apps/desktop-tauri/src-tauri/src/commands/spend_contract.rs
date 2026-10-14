@@ -28,6 +28,9 @@ pub async fn get_spend_contract(
         let settings = Settings::load();
         let period =
             CostReportingPeriod::resolve_request(period.as_deref(), settings.cost_reporting_period);
+        if !settings.cost_usage_enabled {
+            return SpendContract::empty(&provider, period);
+        }
         let scanner = CostScanner::for_period(period);
         let summary = match provider.as_str() {
             "codex" => scanner.scan_codex(),

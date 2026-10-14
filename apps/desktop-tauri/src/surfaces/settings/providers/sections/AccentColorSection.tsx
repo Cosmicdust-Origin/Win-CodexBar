@@ -1,28 +1,33 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { LocaleKey } from "../../../../i18n/keys";
 import type { SettingsUpdate } from "../../../../types/bridge";
 import { getProviderIcon } from "../../../../components/providers/providerIcons";
+import { SettingsGroup } from "../../../../components/FormControls";
 
 interface Props {
   providerId: string;
   accentColor: string | null;
+  disabled?: boolean;
   t: (key: LocaleKey) => string;
   onChange: (patch: SettingsUpdate) => void;
 }
 
 /**
- * Per-provider accent color override (#2972): hex input, native color
- * picker, and a reset-to-shipped-color button. The override is persisted
- * via the standard settings-update flow (onSettingsChange).
+ * Accent color group (macOS `ProviderAccentColorSection`): a hex field, the
+ * native color well and "Use default", which appears only while an override
+ * is saved. The override is persisted through the settings-update flow.
  */
 export function AccentColorSection({
   providerId,
   accentColor,
+  disabled = false,
   t,
   onChange,
 }: Props) {
   const [input, setInput] = useState(accentColor ?? "");
   const [error, setError] = useState<string | null>(null);
+  // Follow saves made elsewhere (another window, or the reset below).
+  useEffect(() => setInput(accentColor ?? ""), [accentColor]);
 
   const brandColor = getProviderIcon(providerId).brandColor;
   const effective = accentColor ?? brandColor;
@@ -31,7 +36,7 @@ export function AccentColorSection({
     setError(null);
     const trimmed = raw.trim();
     if (trimmed === "") {
-      onChange({ providerAccentColors: { [providerId]: null } });
+      if (accentColor !== null) onChange({ providerAccentColors: { [providerId]: null } });
       setInput("");
       return;
     }
@@ -41,8 +46,10 @@ export function AccentColorSection({
       return;
     }
     const normalized = `#${trimmedHex.toUpperCase()}`;
-    onChange({ providerAccentColors: { [providerId]: normalized } });
     setInput(normalized);
+    if (normalized !== accentColor) {
+      onChange({ providerAccentColors: { [providerId]: normalized } });
+    }
   };
 
   const handleReset = () => {
@@ -52,49 +59,51 @@ export function AccentColorSection({
   };
 
   return (
-    <section className="provider-detail-section provider-detail-accent-color">
-      <h4>{t("ProviderAccentColor")}</h4>
-      <p className="provider-detail-section__helper">
-        {t("ProviderAccentColorHelper")}
-      </p>
+    <SettingsGroup
+      className="provider-detail-group provider-accent-color-group"
+      title={t("ProviderAccentColor")}
+      footer={t("ProviderAccentColorHelper")}
+    >
       <div className="accent-color-row">
         <input
-          type="color"
-          className="accent-color-picker"
-          value={effective}
-          aria-label={t("ProviderAccentColor")}
-          onChange={(e) => {
-            const value = e.target.value.toUpperCase();
-            setInput(value);
-            handleSave(value);
-          }}
-        />
-        <input
           type="text"
-          className="accent-color-input"
+          className="text-input accent-color-input"
           value={input}
           placeholder={brandColor}
           maxLength={7}
           spellCheck={false}
+          disabled={disabled}
+          aria-label={`${t("ProviderAccentColor")} hex`}
           onChange={(e) => setInput(e.target.value)}
           onBlur={() => handleSave(input)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              handleSave(input);
-            }
+            if (e.key === "Enter") handleSave(input);
           }}
         />
-        <button
-          type="button"
-          className="credential-btn credential-btn--secondary"
-          disabled={accentColor === null}
-          onClick={handleReset}
-          title={t("ProviderAccentColorReset")}
-        >
-          {t("ProviderAccentColorReset")}
-        </button>
+        <input
+          type="color"
+          className="accent-color-picker"
+          value={effective}
+          disabled={disabled}
+          aria-label={t("ProviderAccentColor")}
+          onChange={(e) => handleSave(e.target.value)}
+        />
+        {accentColor !== null && (
+          <button
+            type="button"
+            className="provider-detail-link-btn"
+            disabled={disabled}
+            onClick={handleReset}
+          >
+            {t("ProviderAccentColorReset")}
+          </button>
+        )}
       </div>
-      {error && <p className="settings-section__error">{error}</p>}
-    </section>
+      {error && (
+        <p className="provider-option-error" role="alert">
+          {error}
+        </p>
+      )}
+    </SettingsGroup>
   );
 }

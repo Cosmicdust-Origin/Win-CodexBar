@@ -10,6 +10,12 @@ export interface MenuCardPresence {
   hasMetrics: boolean;
   /** Inventory rows or provider key-value details. */
   hasDetailSections: boolean;
+  /**
+   * Draw the detail sections: always on the full card, and on the compact
+   * Overview only when it has no metric rows (upstream
+   * `showsOverviewSupplementalContent`: `!compact || metrics.isEmpty`).
+   */
+  showsDetailSections: boolean;
   hasCost: boolean;
   localUsage: ProviderChartData["localUsage"] | null;
   wayfinderUsage: ProviderUsageSnapshot["wayfinderUsage"] | null;
@@ -23,6 +29,9 @@ export interface MenuCardPresence {
  */
 function balanceRepeatsDetail(provider: ProviderUsageSnapshot): boolean {
   const cost = provider.cost;
+  // A provider that styles its cost block (upstream `ProviderCostMenuCardStyle`,
+  // such as LithosAI's "Credits") keeps it beside the matching detail row.
+  if (cost?.titleKey) return false;
   if (!cost || cost.balance == null || (cost.limit ?? 0) > 0 || cost.alwaysVisible === true) {
     return false;
   }
@@ -43,19 +52,28 @@ export function describeCard(
 ): MenuCardPresence {
   const hasError = !!provider.error;
   const hasMetrics = !hasError && visibleMetrics.length > 0;
-  const hasDetailSections =
-    !hasError &&
-    ((provider.inventory?.length ?? 0) > 0 || (provider.displayDetails?.length ?? 0) > 0);
   const hasCost =
     !hasError &&
     !!provider.cost &&
     (costSummaryDisplayStyle !== "hidden" || provider.cost.alwaysVisible === true) &&
     !balanceRepeatsDetail(provider);
+  const hasDetailSections =
+    !hasError &&
+    ((provider.inventory?.length ?? 0) > 0 || (provider.displayDetails?.length ?? 0) > 0);
+  const showsDetailSections = hasDetailSections && (!compactOverview || !hasMetrics);
   const localUsage = hasError ? null : chartData?.localUsage ?? null;
   const wayfinderUsage =
     !hasError && provider.providerId === "wayfinder" ? provider.wayfinderUsage ?? null : null;
   const hasDetails = compactOverview
-    ? hasMetrics || !!wayfinderUsage
+    ? hasMetrics || showsDetailSections || !!wayfinderUsage
     : hasMetrics || hasDetailSections || hasCost || !!localUsage || !!wayfinderUsage;
-  return { hasMetrics, hasDetailSections, hasCost, localUsage, wayfinderUsage, hasDetails };
+  return {
+    hasMetrics,
+    hasDetailSections,
+    showsDetailSections,
+    hasCost,
+    localUsage,
+    wayfinderUsage,
+    hasDetails,
+  };
 }

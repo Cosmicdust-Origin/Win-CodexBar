@@ -1,63 +1,64 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useLocale } from "../../../hooks/useLocale";
+import { Field, Toggle } from "../../../components/FormControls";
 import { UsageSpendDailyLedger } from "../../../components/UsageSpendDailyLedger";
+import { getUsageSpendSummary, writeUsageSpendExport } from "../../../lib/tauri";
+import { formatUsd, shareUsageSpendPng } from "../../../lib/usageSpendSharing";
+import { buildSpendProviderRowGroups } from "../../../lib/usageSpendBreakdown";
 import {
-  getSettingsSnapshot,
-  getUsageSpendSummary,
-  updateSettings,
-  writeUsageSpendExport,
-} from "../../../lib/tauri";
-import {
-  formatSpendMetric,
-  formatUsd,
-  shareUsageSpendPng,
-} from "../../../lib/usageSpendSharing";
-import { buildSpendProviderGroups, findSpendDay, formatSpendDay } from "../../../lib/usageSpendBreakdown";
+  SPEND_DASHBOARD_PERIODS,
+  formatCompactTokens,
+  isContractHidden,
+  normalizeHiddenSourceIds,
+  spendSources,
+  spendTotalsByCurrency,
+  toggleHiddenSource,
+  visibleUsageSpendSummary,
+} from "../../../lib/usageSpendDashboard";
 import type { SpendContract, UsageSpendSummary } from "../../../types/bridge";
 import type { LocaleKey } from "../../../i18n/keys";
 import {
-  DEFAULT_COST_PERIOD,
   costPeriodLabel,
+  costPeriodShortLabel,
   normalizeCostPeriod,
+  parseCostPeriod,
 } from "../../../lib/costPeriod";
 import type { TabProps } from "../settingsTabs";
 import ProjectConversations from "./ProjectConversations";
 import { UsageSpendProviderGroups } from "./UsageSpendProviderGroups";
 import { UsageSpendTrendPanel } from "./UsageSpendTrendPanel";
 
-export default function UsageSpendTab(_props: TabProps) {
+type Translate = (key: LocaleKey) => string;
+type BreakdownView = "providers" | "projects" | "sessions";
+
+/**
+ * Settings > Usage & Spend, laid out like the macOS pane: header and refresh,
+ * the time range, the per-currency stat strip, token mix and coverage, the
+ * Providers / Projects / Sessions picker, the trend and ledger, then the data
+ * controls (Track costs, OpenCodex, Sources, exports).
+ *
+ * Hidden sources only filter this view: every section and every export reads
+ * `visibleUsageSpendSummary`.
+ */
+export default function UsageSpendTab({ settings, set, saving }: TabProps) {
   const { t } = useLocale();
+  const period = normalizeCostPeriod(settings.spendDashboardPeriod ?? settings.costReportingPeriod);
+  const trackCosts = settings.costUsageEnabled ?? true;
+  const includeOpenCodex = settings.openCodexUsageLogsEnabled ?? false;
+  const hideNativeCodex = settings.hideNativeCodexCostWhenOpenCodexPresent ?? false;
+  const hiddenKey = normalizeHiddenSourceIds(settings.spendDashboardHiddenSourceIds ?? []).join(",");
+  const hidden = useMemo(() => (hiddenKey ? hiddenKey.split(",") : []), [hiddenKey]);
+
   const [summary, setSummary] = useState<UsageSpendSummary | null>(null);
-  // Null until the saved History window is known, so the first scan uses it
-  // instead of scanning the default and then rescanning.
-  const [period, setPeriod] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
-  const [includeOpenCodex, setIncludeOpenCodex] = useState(false);
-  const [hideNativeCodex, setHideNativeCodex] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [showAllProjects, setShowAllProjects] = useState(false);
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(() => new Set());
-  const tableRef = useRef<HTMLTableElement | null>(null);
-
-  useEffect(() => {
-    void getSettingsSnapshot()
-      .then((settings) => {
-        setIncludeOpenCodex(settings.openCodexUsageLogsEnabled ?? false);
-        setHideNativeCodex(settings.hideNativeCodexCostWhenOpenCodexPresent ?? false);
-        setPeriod(normalizeCostPeriod(settings.costReportingPeriod));
-      })
-      .catch(() => {
-        // Keep the safe defaults (off, 30 days) if settings cannot be loaded.
-        setPeriod(DEFAULT_COST_PERIOD);
-      });
-  }, []);
+  const [view, setView] = useState<BreakdownView>("providers");
 
   const load = useCallback(async (forceRefresh = false, silent = false) => {
-    if (period === null) return;
     if (!silent) {
       setLoading(true);
       setError(null);
@@ -65,286 +66,396 @@ export default function UsageSpendTab(_props: TabProps) {
     try {
       const data = await getUsageSpendSummary({ period, forceRefresh });
       setSummary(data);
+      if (silent) setError(null);
     } catch (err: unknown) {
       if (!silent) setError(err instanceof Error ? err.message : String(err));
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [hideNativeCodex, includeOpenCodex, period]);
+    // The OpenCodex flags and Track costs change what the backend scans.
+  }, [period, trackCosts, includeOpenCodex, hideNativeCodex]);
 
   useEffect(() => {
-    load(false);
+    void load(false);
   }, [load]);
 
-  // A selected day belongs to one History window; changing the window clears it.
+  // A selected day belongs to one time range; changing the range clears it.
   useEffect(() => {
     setSelectedDay(null);
   }, [period]);
 
-  // Upstream 0.55.0 #3106 parity: provider token/cost publications refresh
-  // Usage & Spend silently while the pane is open. Coalesce bursts so a
-  // multi-provider refresh does not trigger one dashboard rebuild per event.
+  // Upstream 0.55.0 #3106 parity: provider token/cost publications refresh the
+  // pane silently while it is open. A settings save (Track costs, OpenCodex)
+  // lands after the optimistic toggle, so rescan when it is persisted too.
+  // Bursts are coalesced into one rebuild.
   useEffect(() => {
-    let unlisten: UnlistenFn | null = null;
+    const unlisteners: UnlistenFn[] = [];
     let timer: ReturnType<typeof setTimeout> | null = null;
     let cancelled = false;
-    void listen("provider-updated", () => {
+    const schedule = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         if (!cancelled) void load(false, true);
       }, 200);
-    }).then((fn) => {
-      if (cancelled) fn();
-      else unlisten = fn;
-    }).catch(() => {});
+    };
+    for (const event of ["provider-updated", "settings-changed"]) {
+      void listen(event, schedule)
+        .then((fn) => {
+          if (cancelled) fn();
+          else unlisteners.push(fn);
+        })
+        .catch(() => {});
+    }
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
-      unlisten?.();
+      for (const fn of unlisteners) fn();
     };
   }, [load]);
 
-  // Label the period column with the window the summary was built for, so it
-  // stays accurate while a rescan for a newly picked window is in flight.
-  const periodTitle = costPeriodLabel(summary?.reportingPeriod ?? period, t);
+  const tracking = trackCosts && summary?.costTrackingEnabled !== false;
+  const visible = useMemo(
+    () => (summary && tracking ? visibleUsageSpendSummary(summary, hidden) : null),
+    [summary, tracking, hidden],
+  );
+  const contractHidden = summary ? isContractHidden(summary, hidden) : false;
+  const periodTitle = costPeriodLabel(visible?.reportingPeriod ?? period, t);
+
+  const exportJson = visible ? JSON.stringify(visible, null, 2) : null;
 
   const onShare = useCallback(() => {
     setShareError(null);
-    const error = shareUsageSpendPng(
-      summary,
+    const failure = shareUsageSpendPng(
+      visible,
       t("UsageSpendTitle"),
-      `codexbar-usage-spend-${summary?.reportingDay ?? "unknown"}.png`,
+      `codexbar-usage-spend-${visible?.reportingDay ?? "unknown"}.png`,
       periodTitle,
     );
-    if (error) setShareError(t(error as LocaleKey));
-  }, [summary, t, periodTitle]);
+    if (failure) setShareError(t(failure as LocaleKey));
+  }, [visible, t, periodTitle]);
 
   const onCopyJson = useCallback(async () => {
     setShareError(null);
-    if (!summary) {
+    if (!exportJson) {
       setShareError(t("UsageSpendShareEmpty"));
       return;
     }
     try {
-      await navigator.clipboard.writeText(JSON.stringify(summary, null, 2));
+      await navigator.clipboard.writeText(exportJson);
     } catch (cause: unknown) {
       setShareError(cause instanceof Error ? cause.message : String(cause));
     }
-  }, [summary, t]);
+  }, [exportJson, t]);
 
-  const onSaveJson = useCallback(async () => {
+  const onExportJson = useCallback(async () => {
     setShareError(null);
-    if (!summary) {
+    if (!exportJson || !visible) {
       setShareError(t("UsageSpendShareEmpty"));
       return;
     }
     try {
-      const stamp = summary.reportingDay;
       const path = await save({
-        defaultPath: `codexbar-usage-spend-${stamp}.json`,
+        defaultPath: `codexbar-usage-spend-${visible.reportingDay}.json`,
         filters: [{ name: "JSON", extensions: ["json"] }],
       });
       if (!path) return;
-      await writeUsageSpendExport(path, JSON.stringify(summary, null, 2));
+      await writeUsageSpendExport(path, exportJson);
     } catch (cause: unknown) {
       setShareError(cause instanceof Error ? cause.message : String(cause));
     }
-  }, [summary, t]);
+  }, [exportJson, visible, t]);
+
+  const sources = spendSources(summary, hidden);
+  const exportsDisabled = loading || !visible;
 
   return (
-    <section className="settings-section">
-      <h3 className="settings-section__title settings-section__title--bold">
-        {t("UsageSpendTitle")}
-      </h3>
-      <p className="settings-section__caption">{t("UsageSpendCaption")}</p>
-
-      <div className="settings-section__group" style={{ marginBottom: 12, display: "flex", gap: 8 }}>
+    <section className="settings-section usage-spend">
+      <div className="usage-spend__header">
+        <div>
+          <h3 className="settings-section__title settings-section__title--bold">{t("UsageSpendTitle")}</h3>
+          <p className="settings-section__caption">{t("UsageSpendCaption")}</p>
+        </div>
         <button
           type="button"
-          className="credential-btn credential-btn--secondary"
-          disabled={loading}
-          onClick={() => load(true)}
+          className="credential-btn credential-btn--secondary usage-spend__refresh"
+          disabled={loading || !trackCosts}
+          onClick={() => void load(true)}
         >
-          {loading ? t("UsageSpendLoading") : t("UsageSpendRefresh")}
-        </button>
-        <button
-          type="button"
-          className="credential-btn credential-btn--secondary"
-          disabled={loading || !summary}
-          onClick={onShare}
-        >
-          {t("UsageSpendShare")}
-        </button>
-        <button
-          type="button"
-          className="credential-btn credential-btn--secondary"
-          disabled={loading || !summary}
-          onClick={() => void onCopyJson()}
-        >
-          {t("UsageSpendCopyJson")}
-        </button>
-        <button
-          type="button"
-          className="credential-btn credential-btn--secondary"
-          disabled={loading || !summary}
-          onClick={() => void onSaveJson()}
-        >
-          {t("UsageSpendSaveJson")}
+          <span aria-hidden="true">↻</span> {loading ? t("UsageSpendLoading") : t("UsageSpendRefresh")}
         </button>
       </div>
 
-      <div className="settings-section__group" style={{ marginBottom: 12, display: "flex", gap: 8 }}>
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <input
-            type="checkbox"
-            checked={includeOpenCodex}
-            onChange={(event) => {
-              const enabled = event.target.checked;
-              setIncludeOpenCodex(enabled);
-              void updateSettings({ openCodexUsageLogsEnabled: enabled }).catch((err: unknown) => {
-                setIncludeOpenCodex(!enabled);
-                setError(err instanceof Error ? err.message : String(err));
-              });
-            }}
+      {trackCosts && (
+        <PeriodPicker value={period} disabled={saving} onChange={(next) => set({ spendDashboardPeriod: next })} t={t} />
+      )}
+
+      {error && (
+        <div className="usage-spend__failures" role="alert">
+          <strong>{t("UsageSpendRefreshFailures")}</strong>
+          <span>{error}</span>
+        </div>
+      )}
+
+      {!tracking ? (
+        <div className="usage-spend__off" role="status">
+          <strong>{t("UsageSpendTrackingOffTitle")}</strong>
+          <p className="settings-section__caption">{t("UsageSpendTrackingOffBody")}</p>
+        </div>
+      ) : (
+        visible && (
+          <DashboardBody
+            summary={visible}
+            contractHidden={contractHidden}
+            loading={loading}
+            view={view}
+            onView={setView}
+            selectedDay={selectedDay}
+            onSelectDay={setSelectedDay}
+            t={t}
           />
-          {t("UsageSpendOpenCodexImport")}
-        </label>
-        {includeOpenCodex && (
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <input
-              type="checkbox"
-              checked={hideNativeCodex}
-              onChange={(event) => {
-                const enabled = event.target.checked;
-                setHideNativeCodex(enabled);
-                void updateSettings({ hideNativeCodexCostWhenOpenCodexPresent: enabled }).catch((err: unknown) => {
-                  setHideNativeCodex(!enabled);
-                  setError(err instanceof Error ? err.message : String(err));
-                });
-              }}
+        )
+      )}
+
+      <details className="usage-spend__controls" open>
+        <summary>{t("UsageSpendDataControls")}</summary>
+        <div className="settings-group__box">
+          <Field label={t("UsageSpendTrackCosts")} description={t("UsageSpendTrackCostsHelper")}>
+            <Toggle
+              variant="switch"
+              checked={trackCosts}
+              disabled={saving}
+              onChange={(value) => set({ costUsageEnabled: value })}
             />
-            {t("UsageSpendHideNativeCodex")}
-          </label>
-        )}
-      </div>
-
-      {error && <p className="settings-section__error">{error}</p>}
-      {shareError && <p className="settings-section__error">{shareError}</p>}
-
-      {!error && (
-        <table className="usage-spend-table" ref={tableRef}>
-          <thead>
-            <tr>
-              <th>{t("UsageSpendColProvider")}</th>
-              <th>{periodTitle}</th>
-              <th>{t("UsageSpendCol7d")}</th>
-              <th>{t("UsageSpendCol30d")}</th>
-              <th>{t("UsageSpendColCurrency")}</th>
-              <th>{t("UsageSpendColSource")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(summary?.rows ?? []).map((row) => (
-              <tr key={row.providerId}>
-                <td>{row.displayName}</td>
-                <td>
-                  {formatSpendMetric(
-                    row.periodCost,
-                    row.periodTokens,
-                    row.currency,
-                    t("UsageSpendTokens"),
-                  )}
-                </td>
-                <td>
-                  {formatSpendMetric(
-                    row.sevenDay,
-                    row.sevenDayTokens,
-                    row.currency,
-                    t("UsageSpendTokens"),
-                    row.sevenDayEstimate?.knownSubtotalUsd,
-                    t("UsageSpendKnownSubtotal"),
-                    row.sevenDayTokensLowerBound,
-                  )}
-                </td>
-                <td>
-                  {formatSpendMetric(
-                    row.thirtyDay,
-                    row.thirtyDayTokens,
-                    row.currency,
-                    t("UsageSpendTokens"),
-                    row.thirtyDayEstimate?.knownSubtotalUsd,
-                    t("UsageSpendKnownSubtotal"),
-                    row.thirtyDayTokensLowerBound,
-                  )}
-                </td>
-                <td>{row.currency || "USD"}</td>
-                <td className="usage-spend-table__source">
-                  {row.source}
-                  {row.refreshing && (
-                    <span className="usage-spend-table__refreshing" title={row.staleUpdatedAt ? `Stale as of ${row.staleUpdatedAt}` : undefined}>
-                      {" · "}{t("UsageSpendRefreshing")}
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {!loading && (summary?.rows?.length ?? 0) === 0 && (
-              <tr>
-                <td colSpan={6}>{t("UsageSpendEmpty")}</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      )}
-
-      {!error && summary && <SpendContractOverview contract={summary.contract} selectedDay={selectedDay} t={t} />}
-
-      {!error && summary && (
-        <UsageSpendTrendPanel contract={summary.contract} selectedDay={selectedDay} onSelectDay={setSelectedDay} t={t} />
-      )}
-
-      {!error && summary && <UsageSpendDailyLedger daily={summary.contract.daily} />}
-
-      {!error && summary && (
-        <UsageSpendProviderGroups
-          groups={buildSpendProviderGroups(
-            summary.contract,
-            summary.rows.find((row) => row.providerId === summary.contract.providerId)?.displayName
-              ?? summary.contract.providerId,
+          </Field>
+          {/* Mac PreferencesSpendDashboardPane.swift:498-512: OpenCodex and the Sources
+              filter only show while Track costs is on (#825). */}
+          {trackCosts && (
+            <>
+              <Field label={t("UsageSpendOpenCodexImport")}>
+                <Toggle
+                  variant="switch"
+                  checked={includeOpenCodex}
+                  disabled={saving}
+                  onChange={(value) => set({ openCodexUsageLogsEnabled: value })}
+                />
+              </Field>
+              {includeOpenCodex && (
+                <Field label={t("UsageSpendHideNativeCodex")}>
+                  <Toggle
+                    variant="switch"
+                    checked={hideNativeCodex}
+                    disabled={saving}
+                    onChange={(value) => set({ hideNativeCodexCostWhenOpenCodexPresent: value })}
+                  />
+                </Field>
+              )}
+              {sources.length > 0 && (
+                <fieldset className="usage-spend__sources">
+                  <legend className="settings-field__label">{t("UsageSpendSources")}</legend>
+                  {sources.map((source) => (
+                    <Toggle
+                      key={source.id}
+                      label={source.displayName}
+                      checked={!hidden.includes(source.id)}
+                      disabled={saving}
+                      onChange={(show) =>
+                        set({ spendDashboardHiddenSourceIds: toggleHiddenSource(hidden, source.id, show) })
+                      }
+                    />
+                  ))}
+                </fieldset>
+              )}
+            </>
           )}
-          caption={t("UsageSpendModelsPeriodCaption").replace("{}", costPeriodLabel(summary.contract.reportingPeriod, t))}
-          t={t}
-        />
-      )}
-
-      {!error && summary && (
-        <ProjectsPanel
-          contract={summary.contract}
-          showAll={showAllProjects}
-          expanded={expandedProjects}
-          onToggleAll={() => setShowAllProjects((value) => !value)}
-          t={t}
-          onToggleProject={(id) => {
-            setExpandedProjects((current) => {
-              const next = new Set(current);
-              if (next.has(id)) next.delete(id);
-              else next.add(id);
-              return next;
-            });
-          }}
-        />
-      )}
+          <div className="usage-spend__exports">
+            <button
+              type="button"
+              className="credential-btn credential-btn--secondary"
+              disabled={exportsDisabled}
+              onClick={() => void onCopyJson()}
+            >
+              {t("UsageSpendCopyJson")}
+            </button>
+            <button
+              type="button"
+              className="credential-btn credential-btn--secondary"
+              disabled={exportsDisabled}
+              onClick={() => void onExportJson()}
+            >
+              {t("UsageSpendSaveJson")}
+            </button>
+            <button
+              type="button"
+              className="credential-btn credential-btn--secondary usage-spend__share"
+              disabled={exportsDisabled}
+              onClick={onShare}
+            >
+              {t("UsageSpendShare")}
+            </button>
+          </div>
+          {shareError && <p className="settings-section__error">{shareError}</p>}
+        </div>
+      </details>
     </section>
   );
 }
 
+/** The macOS 7d / 30d / 90d / Month to date / All segments; a legacy custom window gets its own segment. */
+function PeriodPicker({
+  value,
+  disabled,
+  onChange,
+  t,
+}: {
+  value: string;
+  disabled: boolean;
+  onChange: (period: string) => void;
+  t: Translate;
+}) {
+  const options: string[] = [...SPEND_DASHBOARD_PERIODS];
+  if (!options.includes(value)) options.push(value);
+  const label = (raw: string) =>
+    parseCostPeriod(raw)?.kind === "monthToDate" ? t("CostPeriodMonthToDate") : costPeriodShortLabel(raw, t);
+  return (
+    <div className="provider-detail-segmented usage-spend__segmented" role="radiogroup" aria-label={t("UsageSpendPeriodLabel")}>
+      {options.map((option) => (
+        <button
+          key={option}
+          type="button"
+          role="radio"
+          aria-checked={option === value}
+          title={costPeriodLabel(option, t)}
+          className={`provider-detail-segmented__option${option === value ? " is-active" : ""}`}
+          disabled={disabled}
+          onClick={() => {
+            if (option !== value) onChange(option);
+          }}
+        >
+          {label(option)}
+        </button>
+      ))}
+    </div>
+  );
+}
 
+function DashboardBody({
+  summary,
+  contractHidden,
+  loading,
+  view,
+  onView,
+  selectedDay,
+  onSelectDay,
+  t,
+}: {
+  summary: UsageSpendSummary;
+  contractHidden: boolean;
+  loading: boolean;
+  view: BreakdownView;
+  onView: (view: BreakdownView) => void;
+  selectedDay: string | null;
+  onSelectDay: (day: string | null) => void;
+  t: Translate;
+}) {
+  const totals = spendTotalsByCurrency(summary.rows);
+  const contract = summary.contract;
+  const views: { id: BreakdownView; label: string }[] = [
+    { id: "providers", label: t("UsageSpendViewProviders") },
+    { id: "projects", label: t("UsageSpendProjects") },
+    { id: "sessions", label: t("UsageSpendViewSessions") },
+  ];
 
-function SpendContractOverview({ contract, selectedDay, t }: { contract: SpendContract; selectedDay: string | null; t: (key: LocaleKey) => string }) {
-  const day = findSpendDay(contract.daily, selectedDay);
-  const coverage = contract.priceCoverageRatio == null
-    ? t("UsageSpendUnknown")
-    : `${Math.round(contract.priceCoverageRatio * 100)}%`;
+  return (
+    <>
+      {totals.length === 0 && !loading && <p className="settings-section__caption">{t("UsageSpendEmpty")}</p>}
+      {totals.map((entry) => (
+        <div key={entry.currency} className="usage-spend__currency">
+          <h4 className="usage-spend__currency-code">{entry.currency}</h4>
+          <p className="settings-section__caption">{t("UsageSpendLocalHistory")}</p>
+          <dl className="usage-spend__strip">
+            <Stat label={t("UsageSpendEstimatedSpend")} value={formatUsd(entry.cost, entry.currency)} large />
+            <Stat label={t("UsageSpendTrackedTokens")} value={formatCompactTokens(entry.tokens)} large />
+            <Stat label={t("UsageSpendSources")} value={entry.sources.toLocaleString()} large />
+          </dl>
+        </div>
+      ))}
+
+      {!contractHidden && <TokenMix contract={contract} t={t} />}
+      {!contractHidden && <CoverageLine contract={contract} t={t} />}
+
+      <div className="usage-spend__card">
+        <div className="provider-detail-segmented usage-spend__segmented" role="tablist" aria-label={t("UsageSpendBreakdownLabel")}>
+          {views.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              role="tab"
+              aria-selected={option.id === view}
+              className={`provider-detail-segmented__option${option.id === view ? " is-active" : ""}`}
+              onClick={() => onView(option.id)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {view === "providers" && (
+          <UsageSpendProviderGroups
+            groups={buildSpendProviderRowGroups(summary.rows, contract)}
+            caption={t("UsageSpendModelsPeriodCaption").replace("{}", costPeriodLabel(summary.reportingPeriod, t))}
+            showHeading={false}
+            t={t}
+          />
+        )}
+        {view === "projects" && <ProjectsPanel contract={contract} t={t} />}
+        {view === "sessions" &&
+          (contract.conversations.length === 0 ? (
+            <p className="settings-section__caption">{t("UsageSpendNoSessions")}</p>
+          ) : (
+            <ProjectConversations conversations={contract.conversations} t={t} />
+          ))}
+      </div>
+
+      {!contractHidden && (
+        <UsageSpendTrendPanel contract={contract} selectedDay={selectedDay} onSelectDay={onSelectDay} t={t} />
+      )}
+      {!contractHidden && <UsageSpendDailyLedger daily={contract.daily} />}
+    </>
+  );
+}
+
+function Stat({ label, value, large }: { label: string; value: string; large?: boolean }) {
+  return (
+    <div className={`usage-spend__stat${large ? " usage-spend__stat--large" : ""}`}>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+/** Five-cell token mix for the detail contract; a source that never records a kind shows "—". */
+function TokenMix({ contract, t }: { contract: SpendContract; t: Translate }) {
+  const mix = contract.tokenMix;
+  const cells: [LocaleKey, number | null][] = [
+    ["UsageSpendTokenInput", mix.inputTokens],
+    ["UsageSpendTokenOutput", mix.outputTokens],
+    ["UsageSpendTokenCacheRead", mix.cacheReadTokens],
+    ["UsageSpendTokenCacheWrite", mix.cacheCreationTokens],
+    ["UsageSpendTokenReasoning", mix.reasoningTokens],
+  ];
+  if (cells.every(([, value]) => value == null)) return null;
+  return (
+    <dl className="usage-spend__mix" aria-label={t("UsageSpendTokenMix")}>
+      {cells.map(([key, value]) => (
+        <Stat key={key} label={t(key)} value={formatCompactTokens(value)} />
+      ))}
+    </dl>
+  );
+}
+
+function CoverageLine({ contract, t }: { contract: SpendContract; t: Translate }) {
+  const coverage = contract.priceCoverage;
+  const counted = coverage.priced + coverage.unpriced + coverage.unmetered + coverage.estimated;
+  if (counted === 0 && contract.provenance === "unknown") return null;
   const provenance = contract.provenance === "listPriceEstimate"
     ? t("UsageSpendApiEstimate")
     : contract.provenance === "vendorMetered"
@@ -352,80 +463,32 @@ function SpendContractOverview({ contract, selectedDay, t }: { contract: SpendCo
       : contract.provenance === "mixed"
         ? t("UsageSpendMixedSources")
         : t("UsageSpendUnknown");
-  const total = contract.knownCostUsd == null
-    ? "—"
-    : `${contract.priceCoverage.unpriced > 0 ? "~" : ""}${formatUsd(contract.knownCostUsd, "USD")}`;
-  const tokenParts = [
-    contract.tokenMix.inputTokens == null ? null : `${contract.tokenMix.inputTokens.toLocaleString()} input`,
-    contract.tokenMix.outputTokens == null ? null : `${contract.tokenMix.outputTokens.toLocaleString()} output`,
-    contract.tokenMix.cacheReadTokens == null ? null : `${contract.tokenMix.cacheReadTokens.toLocaleString()} cached`,
-  ].filter(Boolean).join(" · ");
-
-  return (
-    <div className="settings-section__group" style={{ marginTop: 16 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
-        {day ? (
-          <MetricCard
-            label={t("UsageSpendSpend")}
-            value={day.costUsd == null ? "—" : formatUsd(day.costUsd, "USD")}
-            detail={formatSpendDay(day.day)}
-          />
-        ) : (
-          <MetricCard label={t("UsageSpendSpend")} value={total} detail={contract.knownZero ? t("UsageSpendKnownZero") : provenance} />
-        )}
-        <MetricCard label={t("UsageSpendPriceCoverage")} value={coverage} detail={`${contract.priceCoverage.unpriced} ${t("UsageSpendUnpriced")}`} />
-        <MetricCard label={t("UsageSpendConversations")} value={contract.conversationCount.toLocaleString()} detail={contract.historyCoverageEstablished ? t("UsageSpendHistoryCovered") : t("UsageSpendPartialHistory")} />
-        <MetricCard label={t("UsageSpendTokenMix")} value={tokenParts || "—"} detail={contract.customPricingActive ? t("UsageSpendCustomPricingActive") : t("UsageSpendDefaultPricing")} />
-      </div>
-      {contract.imports.map((source) => (
-        <p key={source.sourceId} className="settings-section__caption" style={{ marginTop: 8 }}>
-          {source.displayName}: {source.requestCount.toLocaleString()} {t("UsageSpendRequests")} · {source.conversationCount.toLocaleString()} {t("UsageSpendConversations").toLowerCase()}
-        </p>
-      ))}
-    </div>
-  );
+  const parts = [
+    `${t("UsageSpendPriced")} ${coverage.priced}`,
+    `${t("UsageSpendUnpricedCount")} ${coverage.unpriced}`,
+    `${t("UsageSpendUnmetered")} ${coverage.unmetered}`,
+    `${t("UsageSpendEstimated")} ${coverage.estimated}`,
+    provenance,
+  ];
+  if (contract.customPricingActive) parts.push(t("UsageSpendCustomPricingActive"));
+  return <p className="settings-section__caption usage-spend__coverage">{parts.join(" · ")}</p>;
 }
 
-function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return (
-    <div className="provider-detail-section" style={{ padding: "10px 12px" }}>
-      <span className="settings-section__caption">{label}</span>
-      <strong style={{ display: "block", marginTop: 3 }}>{value}</strong>
-      <span className="settings-section__caption">{detail}</span>
-    </div>
-  );
-}
-
-function ProjectsPanel({
-  contract,
-  showAll,
-  expanded,
-  onToggleAll,
-  onToggleProject,
-  t,
-}: {
-  contract: SpendContract;
-  showAll: boolean;
-  expanded: Set<string>;
-  onToggleAll: () => void;
-  onToggleProject: (id: string) => void;
-  t: (key: LocaleKey) => string;
-}) {
+function ProjectsPanel({ contract, t }: { contract: SpendContract; t: Translate }) {
+  const [showAll, setShowAll] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const projects = showAll ? contract.projects : contract.projects.slice(0, 8);
   const partial = contract.projectSourceStatus != null && contract.projectSourceStatus !== "complete";
 
   return (
-    <div className="settings-section__group" style={{ marginTop: 20 }}>
+    <div className="settings-section__group">
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-        <div>
-          <h4 style={{ margin: 0 }}>{t("UsageSpendProjects")}</h4>
-          <p className="settings-section__caption" style={{ marginTop: 4 }}>
-            {t("UsageSpendProjectsPeriodCaption").replace("{}", costPeriodLabel(contract.reportingPeriod, t))}
-            {partial ? ` · ${t("UsageSpendPartialHistory")}` : ""}.
-          </p>
-        </div>
+        <p className="settings-section__caption" style={{ marginTop: 4 }}>
+          {t("UsageSpendProjectsPeriodCaption").replace("{}", costPeriodLabel(contract.reportingPeriod, t))}
+          {partial ? ` · ${t("UsageSpendPartialHistory")}` : ""}.
+        </p>
         {contract.projects.length > 8 && (
-          <button type="button" className="credential-btn credential-btn--secondary" onClick={onToggleAll}>
+          <button type="button" className="credential-btn credential-btn--secondary" onClick={() => setShowAll((value) => !value)}>
             {showAll ? t("UsageSpendShowLess") : `${t("UsageSpendShowAll")} (${contract.projects.length})`}
           </button>
         )}
@@ -442,21 +505,16 @@ function ProjectsPanel({
               <div key={project.id} className="provider-detail-section" style={{ padding: "10px 12px" }}>
                 <button
                   type="button"
-                  onClick={() => onToggleProject(project.id)}
+                  onClick={() =>
+                    setExpanded((current) => {
+                      const next = new Set(current);
+                      if (next.has(project.id)) next.delete(project.id);
+                      else next.add(project.id);
+                      return next;
+                    })
+                  }
                   aria-expanded={isExpanded}
-                  style={{
-                    width: "100%",
-                    display: "grid",
-                    gridTemplateColumns: "minmax(0, 1fr) auto auto",
-                    gap: 12,
-                    alignItems: "center",
-                    border: 0,
-                    padding: 0,
-                    background: "transparent",
-                    color: "inherit",
-                    textAlign: "left",
-                    cursor: "pointer",
-                  }}
+                  className="usage-spend__row-button"
                 >
                   <span style={{ minWidth: 0 }}>
                     <strong>{project.displayName}</strong>

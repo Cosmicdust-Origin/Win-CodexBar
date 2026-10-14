@@ -140,6 +140,7 @@ impl SnapshotProducer {
                 identity,
                 version: Some(self.version.clone()),
                 usage_bars_show_used: Some(settings.show_as_used),
+                weekly_work_days: settings.weekly_progress_work_days,
             }),
             sidecar: Some(metrics),
         })

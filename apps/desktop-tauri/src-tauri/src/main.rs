@@ -14,6 +14,7 @@ mod proof_harness;
 mod shell;
 mod shortcut_bridge;
 mod state;
+mod status_poller;
 mod stay_awake;
 mod surface;
 mod surface_target;
@@ -145,6 +146,7 @@ fn main() {
     let force_start_visible = std::env::var_os("CODEXBAR_START_VISIBLE").is_some();
     let mut settings = codexbar::settings::Settings::load();
     settings.apply_display_mode_fold_migration();
+    settings.apply_quota_warning_migration();
     let launch = launch_behavior(
         force_start_visible,
         settings.start_minimized,
@@ -155,9 +157,10 @@ fn main() {
     initial_state.proof_config = proof_config;
     // Validate the complete proof seed before installing any snapshots, so an
     // invalid multi-provider fixture cannot leave a partial cache behind.
-    if let Some(snapshots) =
-        proof_harness::seed_usage_snapshots_from_env(initial_state.proof_config.as_ref())
-    {
+    if let Some(snapshots) = proof_harness::seed_usage_snapshots_from_env(
+        initial_state.proof_config.as_ref(),
+        settings.weekly_progress_work_days,
+    ) {
         let seeded_at = std::time::Instant::now();
         for snapshot in &snapshots {
             tracing::info!(
@@ -199,12 +202,15 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::get_bootstrap_state,
             commands::get_provider_catalog,
+            status_poller::get_provider_statuses,
             commands::get_settings_snapshot,
             commands::get_currency_rates,
             stay_awake::get_stay_awake_status,
             commands::list_agent_sessions,
             commands::focus_agent_session,
             commands::update_settings,
+            commands::get_hooks_config,
+            commands::save_hooks_config,
             commands::set_surface_mode,
             commands::dismiss_tray_panel,
             commands::begin_flyout_gesture,

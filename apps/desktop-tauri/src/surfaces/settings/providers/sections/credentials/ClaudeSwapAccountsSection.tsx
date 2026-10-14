@@ -12,8 +12,6 @@ import {
   claudeSwapAccountsList,
   claudeSwapAccountReauthenticate,
   claudeSwapAccountSwitch,
-  getSettingsSnapshot,
-  updateSettings,
 } from "../../../../../lib/tauri";
 import {
   localClaudeReconciliationOutcome,
@@ -24,6 +22,10 @@ import { useCurrency } from "../../../../../hooks/CurrencyProvider";
 interface Props {
   t: (key: LocaleKey) => string;
   language?: Language;
+  /** Settings `claudeSwapEnabled`; the switch lives in Claude > Options. */
+  enabled: boolean;
+  /** Settings `claudeSwapExecutablePath`; the field lives in Claude's Fields group. */
+  executablePath: string;
 }
 
 const EMPTY_STATE: ClaudeSwapAccountsState = {
@@ -99,13 +101,16 @@ function languageLocale(language: Language): string {
  *
  * This list is deliberately separate from the built-in saved Claude Code
  * accounts above: it is display + explicit activation only, is hidden while the
- * integration is disabled or unconfigured, and CodexBar never reads or stores
- * cswap credentials.
+ * integration is disabled, and CodexBar never reads or stores cswap credentials.
+ * The opt-in switch and executable path are settings rows elsewhere in the
+ * pane; this list reloads whenever either changes.
  */
-export function ClaudeSwapAccountsSection({ t, language = "english" }: Props) {
-  const [enabled, setEnabled] = useState(false);
-  const [executablePath, setExecutablePath] = useState("");
-  const [pathDraft, setPathDraft] = useState("");
+export function ClaudeSwapAccountsSection({
+  t,
+  language = "english",
+  enabled,
+  executablePath,
+}: Props) {
   const [state, setState] = useState<ClaudeSwapAccountsState>(EMPTY_STATE);
   const locale = languageLocale(language);
   const { format: formatCurrency } = useCurrency();
@@ -118,26 +123,19 @@ export function ClaudeSwapAccountsSection({ t, language = "english" }: Props) {
 
   const reload = useCallback(async () => {
     const next = await claudeSwapAccountsList();
-    if (mounted.current) {
-      setState(next);
-      setEnabled(next.enabled);
-    }
+    if (mounted.current) setState(next);
   }, []);
 
   useEffect(() => {
     mounted.current = true;
-    void getSettingsSnapshot()
-      .then((settings) => {
-        if (!mounted.current) return;
-        setEnabled(settings.claudeSwapEnabled ?? false);
-        const path = settings.claudeSwapExecutablePath ?? "";
-        setExecutablePath(path);
-        setPathDraft(path);
-      })
-      .catch((e) => {
-        if (mounted.current) setError(String(e));
-      });
+    if (!enabled) {
+      setState(EMPTY_STATE);
+      return () => {
+        mounted.current = false;
+      };
+    }
     const load = () => {
+      setError(null);
       void reload().catch((e) => {
         if (mounted.current) setError(String(e));
       });
@@ -148,7 +146,7 @@ export function ClaudeSwapAccountsSection({ t, language = "english" }: Props) {
       mounted.current = false;
       void unlisten.then((fn) => fn()).catch(() => {});
     };
-  }, [reload]);
+  }, [enabled, executablePath, reload]);
 
   useEffect(() => {
     const outcome = localClaudeReconciliationOutcome(snapshot, operation?.generation ?? null);
@@ -161,34 +159,6 @@ export function ClaudeSwapAccountsSection({ t, language = "english" }: Props) {
       setError(null);
     }
   }, [operation, snapshot, t]);
-
-  const runSettings = async (
-    patch: { claudeSwapEnabled?: boolean; claudeSwapExecutablePath?: string },
-  ) => {
-    setBusy(true);
-    setError(null);
-    setMessage(null);
-    try {
-      await updateSettings(patch);
-      // Persist the accepted path in local state so a later blur with the same
-      // value is a no-op, while a failed save leaves the draft untouched and
-      // remains retryable.
-      if (mounted.current && patch.claudeSwapExecutablePath !== undefined) {
-        setExecutablePath(patch.claudeSwapExecutablePath);
-      }
-      await reload();
-    } catch (e) {
-      if (mounted.current) setError(String(e));
-    } finally {
-      if (mounted.current) setBusy(false);
-    }
-  };
-
-  const savePath = async () => {
-    const next = pathDraft.trim();
-    if (next === executablePath.trim()) return;
-    await runSettings({ claudeSwapExecutablePath: next });
-  };
 
   const runAccountAction = async (account: ClaudeSwapAccount) => {
     setBusy(true);
@@ -215,44 +185,16 @@ export function ClaudeSwapAccountsSection({ t, language = "english" }: Props) {
     }
   };
 
-  const status = !enabled
-    ? t("ClaudeSwapStatusDisabled")
-    : !state.executableConfigured
-      ? t("ClaudeSwapStatusNoExecutable")
-      : t("ClaudeSwapStatusReady");
+  if (!enabled) return null;
+
+  const status = !state.executableConfigured
+    ? t("ClaudeSwapStatusNoExecutable")
+    : t("ClaudeSwapStatusReady");
 
   return (
     <section className="provider-detail-section claude-swap-accounts">
       <h4>{t("ClaudeSwapTitle")}</h4>
-      <p className="settings-section__hint">{t("ClaudeSwapHint")}</p>
-      <label className="provider-detail-toggle">
-        <input
-          type="checkbox"
-          checked={enabled}
-          disabled={busy || reconciling}
-          onChange={(e) => void runSettings({ claudeSwapEnabled: e.target.checked })}
-        />
-        <span>
-          <span className="provider-detail-toggle__label">{t("ClaudeSwapEnable")}</span>
-          <span className="provider-detail-toggle__helper">{t("ClaudeSwapEnableHelp")}</span>
-        </span>
-      </label>
-      <label className="provider-detail-field">
-        <span className="provider-detail-field__label">{t("ClaudeSwapExecutablePath")}</span>
-        <input
-          type="text"
-          className="provider-detail-field__input"
-          value={pathDraft}
-          disabled={busy || reconciling}
-          placeholder={t("ClaudeSwapExecutablePathPlaceholder")}
-          onChange={(e) => setPathDraft(e.target.value)}
-          onBlur={() => void savePath()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void savePath();
-          }}
-        />
-      </label>
-      {enabled && <p className="provider-detail-helper">{status}</p>}
+      <p className="provider-detail-helper">{status}</p>
       {reconciling && <p className="provider-detail-helper" role="status">{t("ClaudeSwapReconciling")}</p>}
       {error && (
         <div className="provider-detail-error" role="alert">
@@ -269,7 +211,7 @@ export function ClaudeSwapAccountsSection({ t, language = "english" }: Props) {
           {message}
         </div>
       )}
-      {enabled && state.executableConfigured && state.accounts.length === 0 && !state.error && (
+      {state.executableConfigured && state.accounts.length === 0 && !state.error && (
         <p>{t("ClaudeSwapEmpty")}</p>
       )}
       <ul className="credential-list">

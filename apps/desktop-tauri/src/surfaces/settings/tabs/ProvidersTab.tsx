@@ -36,6 +36,8 @@ export default function ProvidersTab({
   return (
     <ProviderDetailPane
       providerId={entry?.id ?? null}
+      settings={settings}
+      catalog={providers}
       liveSnapshot={liveSnapshot}
       cookieDomain={entry?.cookieDomain ?? null}
       resetTimeRelative={settings.resetTimeRelative}

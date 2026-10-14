@@ -441,7 +441,13 @@ fn test_english_is_complete_and_other_languages_can_fallback() {
         .map(|(locale, resource)| (locale, resource_key_names(resource)))
         .collect();
     let locale_key_names: HashSet<&str> = LocaleKey::ALL.iter().map(|(_, name)| *name).collect();
-    let aixy_gateway_keys = ["AixyGatewayTitle", "AixyGatewayLabel", "AixyGatewayHelp"];
+    let aixy_gateway_keys = [
+        "AixyGatewayTitle",
+        "AixyGatewayLabel",
+        "AixyGatewayHelp",
+        "ClawRouterGatewayTitle",
+        "ClawRouterGatewayHelp",
+    ];
     let credential_expiry_keys = [
         "CredentialExpiryNotifications",
         "CredentialExpiryNotificationsHelper",
@@ -453,7 +459,7 @@ fn test_english_is_complete_and_other_languages_can_fallback() {
         for name in aixy_gateway_keys {
             assert!(
                 keys.contains(name),
-                "missing Aixy gateway Fluent key {name} in {locale}"
+                "missing gateway Fluent key {name} in {locale}"
             );
         }
         for name in keys {
@@ -630,8 +636,8 @@ fn resource_key_names(resource: &str) -> HashSet<&str> {
         .collect()
 }
 
-/// The Claude keychain-prompt option has no Windows consumer yet, so both of its
-/// helpers (Advanced pane and Providers > Claude) must say so instead of
+/// The Claude keychain-prompt option has no Windows consumer yet, so its helper
+/// (Providers > Claude > Options) must say so instead of
 /// promising skipped credential reads or a macOS `/usr/bin/security` path.
 #[test]
 fn avoid_keychain_prompts_helper_says_it_is_not_enforced_on_windows() {
@@ -680,14 +686,42 @@ fn avoid_keychain_prompts_helper_says_it_is_not_enforced_on_windows() {
     assert_eq!(expected.len(), Language::all().len());
     for (language, text) in expected {
         assert_eq!(
-            get_text(language, LocaleKey::AvoidKeychainPromptsHelper),
-            text,
-            "{language:?}"
-        );
-        assert_eq!(
             get_text(language, LocaleKey::ProviderClaudeAvoidKeychainPromptsHelp),
             text,
             "{language:?} Providers > Claude"
+        );
+    }
+}
+
+#[test]
+fn clawrouter_cost_titles_stay_english_in_every_locale_as_on_the_mac() {
+    // Upstream `MenuCardView+Costs.swift` `.clawRouter` passes both titles as bare
+    // literals (no `L()`, no Localizable.strings entry), so every locale reads English.
+    assert_eq!(Language::all().len(), 10);
+    for &language in Language::all() {
+        assert_eq!(
+            get_text(language, LocaleKey::CostTitleClawRouterMonthlyBudget),
+            "Monthly budget",
+            "{language:?}"
+        );
+        assert_eq!(
+            get_text(language, LocaleKey::CostTitleClawRouterSpend),
+            "ClawRouter spend",
+            "{language:?}"
+        );
+    }
+}
+
+#[test]
+fn provider_service_status_help_stays_english_in_every_locale_as_on_the_mac() {
+    // Upstream `PreferencesSidebar.swift` passes "Provider service status: %@" through
+    // `L()`, but no Localizable.strings file has an entry, so every Mac locale reads English.
+    assert_eq!(Language::all().len(), 10);
+    for &language in Language::all() {
+        assert_eq!(
+            get_text(language, LocaleKey::ProviderServiceStatusHelp),
+            "Provider service status: {}",
+            "{language:?}"
         );
     }
 }

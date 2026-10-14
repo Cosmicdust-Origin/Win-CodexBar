@@ -227,3 +227,30 @@ fn local_usage_today_hides_known_zero_and_unknown_cost_but_keeps_tokens() {
     let absent = summary_for(None);
     assert_eq!((absent.today_cost, absent.latest_tokens), (None, None));
 }
+
+#[test]
+fn a_scan_that_finishes_after_track_costs_went_off_is_not_cached() {
+    use super::{cached_provider_local_usage_summary, store_scanned_local_usage_summary};
+    let summary = || ProviderLocalUsageSummary {
+        today_cost: Some(1.25),
+        thirty_day_cost: Some(12.5),
+        thirty_day_tokens: Some(42_000),
+        period_cost: Some(12.5),
+        period_tokens: Some(42_000),
+        reporting_period: "month-to-date".to_string(),
+        latest_tokens: None,
+        top_model: None,
+        estimate_note: "estimated".to_string(),
+        token_cost_updated_at_ms: 1234,
+        incomplete_request_count: None,
+    };
+
+    store_scanned_local_usage_summary("track-off-race", Some(summary()), false);
+    assert!(cached_provider_local_usage_summary("track-off-race").is_none());
+
+    store_scanned_local_usage_summary("track-on-scan", Some(summary()), true);
+    assert_eq!(
+        cached_provider_local_usage_summary("track-on-scan").and_then(|s| s.today_cost),
+        Some(1.25)
+    );
+}

@@ -7,7 +7,7 @@ use crate::core::{
     TokenAccountSupport, UsageSnapshot,
 };
 use crate::providers::claude::claude_swap::ClaudeSwapAccount;
-use crate::status::{ProviderStatus as StatusInfo, StatusLevel};
+use crate::status::{ProviderStatus as StatusInfo, StatusIndicator};
 use chrono::Utc;
 use fetch_helpers::find_token_account;
 use render::{render_json_result, render_text_with_status};
@@ -63,15 +63,61 @@ fn claude_swap_json_payload_is_allow_listed() {
 #[test]
 fn claude_swap_json_payload_keeps_provider_status_distinct() {
     let status = StatusInfo {
-        level: StatusLevel::Degraded,
-        description: "Degraded Performance".to_string(),
-        ..Default::default()
+        indicator: StatusIndicator::Minor,
+        description: Some("Degraded Performance".to_string()),
+        updated_at: None,
     };
     let payload =
         super::claude_swap::claude_swap_json_payload(&sample_swap_account(), Some(&status));
     assert_eq!(payload["account"]["status"], "ok");
     assert_eq!(payload["status"]["level"], "degraded");
     assert_eq!(payload["status"]["description"], "Degraded Performance");
+}
+
+/// The CLI keeps its pre-poller `status.level` values, symbols and status
+/// line for every feed indicator; only raw `minor` changed, from `unknown`.
+#[test]
+fn cli_status_output_keeps_the_legacy_level_vocabulary() {
+    use render::{append_status_line, render_status_indicator};
+    let cases = [
+        (StatusIndicator::Operational, "operational", " ●", false),
+        (StatusIndicator::Minor, "degraded", " ◐", true),
+        (StatusIndicator::Major, "major", " ○", true),
+        (StatusIndicator::Critical, "major", " ○", true),
+        (StatusIndicator::Maintenance, "unknown", " ?", false),
+        (StatusIndicator::Unknown, "unknown", " ?", false),
+    ];
+    for (indicator, level, symbol, has_line) in cases {
+        let status = StatusInfo {
+            indicator,
+            description: Some("Feed text".to_string()),
+            updated_at: None,
+        };
+        let json = render_json_result(
+            ProviderId::Claude,
+            fetch_result(UsageSnapshot::new(RateWindow::new(10.0))),
+            Some(&status),
+            None,
+        );
+        assert_eq!(json["status"]["level"], level, "{indicator:?}");
+        assert_eq!(json["status"]["description"], "Feed text", "{indicator:?}");
+        let swap =
+            super::claude_swap::claude_swap_json_payload(&sample_swap_account(), Some(&status));
+        assert_eq!(swap["status"]["level"], level, "{indicator:?}");
+        assert_eq!(
+            render_status_indicator(Some(&status), false),
+            symbol,
+            "{indicator:?}"
+        );
+        let mut lines = Vec::new();
+        append_status_line(&mut lines, Some(&status));
+        let expected: Vec<String> = if has_line {
+            vec!["  Status: Feed text".to_string()]
+        } else {
+            Vec::new()
+        };
+        assert_eq!(lines, expected, "{indicator:?}");
+    }
 }
 
 #[test]
@@ -83,9 +129,9 @@ fn claude_swap_brief_renderer_keeps_one_line_per_provider() {
     second.slot = 3;
     second.label = "personal@example.com".to_string();
     let status = StatusInfo {
-        level: StatusLevel::Operational,
-        description: "All Systems Operational".to_string(),
-        ..Default::default()
+        indicator: StatusIndicator::Operational,
+        description: Some("All Systems Operational".to_string()),
+        updated_at: None,
     };
 
     let text = super::claude_swap::render_claude_swap_brief(&[first, second], Some(&status), false);
@@ -354,7 +400,7 @@ fn opencodego_account_projection_distinguishes_api_and_cookie_routes() {
 fn text_rendering_shows_sub_one_percent_usage() {
     let result = fetch_result(UsageSnapshot::new(RateWindow::new(0.4)));
 
-    let output = render_text_with_status(ProviderId::Codex, &result, None, false);
+    let output = render_text_with_status(ProviderId::Codex, &result, None, false, None);
 
     assert!(output.contains("<1% used"));
 }
@@ -382,7 +428,7 @@ fn secondary_label_override_is_shared_by_full_and_brief_renderers() {
             .with_secondary(RateWindow::new(20.0))
             .with_secondary_label("Weekly"),
     );
-    let full = render_text_with_status(ProviderId::Antigravity, &result, None, false);
+    let full = render_text_with_status(ProviderId::Antigravity, &result, None, false, None);
     let brief = render_brief_text(ProviderId::Antigravity, &result);
     assert!(full.contains("Weekly:"));
     assert!(brief.contains("Weekly 20%"));
@@ -392,7 +438,7 @@ fn primary_label_override_is_shared_by_full_and_brief_renderers() {
     let result =
         fetch_result(UsageSnapshot::new(RateWindow::new(42.0)).with_primary_label("Monthly"));
 
-    let full = render_text_with_status(ProviderId::Grok, &result, None, false);
+    let full = render_text_with_status(ProviderId::Grok, &result, None, false, None);
     let brief = render_brief_text(ProviderId::Grok, &result);
 
     assert!(full.contains("Monthly:"));
@@ -418,12 +464,12 @@ fn openrouter_history_preserves_period_and_known_zero_in_text() {
     let result = fetch_result(UsageSnapshot::new(RateWindow::new(0.0)))
         .with_cost(CostSnapshot::new(0.0, "USD", "Last 30 days (UTC)").always_visible());
 
-    let output = render_text_with_status(ProviderId::OpenRouter, &result, None, false);
+    let output = render_text_with_status(ProviderId::OpenRouter, &result, None, false, None);
 
     assert!(output.contains("Last 30 days (UTC): $0.00"));
     assert!(!output.contains("Cost:    $0.00"));
 
-    let json = render_json_result(ProviderId::OpenRouter, result, None);
+    let json = render_json_result(ProviderId::OpenRouter, result, None, None);
     assert!(json.get("usage").is_some());
     assert!(json.get("cost").is_some());
     assert!(json.get("history").is_none());
@@ -434,7 +480,7 @@ fn ordinary_costs_keep_the_existing_cost_line() {
     let result = fetch_result(UsageSnapshot::new(RateWindow::new(0.0)))
         .with_cost(CostSnapshot::new(2.5, "EUR", "This month (API key)"));
 
-    let output = render_text_with_status(ProviderId::OpenRouter, &result, None, false);
+    let output = render_text_with_status(ProviderId::OpenRouter, &result, None, false, None);
 
     assert!(output.contains("Cost:    €2.50 (This month (API key))"));
     assert!(!output.contains("Last 30 days"));
@@ -451,7 +497,7 @@ fn inventory_is_rendered_in_full_text_but_not_brief_text() {
         },
     );
 
-    let full = render_text_with_status(ProviderId::Grok, &result, None, false);
+    let full = render_text_with_status(ProviderId::Grok, &result, None, false, None);
     let brief = render_brief_text(ProviderId::Grok, &result);
 
     assert!(full.contains("Limit Reset Credits: 2 available"));
@@ -467,8 +513,8 @@ fn display_details_are_rendered_in_full_text_and_json() {
             .and_then(|row| row.with_progress(12.0, 100.0)),
     );
 
-    let full = render_text_with_status(ProviderId::Grok, &result, None, false);
-    let json = render_json_result(ProviderId::Grok, result, None);
+    let full = render_text_with_status(ProviderId::Grok, &result, None, false, None);
+    let json = render_json_result(ProviderId::Grok, result, None, None);
 
     assert!(full.contains("Used this cycle: 12 (Monthly refill: 100) [12.00/100.00]"));
     assert_eq!(json["details"][0]["title"], "Used this cycle");
@@ -489,8 +535,8 @@ fn sectioned_display_details_print_one_heading_per_group() {
         .with_display_detail(row("a", "Alpha", Some("Model activity")))
         .with_display_detail(row("b", "Beta", Some("Model activity")));
 
-    let text = render_text_with_status(ProviderId::LiteLLM, &result, None, false);
-    let json = render_json_result(ProviderId::LiteLLM, result, None);
+    let text = render_text_with_status(ProviderId::LiteLLM, &result, None, false, None);
+    let json = render_json_result(ProviderId::LiteLLM, result, None, None);
 
     assert_eq!(text.matches("Model activity:").count(), 1);
     assert!(text.find("Plain: 1").unwrap() < text.find("Model activity:").unwrap());
@@ -510,7 +556,7 @@ fn json_inventory_is_additive_and_contains_no_redemption_token() {
         },
     );
 
-    let json = render_json_result(ProviderId::Grok, result, None);
+    let json = render_json_result(ProviderId::Grok, result, None, None);
     assert_eq!(json["inventory"][0]["availableCount"], 1);
     assert!(
         serde_json::to_string(&json)
@@ -526,7 +572,7 @@ fn json_inventory_is_additive_and_contains_no_redemption_token() {
 
 fn history_output(cost: CostSnapshot) -> String {
     let result = fetch_result(UsageSnapshot::new(RateWindow::new(0.0))).with_cost(cost);
-    render_text_with_status(ProviderId::OpenRouter, &result, None, false)
+    render_text_with_status(ProviderId::OpenRouter, &result, None, false, None)
 }
 
 #[test]
@@ -610,7 +656,7 @@ fn history_fields_do_not_change_the_cost_json_contract() {
             .with_provenance(CostProvenance::VendorMetered)
             .always_visible(),
     );
-    let json = render_json_result(ProviderId::OpenRouter, result, None);
+    let json = render_json_result(ProviderId::OpenRouter, result, None, None);
     let cost = json.get("cost").and_then(|cost| cost.as_object()).unwrap();
     assert!(!cost.contains_key("historyTokens") && !cost.contains_key("history_tokens"));
     assert!(!cost.contains_key("provenance"));
@@ -691,7 +737,7 @@ fn detail_backed_windows_omit_reset_line_without_reset_date() {
 
 #[test]
 fn detail_backed_flag_stays_out_of_json_output() {
-    let json = render_json_result(ProviderId::Mistral, detail_backed_result(None), None);
+    let json = render_json_result(ProviderId::Mistral, detail_backed_result(None), None, None);
     let windows = json["usage"]["extra_rate_windows"]
         .as_array()
         .expect("extra windows");
@@ -702,4 +748,145 @@ fn detail_backed_flag_stays_out_of_json_output() {
     );
     assert!(windows[0]["window"].get("descriptionIsDetail").is_none());
     assert!(windows[0]["window"].get("description_is_detail").is_none());
+}
+
+#[test]
+fn cli_lane_pace_scores_copilot_against_the_february_cycle() {
+    use chrono::TimeZone;
+    // Copilot window with no length, reset Mar 1, now Feb 15: half of the
+    // 28-day cycle has elapsed.
+    let now = Utc.with_ymd_and_hms(2026, 2, 15, 0, 0, 0).unwrap();
+    let reset = Utc.with_ymd_and_hms(2026, 3, 1, 0, 0, 0).unwrap();
+    let window = RateWindow::with_details(60.0, None, Some(reset), None);
+
+    let pace = render::lane_pace_at(ProviderId::Copilot, &window, now, None, || None)
+        .expect("copilot reset-window pace");
+    assert_eq!(pace.expected_used_percent, 50.0);
+    assert_eq!(pace.delta_percent, 10.0);
+    assert_eq!(pace.eta_seconds, Some(806_400.0));
+
+    // Providers without the capability use the lane's own rule.
+    let mut fallback_used = false;
+    let codex = render::lane_pace_at(ProviderId::Codex, &window, now, None, || {
+        fallback_used = true;
+        None
+    });
+    assert!(codex.is_none());
+    assert!(fallback_used);
+}
+
+#[test]
+fn cli_lane_pace_keeps_reset_window_pace_for_a_resolved_31_day_cycle() {
+    use chrono::TimeZone;
+    // StepFun already expands the 30-day sentinel to the real cycle: 31
+    // days ending Mar 31. Mar 15 12:00 is 15.5 days in.
+    let now = Utc.with_ymd_and_hms(2026, 3, 15, 12, 0, 0).unwrap();
+    let reset = Utc.with_ymd_and_hms(2026, 3, 31, 0, 0, 0).unwrap();
+    let window = RateWindow::with_details(70.0, Some(44_640), Some(reset), None);
+
+    let pace = render::lane_pace_at(ProviderId::StepFun, &window, now, None, || {
+        panic!("a calendar-month window must use the reset-window rule")
+    })
+    .expect("stepfun reset-window pace");
+    assert_eq!(pace.expected_used_percent, 50.0);
+    assert_eq!(pace.delta_percent, 20.0);
+}
+
+#[test]
+fn cli_reset_window_pace_needs_three_percent_expected() {
+    use chrono::TimeZone;
+    // Upstream `CLIRenderer.paceMinimumExpectedPercent` (3). Copilot's cycle
+    // ending Mar 31 is 31 days long; 12 hours in, 0.5 / 31 = 1.61% is
+    // expected, so the CLI shows no pace and does not fall back.
+    let reset = Utc.with_ymd_and_hms(2026, 3, 31, 0, 0, 0).unwrap();
+    let window = RateWindow::with_details(5.0, None, Some(reset), None);
+    let early = Utc.with_ymd_and_hms(2026, 2, 28, 12, 0, 0).unwrap();
+    let pace = render::lane_pace_at(ProviderId::Copilot, &window, early, None, || {
+        panic!("reset-window lanes never fall back")
+    });
+    assert!(pace.is_none());
+    // One day in (3.23%), the pace shows.
+    let day_one = Utc.with_ymd_and_hms(2026, 3, 1, 0, 0, 0).unwrap();
+    let pace = render::lane_pace_at(ProviderId::Copilot, &window, day_one, None, || None)
+        .expect("pace after 3% expected");
+    assert_eq!(pace.expected_used_percent, 100.0 / 31.0);
+}
+
+#[test]
+fn copilot_monthly_windows_get_reset_window_pace_in_json_and_text() {
+    use chrono::Duration;
+    // Copilot windows have a reset date and no length: the CLI scores them
+    // against the calendar month ending at the reset, as the Mac does.
+    let reset = Utc::now() + Duration::days(10);
+    let cycle_minutes = f64::from(RateWindow::calendar_month_window_minutes(reset).unwrap());
+    let expected = 100.0 * (cycle_minutes - 10.0 * 1440.0) / cycle_minutes;
+    let usage = UsageSnapshot::new(RateWindow::with_details(5.0, None, Some(reset), None))
+        .with_secondary(RateWindow::with_details(5.0, None, Some(reset), None));
+
+    let json = render_json_result(ProviderId::Copilot, fetch_result(usage.clone()), None, None);
+    let primary = json["pace"]["primary"]["expectedUsedPercent"]
+        .as_f64()
+        .expect("copilot primary pace");
+    assert!((primary - expected).abs() < 0.01, "{primary} vs {expected}");
+    let secondary = json["pace"]["secondary"]["expectedUsedPercent"]
+        .as_f64()
+        .expect("copilot secondary pace");
+    // Without the capability the secondary would use a 7-day fallback and a
+    // 10-day reset would give no pace at all.
+    assert!(
+        (secondary - expected).abs() < 0.01,
+        "{secondary} vs {expected}"
+    );
+
+    let text = render_text_with_status(
+        ProviderId::Copilot,
+        &fetch_result(usage.clone()),
+        None,
+        false,
+        None,
+    );
+    assert_eq!(text.matches("  Pace:").count(), 2, "{text}");
+
+    // Codex has no reset-window capability: a length-less primary has no pace.
+    let codex = render_json_result(ProviderId::Codex, fetch_result(usage), None, None);
+    assert!(codex["pace"].is_null() || codex["pace"]["primary"].is_null());
+}
+
+#[test]
+fn json_pace_follows_weekly_work_days() {
+    use chrono::{Datelike, Duration, Local, TimeZone};
+    // Weekly window ending at the next local Monday 00:00, so it covers the
+    // current Mon..Sun and Mon-Fri workday pace is ahead of linear pace at any
+    // instant inside it.
+    let today = Local::now().date_naive();
+    let next_monday = today + Duration::days(7 - i64::from(today.weekday().num_days_from_monday()));
+    let reset = Local
+        .from_local_datetime(&next_monday.and_hms_opt(0, 0, 0).unwrap())
+        .single()
+        .unwrap()
+        .with_timezone(&Utc);
+    if reset - Utc::now() >= Duration::days(7) {
+        return; // Monday 00:00 exactly or a DST-shortened week: nothing to compare.
+    }
+    let usage = UsageSnapshot::new(RateWindow::new(10.0)).with_secondary(RateWindow::with_details(
+        10.0,
+        Some(10080),
+        Some(reset),
+        None,
+    ));
+    let expected = |work_days: Option<u8>| {
+        render_json_result(
+            ProviderId::Codex,
+            fetch_result(usage.clone()),
+            None,
+            work_days,
+        )["pace"]["secondary"]["expectedUsedPercent"]
+            .as_f64()
+            .unwrap()
+    };
+
+    let linear = expected(None);
+    // Each render reads the clock again, so compare within a small tolerance.
+    assert!((expected(Some(7)) - linear).abs() < 0.01);
+    assert!(expected(Some(5)) > linear);
 }

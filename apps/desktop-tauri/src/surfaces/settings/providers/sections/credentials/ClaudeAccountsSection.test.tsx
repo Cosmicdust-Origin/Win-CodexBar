@@ -47,10 +47,7 @@ describe("ClaudeAccountsSection", () => {
       accounts: [],
       error: null,
     });
-    mocks.getSettingsSnapshot.mockResolvedValue({
-      claudeSwapEnabled: false,
-      claudeSwapExecutablePath: "",
-    });
+    mocks.getSettingsSnapshot.mockResolvedValue({});
   });
 
   it("offers to save the discovered account and switches only saved inactive accounts", async () => {
@@ -135,5 +132,18 @@ describe("ClaudeAccountsSection", () => {
     expect(screen.getByText("30% PanelUsedSuffix")).toBeInTheDocument();
     rerender(<ClaudeAccountsSection t={t} showAsUsed={false} />);
     expect(screen.queryByText("30% PanelUsedSuffix")).toBeNull();
+  });
+
+  it("shows the claude-swap list only while claude-swap is on", async () => {
+    const { rerender } = render(<ClaudeAccountsSection t={t} />);
+    await screen.findByText(current.email);
+    expect(screen.queryByText("ClaudeSwapTitle")).toBeNull();
+    expect(mocks.claudeSwapAccountsList).not.toHaveBeenCalled();
+    mocks.claudeSwapAccountsList.mockResolvedValue({
+      enabled: true, executableConfigured: false, accounts: [], error: null,
+    });
+    rerender(<ClaudeAccountsSection t={t} claudeSwapEnabled claudeSwapExecutablePath="" />);
+    await screen.findByText("ClaudeSwapTitle");
+    expect(screen.getByText("ClaudeSwapStatusNoExecutable")).toBeTruthy();
   });
 });

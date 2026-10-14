@@ -486,6 +486,11 @@ impl Provider for AbacusProvider {
         ProviderId::Abacus
     }
 
+    /// Upstream `menuBarPaceWindow` paces Abacus on its primary credits lane.
+    fn menu_bar_pace_lane(&self) -> Option<crate::core::IconLane> {
+        Some(crate::core::IconLane::Primary)
+    }
+
     fn metadata(&self) -> &ProviderMetadata {
         &self.metadata
     }

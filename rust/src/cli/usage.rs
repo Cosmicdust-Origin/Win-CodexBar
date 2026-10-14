@@ -237,12 +237,18 @@ struct UsageCommand {
     account: Option<String>,
     /// Read every external claude-swap account for Claude (read-only).
     all_accounts: bool,
+    /// `Settings::weekly_progress_work_days` for weekly pace lines (upstream
+    /// `CLIRenderer.computePace(weeklyWorkDays:)`).
+    weekly_work_days: Option<u8>,
     ctx: FetchContext,
 }
 
 impl UsageCommand {
     fn from_args(args: UsageArgs) -> anyhow::Result<Self> {
-        Self::from_args_with(args, || Settings::load().get_enabled_provider_ids())
+        let settings = Settings::load();
+        let mut command = Self::from_args_with(args, || settings.get_enabled_provider_ids())?;
+        command.weekly_work_days = settings.weekly_progress_work_days;
+        Ok(command)
     }
 
     /// `enabled` supplies the enabled providers for a plain `usage` (no
@@ -273,6 +279,7 @@ impl UsageCommand {
             pretty: args.pretty,
             account: args.account.clone(),
             all_accounts: args.all_accounts,
+            weekly_work_days: None,
             ctx: build_usage_fetch_context(&args, source_mode),
         })
     }

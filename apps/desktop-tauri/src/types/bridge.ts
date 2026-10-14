@@ -1,3 +1,5 @@
+import type { LocaleKey } from "../i18n/keys";
+
 export type SurfaceMode = "hidden" | "trayPanel" | "popOut" | "settings";
 export type VisibleSurfaceMode = Exclude<SurfaceMode, "hidden">;
 export type SettingsTabId =
@@ -8,6 +10,7 @@ export type SettingsTabId =
   | "menu"
   | "usageSpend"
   | "advanced"
+  | "hooks"
   | "about";
 
 // ── Narrowed string-literal unions (persisted settings enums) ─────────
@@ -173,6 +176,31 @@ export interface ProviderCatalogEntry {
   cookieDomain: string | null;
 }
 
+/** Upstream `ProviderStatusIndicator` raw values; `none` is operational. */
+export type ServiceStatusIndicator =
+  | "none"
+  | "minor"
+  | "major"
+  | "critical"
+  | "maintenance"
+  | "unknown";
+
+export interface ProviderServiceStatus {
+  indicator: ServiceStatusIndicator;
+  description: string | null;
+  /** Unix milliseconds of the status feed's last update. */
+  updatedAt: number | null;
+}
+
+/**
+ * One enabled provider with a status page. `status` is null until the first
+ * successful poll. The list is empty while "Check provider status" is off.
+ */
+export interface ProviderStatusEntry {
+  providerId: string;
+  status: ProviderServiceStatus | null;
+}
+
 export interface ProviderSummary {
   id: string;
   displayName: string;
@@ -187,6 +215,7 @@ export interface SettingsSnapshot {
   refreshIntervalSecs: number;
   adaptiveRefresh: boolean;
   refreshAllProvidersOnMenuOpen: boolean;
+  statusChecksEnabled: boolean;
   lowPowerMode: boolean;
   lowPowerModePreference?: "off" | "on" | "automatic";
   startAtLogin: boolean;
@@ -197,7 +226,8 @@ export interface SettingsSnapshot {
   notificationSoundPaths: NotificationSoundPaths;
   highUsageThreshold: number;
   criticalUsageThreshold: number;
-  providerUsageThresholds?: Record<string, UsageThresholdOverride>;
+  /** Per-provider quota warnings keyed by CLI name; Global providers are absent. */
+  providerQuotaWarnings?: Record<string, ProviderQuotaWarnings>;
   predictivePaceWarningEnabled: boolean;
   credentialExpiryNotificationsEnabled: boolean;
   /** Absent on older shells; the UI falls back to `showNotifications`. */
@@ -246,6 +276,8 @@ export interface SettingsSnapshot {
   httpProxyUsername?: string;
   httpProxyPassword?: string;
   uiLanguage: Language;
+  /** Language "System": `uiLanguage` follows the Windows display language. */
+  uiLanguageFollowsSystem: boolean;
   theme: ThemePreference;
   /** 100..=250 — clamped server-side. */
   windowScalePercent: number;
@@ -260,6 +292,12 @@ export interface SettingsSnapshot {
   /** Path to the cswap executable (Claude only, empty when unset). */
   claudeSwapExecutablePath?: string;
   codexSparkUsageVisible: boolean;
+  /** Absent on older shells. */
+  codexOpenaiWebExtras?: boolean;
+  codexHistoricalTracking?: boolean;
+  codexExternalOauthSourcesAllowed?: boolean;
+  codexLocalSessionCostLedgerEnabled?: boolean;
+  codexOpenaiWebBatterySaverEnabled?: boolean;
   disableKeychainAccess: boolean;
   wayfinderGatewayUrl?: string;
   providerMetrics: Record<string, MetricPreference>;
@@ -309,6 +347,12 @@ export interface SettingsSnapshot {
    * `month-to-date`, or `all`. Absent from older backends.
    */
   costReportingPeriod?: string;
+  /** Usage & Spend "Track costs"; off stops the local cost-log scan. Absent from older backends. */
+  costUsageEnabled?: boolean;
+  /** Usage & Spend time range, same raw form as `costReportingPeriod`. */
+  spendDashboardPeriod?: string;
+  /** Usage & Spend sources (row `providerId`s) hidden from the dashboard; sorted and unique. */
+  spendDashboardHiddenSourceIds?: string[];
   /** Per-provider accent color overrides (CLI name → hex color, #2972). */
   providerAccentColors: Record<string, string>;
 }
@@ -328,6 +372,7 @@ export interface SettingsUpdate {
   refreshIntervalSecs?: number;
   adaptiveRefresh?: boolean;
   refreshAllProvidersOnMenuOpen?: boolean;
+  statusChecksEnabled?: boolean;
   lowPowerMode?: boolean;
   lowPowerModePreference?: "off" | "on" | "automatic";
   startAtLogin?: boolean;
@@ -338,7 +383,8 @@ export interface SettingsUpdate {
   notificationSoundPaths?: NotificationSoundPaths;
   highUsageThreshold?: number;
   criticalUsageThreshold?: number;
-  providerUsageThresholds?: Record<string, UsageThresholdOverride>;
+  /** Replaces each listed provider's whole value; `{}` resets it to Global. */
+  providerQuotaWarnings?: Record<string, ProviderQuotaWarnings>;
   predictivePaceWarningEnabled?: boolean;
   credentialExpiryNotificationsEnabled?: boolean;
   sessionQuotaNotificationsEnabled?: boolean;
@@ -379,6 +425,8 @@ export interface SettingsUpdate {
   httpProxyUsername?: string;
   httpProxyPassword?: string;
   uiLanguage?: Language;
+  /** `true` picks "System"; picking a `uiLanguage` turns it off. */
+  uiLanguageFollowsSystem?: boolean;
   theme?: ThemePreference;
   windowScalePercent?: number;
   trayScalePercent?: number;
@@ -389,6 +437,11 @@ export interface SettingsUpdate {
   claudeSwapEnabled?: boolean;
   claudeSwapExecutablePath?: string;
   codexSparkUsageVisible?: boolean;
+  codexOpenaiWebExtras?: boolean;
+  codexHistoricalTracking?: boolean;
+  codexExternalOauthSourcesAllowed?: boolean;
+  codexLocalSessionCostLedgerEnabled?: boolean;
+  codexOpenaiWebBatterySaverEnabled?: boolean;
   disableKeychainAccess?: boolean;
   /** Map of provider CLI name → metric preference label. */
   providerMetrics?: Record<string, MetricPreference>;
@@ -419,12 +472,27 @@ export interface SettingsUpdate {
   hideNativeCodexCostWhenOpenCodexPresent?: boolean;
   /** `rolling:N` (1..=365), `month-to-date`, or `all`; the backend rejects other values. */
   costReportingPeriod?: string;
+  costUsageEnabled?: boolean;
+  /** Same format as `costReportingPeriod`. */
+  spendDashboardPeriod?: string;
+  spendDashboardHiddenSourceIds?: string[];
   providerAccentColors?: Record<string, string | null>;
 }
 
-export interface UsageThresholdOverride {
+/**
+ * One quota warning window. All fields absent = Global (inherit the global
+ * thresholds). `enabled: false` = Off (values kept for when it turns back on).
+ * Otherwise Custom; a missing value inherits the global one.
+ */
+export interface QuotaWarningWindow {
+  enabled?: boolean;
   high?: number;
   critical?: number;
+}
+
+export interface ProviderQuotaWarnings {
+  session?: QuotaWarningWindow;
+  weekly?: QuotaWarningWindow;
 }
 
 /** One provider row for Settings → Usage & Spend. */
@@ -470,6 +538,8 @@ export interface UsageSpendSummary {
   reportingPeriod: string;
   reportingDay: string;
   dashboardTimezone: string;
+  /** False when "Track costs" is off: nothing was scanned and the summary is empty. */
+  costTrackingEnabled?: boolean;
 }
 
 export type CostProvenance = "listPriceEstimate" | "vendorMetered" | "mixed" | "unknown";
@@ -639,6 +709,10 @@ export interface RateWindowSnapshot {
   isInformational?: boolean;
   /** `resetDescription` is a detail line (for example spend amounts), not reset wording. */
   descriptionIsDetail?: boolean;
+  /** The reset is the next quota regeneration: the card says "Regenerates in" (Synthetic). */
+  resetRegenerates?: boolean;
+  /** The window feeds the tray and float bar only; the card draws no row for it. */
+  hiddenOnCard?: boolean;
   reservePercent: number | null;
   reserveDescription: string | null;
   reserveWillLastToReset?: boolean;
@@ -674,6 +748,8 @@ export interface CostSnapshotBridge {
   daily?: CostDailyPoint[];
   /** Provider-metered spend that is itself a primary usage signal. */
   alwaysVisible?: boolean;
+  /** Provider-owned cost-block title (upstream `ProviderCostMenuCardStyle`); absent keeps the shared title. */
+  titleKey?: LocaleKey;
 }
 
 export type PaceStage =
@@ -693,6 +769,12 @@ export interface WindowPaceSnapshot {
   actualUsedPercent: number;
   etaSeconds?: number | null;
   willLastToReset: boolean;
+  /**
+   * Scored against the provider's reset window (upstream
+   * `ProviderPaceCapability.resetWindowPace`). Card lanes show it as weekly
+   * pace whatever the window's length. Omitted when false.
+   */
+  resetWindow?: boolean;
 }
 
 export interface PaceSnapshot {
@@ -782,6 +864,8 @@ export interface ProviderUsageSnapshot {
   primaryLabel?: string;
   secondary: RateWindowSnapshot | null;
   secondaryLabel?: string;
+  /** Provider-chosen locale key that names the secondary lane (wins over `secondaryLabel`). */
+  secondaryLabelKey?: LocaleKey | null;
   modelSpecific: RateWindowSnapshot | null;
   tertiary: RateWindowSnapshot | null;
   /** F5: duration-cadence label for tertiary ("monthly", "weekly" etc.) */
@@ -1392,4 +1476,55 @@ export interface ClaudeSwapAccountsState {
   executableConfigured: boolean;
   accounts: ClaudeSwapAccount[];
   error: string | null;
+}
+
+// ── Hooks (Settings > Hooks; Rust `commands/hooks.rs`) ────────────────
+
+/** The seven hook events, in the macOS picker order (`HookEventType.allCases`). */
+export const HOOK_EVENT_TYPES = [
+  "quota_low",
+  "quota_reached",
+  "quota_reset",
+  "usage_updated",
+  "provider_unavailable",
+  "provider_recovered",
+  "refresh_failed",
+] as const;
+
+export type HookEventType = (typeof HOOK_EVENT_TYPES)[number];
+
+/** One rule in `hooks.json` (`HookRulePayload`). */
+export interface HookRulePayload {
+  enabled: boolean;
+  /** Event names stay strings so the backend can reject an unknown one. */
+  event: string | null;
+  /** Extra events from a hand-edited file; the pane carries them through. */
+  events: string[];
+  /** Provider id, or null for any provider. */
+  provider: string | null;
+  /** For `quota_low`: usage fraction 0..1 (edited as 1..100 %). */
+  threshold: number | null;
+  executable: string;
+  arguments: string[];
+  timeoutSecs: number;
+}
+
+/** What the Hooks pane shows (`HooksConfigSnapshot`). */
+export interface HooksConfigSnapshot {
+  /** On only when `settings.hooks_enabled` and `hooks.json` `enabled` are both on. */
+  enabled: boolean;
+  settingsEnabled: boolean;
+  fileEnabled: boolean;
+  rules: HookRulePayload[];
+  path: string;
+  /** Set when `hooks.json` exists but can't be read; saving is refused. */
+  error: string | null;
+  maxRules: number;
+  maxArguments: number;
+}
+
+/** A save from the Hooks pane (`HooksConfigSave`). `enabled` is sent only by the Enable switch. */
+export interface HooksConfigSave {
+  enabled?: boolean | null;
+  rules: HookRulePayload[];
 }

@@ -190,6 +190,15 @@ impl CursorApi {
             .billing_cycle_end
             .as_ref()
             .and_then(|s| parse_iso_date(s));
+        // Upstream `CursorStatusProbe`: plan lanes carry the billing cycle's
+        // length so reset-window pace scores against the real cycle.
+        let cycle_minutes = billing_cycle_window_minutes(
+            summary
+                .billing_cycle_start
+                .as_deref()
+                .and_then(parse_iso_date),
+            billing_end,
+        );
 
         let (percent_used, secondary, model_specific, cost_snapshot) =
             if let Some(team_budget) = team_budget {
@@ -235,11 +244,11 @@ impl CursorApi {
                     };
 
                     let secondary = plan.auto_percent_used.map(|v| {
-                        RateWindow::with_details(clamp_percent(v), None, billing_end, None)
+                        RateWindow::with_details(clamp_percent(v), cycle_minutes, billing_end, None)
                     });
 
                     let model_specific = plan.api_percent_used.map(|v| {
-                        RateWindow::with_details(clamp_percent(v), None, billing_end, None)
+                        RateWindow::with_details(clamp_percent(v), cycle_minutes, billing_end, None)
                     });
 
                     let cost = Self::on_demand_cost(individual.on_demand.as_ref(), billing_end)
@@ -278,7 +287,7 @@ impl CursorApi {
                 (0.0, None, None, None)
             };
 
-        let primary = RateWindow::with_details(percent_used, None, billing_end, None);
+        let primary = RateWindow::with_details(percent_used, cycle_minutes, billing_end, None);
 
         let plan_type = summary
             .membership_type
@@ -547,6 +556,20 @@ impl UserInfo {
 
 // --- Helper functions ---
 
+/// Billing cycle length in whole minutes (rounded), or `None` when either end
+/// is missing or the cycle is empty or reversed.
+fn billing_cycle_window_minutes(
+    start: Option<DateTime<Utc>>,
+    end: Option<DateTime<Utc>>,
+) -> Option<u32> {
+    let seconds = (end? - start?).num_seconds();
+    if seconds <= 0 {
+        return None;
+    }
+    let minutes = (seconds + 30) / 60;
+    u32::try_from(minutes).ok().filter(|m| *m > 0)
+}
+
 fn parse_iso_date(s: &str) -> Option<DateTime<Utc>> {
     // Try with fractional seconds
     if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
@@ -708,6 +731,61 @@ mod tests {
 
         assert!(result.cost.is_some());
         assert_eq!(result.plan_type.as_deref(), Some("Cursor Pro"));
+    }
+
+    /// Upstream `CursorSandUsageStatus.windowMinutes(start:end:)`: the plan
+    /// bars carry the billing-cycle length so reset-window pace can score them.
+    #[test]
+    fn plan_lanes_carry_the_billing_cycle_length() {
+        let json = r#"{
+            "billingCycleStart": "2026-02-01T00:00:00Z",
+            "billingCycleEnd": "2026-03-01T00:00:00Z",
+            "membershipType": "pro",
+            "individualUsage": {
+                "plan": {
+                    "used": 1500,
+                    "limit": 5000,
+                    "totalPercentUsed": 30.0,
+                    "autoPercentUsed": 20.0,
+                    "apiPercentUsed": 10.0
+                }
+            }
+        }"#;
+        let result = api()
+            .build_result_with_team_budget(parse_summary(json), None, None)
+            .unwrap();
+        assert_eq!(result.primary.window_minutes, Some(40_320));
+        assert_eq!(result.secondary.expect("auto").window_minutes, Some(40_320));
+        assert_eq!(
+            result.model_specific.expect("api").window_minutes,
+            Some(40_320)
+        );
+    }
+
+    #[test]
+    fn billing_cycle_length_rounds_to_the_nearest_minute_and_needs_both_ends() {
+        let start = parse_iso_date("2026-02-01T00:00:00Z");
+        let end = parse_iso_date("2026-03-01T00:00:31Z");
+        assert_eq!(billing_cycle_window_minutes(start, end), Some(40_321));
+        let end = parse_iso_date("2026-03-01T00:00:29Z");
+        assert_eq!(billing_cycle_window_minutes(start, end), Some(40_320));
+        assert_eq!(billing_cycle_window_minutes(None, end), None);
+        assert_eq!(billing_cycle_window_minutes(start, None), None);
+        // A cycle that ends before it starts has no length.
+        assert_eq!(billing_cycle_window_minutes(end, start), None);
+    }
+
+    #[test]
+    fn plan_lanes_without_a_cycle_start_have_no_length() {
+        let json = r#"{
+            "billingCycleEnd": "2026-03-01T00:00:00Z",
+            "membershipType": "pro",
+            "individualUsage": { "plan": { "used": 1500, "limit": 5000 } }
+        }"#;
+        let result = api()
+            .build_result_with_team_budget(parse_summary(json), None, None)
+            .unwrap();
+        assert_eq!(result.primary.window_minutes, None);
     }
 
     #[test]

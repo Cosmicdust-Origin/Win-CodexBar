@@ -25,6 +25,7 @@ vi.mock("@tauri-apps/api/webviewWindow", () => ({
 vi.mock("../lib/tauri", () => ({
   closeSettingsWindow: vi.fn(),
   getWorkAreaRect: () => Promise.resolve(null),
+  getProviderStatuses: () => Promise.resolve([]),
   setSurfaceMode: mocks.setSurfaceMode,
   reorderProviders: mocks.reorderProviders,
 }));
@@ -50,6 +51,9 @@ vi.mock("./settings/tabs/MenuTab", () => ({
 }));
 vi.mock("./settings/tabs/AdvancedTab", () => ({
   default: () => <div data-testid="tab">advanced</div>,
+}));
+vi.mock("./settings/tabs/HooksTab", () => ({
+  default: () => <div data-testid="tab">hooks</div>,
 }));
 vi.mock("./settings/tabs/AboutTab", () => ({
   default: () => <div data-testid="tab">about</div>,
@@ -114,9 +118,10 @@ describe("Settings sidebar", () => {
       "menuBar",
       "menu",
       "advanced",
+      "hooks",
       "about",
     ]);
-    expect(container.querySelectorAll(".settings-sidebar__chip")).toHaveLength(6);
+    expect(container.querySelectorAll(".settings-sidebar__chip")).toHaveLength(7);
     expect(container.querySelector(".settings-sidebar__app-icon")).not.toBeNull();
     expect(providerNames()).toEqual(["codex", "zai", "claude", "cline", "grok"]);
     expect(screen.getByText("SettingsSidebarProvidersOnCount")).toBeInTheDocument();

@@ -41,7 +41,7 @@ fn snapshot(history: Option<OpenAiApiUsageHistory>) -> ProviderUsageSnapshot {
     let mut result =
         ProviderFetchResult::new(UsageSnapshot::new(RateWindow::new(0.0)), "admin-api");
     result.open_ai_api_usage = history;
-    ProviderUsageSnapshot::from_fetch_result(ProviderId::OpenAIApi, &metadata, &result, None)
+    ProviderUsageSnapshot::from_fetch_result(ProviderId::OpenAIApi, &metadata, &result, None, None)
 }
 
 #[test]

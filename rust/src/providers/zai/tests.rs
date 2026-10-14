@@ -253,9 +253,12 @@ fn usage_signal_overrides_stale_percentage() {
 }
 
 #[test]
-fn time_limit_primary_carries_mcp_label_without_duration() {
-    // Upstream 0.48.0: TIME_LIMIT (MCP) windows no longer keep explicit
-    // duration minutes and label as "MCP", not the old monthly sentinel.
+fn time_limit_primary_takes_its_unit_length() {
+    // Upstream zai.js `window` (v0.73.0 :85-99): a TIME_LIMIT (MCP) window
+    // takes its length from the unit multipliers (unit 3 = hours) and keeps
+    // the "MCP" label. The five-hour reset plausibility check is for token
+    // limits only, so a reset 8 hours away is kept.
+    let reset = Utc::now() + chrono::Duration::hours(8);
     let provider = ZaiProvider::new();
     let quota: ZaiQuotaResponse = serde_json::from_value(serde_json::json!({
         "code": 200,
@@ -268,15 +271,38 @@ fn time_limit_primary_carries_mcp_label_without_duration() {
                 "currentValue": 20,
                 "remaining": 80,
                 "percentage": 25,
-                "nextResetTime": 123000_i64
+                "nextResetTime": reset.timestamp_millis()
             }]
         }
     }))
     .unwrap();
     let usage = provider.parse_quota_response(&quota).unwrap().usage;
-    assert_eq!(usage.primary.window_minutes, None);
+    assert_eq!(usage.primary.window_minutes, Some(300));
     assert_eq!(usage.primary.reset_description.as_deref(), Some("MCP"));
-    assert!(usage.primary.resets_at.is_some());
+    assert_eq!(
+        usage.primary.resets_at.map(|at| at.timestamp_millis()),
+        Some(reset.timestamp_millis())
+    );
+}
+
+#[test]
+fn weekly_time_limit_primary_is_seven_days() {
+    let provider = ZaiProvider::new();
+    let quota: ZaiQuotaResponse = serde_json::from_value(serde_json::json!({
+        "code": 200,
+        "data": {
+            "limits": [{
+                "type": "TIME_LIMIT",
+                "unit": 6,
+                "number": 1,
+                "percentage": 40
+            }]
+        }
+    }))
+    .unwrap();
+    let usage = provider.parse_quota_response(&quota).unwrap().usage;
+    assert_eq!(usage.primary.window_minutes, Some(10_080));
+    assert_eq!(usage.primary.reset_description.as_deref(), Some("MCP"));
 }
 
 #[test]
@@ -305,9 +331,9 @@ fn bare_time_limit_primary_has_no_window_duration() {
 
 #[test]
 fn mcp_limit_renders_separate_named_window() {
-    // Upstream 0.48.0 GLM Coding Plan layout: coding-limit primary +
-    // MCP as a named extra window; MCP 1-minute marker no longer maps
-    // to a monthly sentinel secondary.
+    // Upstream GLM Coding Plan layout: coding-limit primary + MCP as a
+    // named extra window, not a secondary. Upstream v0.70.0 zai.js gives
+    // the MCP 1-minute marker the 30-day sentinel duration.
     let provider = ZaiProvider::new();
     let quota: ZaiQuotaResponse = serde_json::from_value(serde_json::json!({
         "code": 200,
@@ -343,7 +369,7 @@ fn mcp_limit_renders_separate_named_window() {
         .find(|window| window.id == "zai-mcp")
         .expect("MCP extra window");
     assert_eq!(mcp.title, "MCP");
-    assert_eq!(mcp.window.window_minutes, None);
+    assert_eq!(mcp.window.window_minutes, Some(43_200));
     assert_eq!(mcp.window.reset_description.as_deref(), Some("MCP"));
     assert_eq!(mcp.window.used_percent, 10.0);
 }
@@ -573,4 +599,59 @@ fn recognized_entry_without_any_quota_signal_is_malformed() {
             "{error}"
         );
     }
+}
+
+#[test]
+fn monthly_mcp_marker_gets_the_sentinel_and_reset_window_pace() {
+    let reset = DateTime::parse_from_rfc3339("2026-03-01T00:00:00Z")
+        .unwrap()
+        .with_timezone(&Utc);
+    let parsed = parse_data(serde_json::json!({"limits": [
+        {"type": "TOKENS_LIMIT", "unit": 3, "number": 5, "percentage": 10},
+        {"type": "TIME_LIMIT", "unit": 5, "number": 1, "percentage": 25,
+         "nextResetTime": reset.timestamp_millis()}
+    ]}))
+    .unwrap();
+
+    let mcp = &parsed.usage.extra_rate_windows[0];
+    assert_eq!(mcp.id, "zai-mcp");
+    assert_eq!(mcp.window.window_minutes, Some(43_200));
+    assert_eq!(mcp.window.reset_description.as_deref(), Some("MCP"));
+    assert_eq!(mcp.window.resets_at, Some(reset));
+
+    let zai = crate::core::ProviderId::Zai.pace_capability();
+    let now = DateTime::parse_from_rfc3339("2026-02-15T00:00:00Z")
+        .unwrap()
+        .with_timezone(&Utc);
+    assert!(zai.supports_reset_window_pace(&mcp.window, now));
+    assert_eq!(
+        zai.resolved_reset_window_for_pace(&mcp.window)
+            .window_minutes,
+        Some(40_320)
+    );
+    assert_eq!(parsed.usage.primary.window_minutes, Some(300));
+}
+
+#[test]
+fn oversized_window_length_has_no_minutes() {
+    let provider = ZaiProvider::new();
+    let quota: ZaiQuotaResponse = serde_json::from_value(serde_json::json!({
+        "code": 200,
+        "data": {
+            "limits": [{
+                "type": "TIME_LIMIT",
+                "unit": 6,
+                "number": i32::MAX,
+                "usage": 100,
+                "currentValue": 20,
+                "remaining": 80,
+                "percentage": 25,
+                "nextResetTime": 123000_i64
+            }]
+        }
+    }))
+    .unwrap();
+    let usage = provider.parse_quota_response(&quota).unwrap().usage;
+    assert_eq!(usage.primary.window_minutes, None);
+    assert_eq!(usage.primary.used_percent, 20.0);
 }

@@ -110,18 +110,6 @@ export default function AdvancedTab({ settings, set, saving }: TabProps) {
             onChange={(v) => set({ disableKeychainAccess: v })}
           />
         </Field>
-        <Field
-          label={t("AvoidKeychainPromptsLabel")}
-          description={t("AvoidKeychainPromptsHelper")}
-        >
-          <Toggle
-            variant="switch"
-            checked={settings.claudeAvoidKeychainPrompts}
-            ariaLabel={t("AvoidKeychainPromptsLabel")}
-            disabled={saving || settings.disableKeychainAccess}
-            onChange={(v) => set({ claudeAvoidKeychainPrompts: v })}
-          />
-        </Field>
       </SettingsGroup>
 
       <SettingsGroup
@@ -221,26 +209,6 @@ export default function AdvancedTab({ settings, set, saving }: TabProps) {
             onKeyDown={(event) => {
               if (event.key === "Enter") event.currentTarget.blur();
             }}
-          />
-        </Field>
-      </SettingsGroup>
-
-      <SettingsGroup
-        title={t("HooksTitle")}
-        footer={
-          <>
-            <p>{t("HooksCaption")}</p>
-            <p>{t("HooksConfigPathHint")}</p>
-          </>
-        }
-      >
-        <Field label={t("HooksEnableLabel")} description={t("HooksEnableHelper")}>
-          <Toggle
-            variant="switch"
-            checked={settings.hooksEnabled ?? false}
-            ariaLabel={t("HooksEnableLabel")}
-            disabled={saving}
-            onChange={(v) => set({ hooksEnabled: v })}
           />
         </Field>
       </SettingsGroup>

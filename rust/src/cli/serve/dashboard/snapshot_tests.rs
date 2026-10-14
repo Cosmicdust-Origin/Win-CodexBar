@@ -45,6 +45,7 @@ mod tests {
             identity,
             version: Some("0.48.0-test".to_string()),
             usage_bars_show_used,
+            weekly_work_days: None,
         }
     }
 

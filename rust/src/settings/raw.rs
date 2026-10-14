@@ -125,6 +125,8 @@ pub(super) struct RawSettings {
     #[serde(default)]
     adaptive_refresh: bool,
     refresh_all_providers_on_menu_open: bool,
+    #[serde(default = "default_true")]
+    status_checks_enabled: bool,
     #[serde(default)]
     low_power_mode: bool,
     #[serde(default)]
@@ -265,6 +267,10 @@ pub(super) struct RawSettings {
     auto_download_updates: bool,
     install_updates_on_quit: bool,
     ui_language: Language,
+    /// Field-level default: a file without the key predates "System" and
+    /// keeps its chosen language (new installs get true from `Settings::default`).
+    #[serde(default)]
+    ui_language_follows_system: bool,
     theme: ThemePreference,
     #[serde(default = "default_window_scale_percent")]
     window_scale_percent: u16,
@@ -317,6 +323,13 @@ pub(super) struct RawSettings {
     cost_reporting_period: CostReportingPeriod,
     #[serde(default)]
     cost_usage_bucket_time_zone: String,
+    #[serde(default = "default_true")]
+    cost_usage_enabled: bool,
+    /// `None` when the key is missing, so the value copies `cost_reporting_period`.
+    #[serde(default)]
+    spend_dashboard_period: Option<CostReportingPeriod>,
+    #[serde(default)]
+    spend_dashboard_hidden_source_ids: Vec<String>,
 }
 
 impl Default for RawSettings {
@@ -328,6 +341,7 @@ impl Default for RawSettings {
             refresh_interval_secs: s.refresh_interval_secs,
             adaptive_refresh: s.adaptive_refresh,
             refresh_all_providers_on_menu_open: s.refresh_all_providers_on_menu_open,
+            status_checks_enabled: s.status_checks_enabled,
             low_power_mode: s.low_power_mode_preference == LowPowerModePreference::On,
             low_power_mode_preference: Some(s.low_power_mode_preference),
             start_minimized: s.start_minimized,
@@ -411,6 +425,7 @@ impl Default for RawSettings {
             auto_download_updates: s.auto_download_updates,
             install_updates_on_quit: s.install_updates_on_quit,
             ui_language: s.ui_language,
+            ui_language_follows_system: s.ui_language_follows_system,
             theme: s.theme,
             window_scale_percent: s.window_scale_percent,
             tray_scale_percent: s.tray_scale_percent,
@@ -439,6 +454,10 @@ impl Default for RawSettings {
                 .hide_native_codex_cost_when_open_codex_present,
             cost_reporting_period: s.cost_reporting_period,
             cost_usage_bucket_time_zone: s.cost_usage_bucket_time_zone,
+            cost_usage_enabled: s.cost_usage_enabled,
+            // Missing means "copy cost_reporting_period" (legacy files).
+            spend_dashboard_period: None,
+            spend_dashboard_hidden_source_ids: s.spend_dashboard_hidden_source_ids,
         }
     }
 }
@@ -654,6 +673,17 @@ impl From<RawSettings> for Settings {
                 .avoid_keychain_prompts = true;
         }
 
+        for config in provider_configs.values_mut() {
+            config.quota_warnings = config.quota_warnings.normalized();
+        }
+        // Migration #5: legacy per-provider threshold overrides move into
+        // `provider_configs.<id>.quota_warnings`; only the new key is saved.
+        let legacy_usage_thresholds_pending = !raw.provider_usage_thresholds.is_empty();
+        super::types::migrate_legacy_usage_thresholds(
+            &mut provider_configs,
+            raw.provider_usage_thresholds,
+        );
+
         let low_power_mode_preference = match raw.low_power_mode_preference {
             // A legacy writer may know only the boolean and leave the new field
             // at its serialized default. Preserve the previously enabled state.
@@ -675,6 +705,7 @@ impl From<RawSettings> for Settings {
             refresh_interval_secs: raw.refresh_interval_secs,
             adaptive_refresh: raw.adaptive_refresh,
             refresh_all_providers_on_menu_open: raw.refresh_all_providers_on_menu_open,
+            status_checks_enabled: raw.status_checks_enabled,
             low_power_mode_preference,
             start_minimized: raw.start_minimized,
             start_at_login: raw.start_at_login,
@@ -684,9 +715,6 @@ impl From<RawSettings> for Settings {
             notification_sound_theme: raw.notification_sound_theme,
             high_usage_threshold: raw.high_usage_threshold,
             critical_usage_threshold: raw.critical_usage_threshold,
-            provider_usage_thresholds: normalize_usage_threshold_overrides(
-                raw.provider_usage_thresholds,
-            ),
             merge_tray_icons: raw.merge_tray_icons,
             tray_icon_mode: raw.tray_icon_mode,
             stacked_tray_top_provider: raw
@@ -750,6 +778,7 @@ impl From<RawSettings> for Settings {
             auto_download_updates: raw.auto_download_updates,
             install_updates_on_quit: raw.install_updates_on_quit,
             ui_language: raw.ui_language,
+            ui_language_follows_system: raw.ui_language_follows_system,
             theme: raw.theme,
             window_scale_percent: clamp_window_scale_percent(raw.window_scale_percent),
             tray_scale_percent: clamp_tray_scale_percent(raw.tray_scale_percent),
@@ -785,9 +814,17 @@ impl From<RawSettings> for Settings {
             hide_native_codex_cost_when_open_codex_present: raw
                 .hide_native_codex_cost_when_open_codex_present,
             codex_external_oauth_sources_allowed: raw.codex_external_oauth_sources_allowed,
+            legacy_usage_thresholds_pending,
             cost_reporting_period: raw.cost_reporting_period,
             cost_usage_bucket_time_zone: super::normalize_cost_usage_bucket_time_zone(
                 &raw.cost_usage_bucket_time_zone,
+            ),
+            cost_usage_enabled: raw.cost_usage_enabled,
+            spend_dashboard_period: raw
+                .spend_dashboard_period
+                .unwrap_or(raw.cost_reporting_period),
+            spend_dashboard_hidden_source_ids: super::normalize_spend_dashboard_hidden_source_ids(
+                raw.spend_dashboard_hidden_source_ids,
             ),
         }
     }

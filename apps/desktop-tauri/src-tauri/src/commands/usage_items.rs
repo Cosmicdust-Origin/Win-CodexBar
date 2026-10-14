@@ -29,7 +29,7 @@ pub(crate) fn usage_item_id(raw_id: &str) -> String {
 }
 
 fn redacted_usage_item_title(title: &str, settings: &Settings) -> String {
-    PersonalInfoRedactor::redact_emails_in_text(Some(title), settings.hide_personal_info)
+    PersonalInfoRedactor::hide_emails_in_text(Some(title), settings.hide_personal_info)
         .unwrap_or_default()
 }
 
@@ -92,7 +92,9 @@ pub(crate) fn usage_item_descriptors(
         let mut detail_titles = std::collections::HashSet::new();
         for detail in &snapshot.display_details {
             if detail_titles.insert(detail.title.clone()) {
-                let redacted = PersonalInfoRedactor::redact_emails_in_text(
+                // The ID keeps the "Hidden" marker it has always used, so
+                // sections hidden under Hide Personal Info stay hidden.
+                let id_title = PersonalInfoRedactor::redact_emails_in_text(
                     Some(&detail.title),
                     settings.hide_personal_info,
                 )
@@ -100,12 +102,12 @@ pub(crate) fn usage_item_descriptors(
                 let id = format!(
                     "{}{}",
                     codexbar::settings::USAGE_ITEM_DETAIL_SECTION_PREFIX,
-                    redacted
+                    id_title
                 );
                 if seen.insert(id.clone()) {
                     items.push(ProviderUsageItemSnapshot {
                         id,
-                        title: redacted,
+                        title: redacted_usage_item_title(&detail.title, settings),
                         available: true,
                     });
                 }
@@ -128,6 +130,28 @@ pub(crate) fn usage_item_descriptors(
                 ),
                 available: false,
             });
+        }
+    }
+
+    // A card-hidden window is never drawn as a row, so neither a live toggle
+    // nor a saved-ID placeholder for it would control anything. Marking it
+    // seen suppresses both; windows absent from the snapshot keep placeholders.
+    if let Some(snapshot) = snapshot {
+        let windows = [
+            ("primary", Some(&snapshot.primary)),
+            ("secondary", snapshot.secondary.as_ref()),
+            ("model-specific", snapshot.model_specific.as_ref()),
+            ("tertiary", snapshot.tertiary.as_ref()),
+        ];
+        for (raw_id, window) in windows {
+            if window.is_some_and(|w| w.hidden_on_card) {
+                seen.insert(usage_item_id(raw_id));
+            }
+        }
+        for extra in &snapshot.extra_rate_windows {
+            if extra.window.hidden_on_card {
+                seen.insert(usage_item_id(&format!("extra-{}", extra.id)));
+            }
         }
     }
 

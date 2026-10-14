@@ -1,0 +1,16 @@
+{
+  "instances": [
+    {
+      "instance_id": "inst-parity-0001",
+      "instance_name": "Parity Labs Bob",
+      "user_id": "user-parity-0001",
+      "plan_name": "Bob Pro",
+      "refresh_at": "2026-10-26T12:00:00Z",
+      "region_domain": "us-east.bob.ibm.com",
+      "teams": [
+        {"id": "team-parity-0001", "name": "Platform", "budget_limit": 500, "usage": 312.5},
+        {"id": "team-parity-0002", "name": "Docs", "budget_limit": 250, "usage": 96.25}
+      ]
+    }
+  ]
+}
