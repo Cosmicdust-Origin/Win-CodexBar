@@ -32,9 +32,7 @@ static PLAN_CACHE: LazyLock<Mutex<CommandCodePlanCache>> =
 /// Recognized better-auth session cookie names in upstream priority order
 /// (upstream `CommandCodeCookieHeader.supportedSessionCookieNames`). #2706 added
 /// the production `commandcode_prod_` family; the legacy `better-auth` names stay
-/// as fallback. Name matching against a pasted header is case-insensitive, and a
-/// bare pasted token keeps the legacy production name until a renamed production
-/// cookie is proven live (same rule as upstream).
+/// as fallback. Name matching against a pasted header is case-insensitive.
 const SESSION_COOKIE_NAMES: &[&str] = &[
     "__Secure-commandcode_prod_.session_token",
     "commandcode_prod_.session_token",
@@ -43,7 +41,10 @@ const SESSION_COOKIE_NAMES: &[&str] = &[
     "__Secure-better-auth.session_token",
     "better-auth.session_token",
 ];
-const LEGACY_BARE_TOKEN_COOKIE_NAME: &str = "__Secure-better-auth.session_token";
+/// Cookie name wrapped around a bare pasted token (upstream #4212). This is the
+/// live production cookie name; the legacy `better-auth` default made every
+/// pasted bare token look expired.
+const BARE_TOKEN_COOKIE_NAME: &str = "__Secure-commandcode_prod_.session_token";
 
 /// Static `planId` → monthly grant catalog mirroring upstream
 /// `CommandCodePlanCatalog`. The credits endpoint only reports the *remaining*
@@ -58,6 +59,11 @@ struct CommandCodePlan {
 const PLANS: &[CommandCodePlan] = &[
     CommandCodePlan {
         id: "individual-go",
+        display_name: "Go",
+        monthly_credits_usd: 10.0,
+    },
+    CommandCodePlan {
+        id: "individual-go-v1",
         display_name: "Go",
         monthly_credits_usd: 10.0,
     },
@@ -100,6 +106,29 @@ enum SubscriptionLookup {
 fn find_plan(plan_id: &str) -> Option<&'static CommandCodePlan> {
     let normalized = plan_id.trim().to_ascii_lowercase();
     PLANS.iter().find(|plan| plan.id == normalized)
+}
+
+/// The plan an active subscription reports (upstream `CommandCodePlanCatalog.Plan`).
+/// A catalog id gets its display name and grant size. An unknown id is kept as
+/// its raw label with no grant size, so the API usage still shows (upstream #4423).
+struct ResolvedPlan {
+    label: String,
+    monthly_credits_usd: Option<f64>,
+}
+
+impl ResolvedPlan {
+    fn from_plan_id(plan_id: &str) -> Self {
+        match find_plan(plan_id) {
+            Some(plan) => Self {
+                label: plan.display_name.to_string(),
+                monthly_credits_usd: Some(plan.monthly_credits_usd),
+            },
+            None => Self {
+                label: plan_id.to_string(),
+                monthly_credits_usd: None,
+            },
+        }
+    }
 }
 
 /// Reset-window pace (upstream `CommandCodeProviderDescriptor.pace`, v0.70.0):
@@ -231,10 +260,8 @@ fn normalize_cookie_header(raw: &str) -> Option<String> {
         return None;
     }
     if !header.contains('=') && !header.contains(';') {
-        // Bare token — assume the established production cookie name (upstream
-        // #2706 keeps the legacy better-auth default until a renamed production
-        // cookie is proven live).
-        return Some(format!("{LEGACY_BARE_TOKEN_COOKIE_NAME}={header}"));
+        // Bare token — wrap it in the production cookie name (upstream #4212).
+        return Some(format!("{BARE_TOKEN_COOKIE_NAME}={header}"));
     }
 
     // A pasted header narrows to the session cookie only (upstream
@@ -413,10 +440,18 @@ fn result_from_payloads(
         .and_then(|root| root.get("data"))
         .and_then(|data| data.get("planId"))
         .and_then(|value| value.as_str())
-        .filter(|value| !value.trim().is_empty())
-        .and_then(find_plan);
-    let total = monthly_credits_total(granted, plan);
-    let monthly_window = monthly_window(monthly_credits, purchased, total, lookup, period_end);
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ResolvedPlan::from_plan_id);
+    let total = monthly_credits_total(granted, plan.as_ref());
+    let monthly_window = monthly_window(
+        monthly_credits,
+        purchased,
+        total,
+        lookup,
+        period_end,
+        plan.is_some(),
+    );
 
     // Slot ordering mirrors upstream `toUsageSnapshot` (5-hour → weekly →
     // monthly); the local snapshot requires a primary, so an API without
@@ -447,7 +482,7 @@ fn result_from_payloads(
         )))
     };
 
-    if let Some(method) = login_method(monthly_credits, purchased, plan, total) {
+    if let Some(method) = login_method(monthly_credits, purchased, plan.as_ref(), total) {
         snapshot = snapshot.with_login_method(method);
     }
 
@@ -516,10 +551,10 @@ fn coerce_reset_at(value: Option<&Value>) -> Option<DateTime<Utc>> {
 /// `monthlyCreditsGranted` the credits response reports when it is finite and
 /// positive, otherwise the plan catalog entry. Zero, negative and non-finite
 /// grants fall back to the plan.
-fn monthly_credits_total(granted: Option<f64>, plan: Option<&CommandCodePlan>) -> Option<f64> {
+fn monthly_credits_total(granted: Option<f64>, plan: Option<&ResolvedPlan>) -> Option<f64> {
     granted
         .filter(|granted| granted.is_finite() && *granted > 0.0)
-        .or_else(|| plan.map(|plan| plan.monthly_credits_usd))
+        .or_else(|| plan.and_then(|plan| plan.monthly_credits_usd))
 }
 
 /// USD spent in the monthly grant: `total - remaining`, clamped to [0, total].
@@ -532,17 +567,21 @@ fn monthly_credits_used(total: f64, monthly_remaining: f64) -> f64 {
 /// grant size the free-tier reading keeps a visible-but-empty bar when credits
 /// remain and no window when the account holds nothing, but a failed
 /// subscription lookup must not borrow that reading: an unknown size leaves the
-/// row unavailable. The reset time only comes from the subscription.
+/// row unavailable. The reset time only comes from the subscription. A reported
+/// plan, even an unknown one, is not the free tier, so with no grant size it has
+/// no monthly percentage (upstream #4423).
 fn monthly_window(
     monthly_remaining: f64,
     purchased: f64,
     total: Option<f64>,
     lookup: SubscriptionLookup,
     period_end: Option<DateTime<Utc>>,
+    has_plan: bool,
 ) -> Option<RateWindow> {
     let used_percent = if let Some(total) = total.filter(|total| *total > 0.0) {
         (monthly_credits_used(total, monthly_remaining) / total * 100.0).clamp(0.0, 100.0)
-    } else if lookup == SubscriptionLookup::Unavailable
+    } else if has_plan
+        || lookup == SubscriptionLookup::Unavailable
         || (monthly_remaining <= 0.0 && purchased <= 0.0)
     {
         return None;
@@ -559,16 +598,17 @@ fn monthly_window(
 
 /// Plan summary line, upstream shape: `GOAT · $61.50 of $70.00 · + $2.00 credits`.
 /// The size comes from the grant total, so a reported grant names the size
-/// even when the plan is unknown.
+/// even when the plan is unknown. An unknown plan with no grant still shows its
+/// label and the remaining balance (upstream #4423).
 fn login_method(
     monthly_remaining: f64,
     purchased: f64,
-    plan: Option<&CommandCodePlan>,
+    plan: Option<&ResolvedPlan>,
     total: Option<f64>,
 ) -> Option<String> {
     let mut parts: Vec<String> = Vec::new();
     if let Some(plan) = plan {
-        parts.push(plan.display_name.to_string());
+        parts.push(plan.label.clone());
     }
     if let Some(total) = total {
         parts.push(format!(
@@ -576,7 +616,7 @@ fn login_method(
             format_usd(monthly_credits_used(total, monthly_remaining)),
             format_usd(total)
         ));
-    } else if monthly_remaining > 0.0 {
+    } else if plan.is_some() || monthly_remaining > 0.0 {
         parts.push(format!("{} remaining", format_usd(monthly_remaining)));
     }
     if purchased > 0.0 {
@@ -659,10 +699,10 @@ mod tests {
 
     #[test]
     fn command_code_accepts_bare_session_token() {
-        // Upstream #2706: bare tokens keep the legacy production cookie name.
+        // Upstream #4212: bare tokens use the live production cookie name.
         assert_eq!(
             normalize_cookie_header("abc123").as_deref(),
-            Some("__Secure-better-auth.session_token=abc123")
+            Some("__Secure-commandcode_prod_.session_token=abc123")
         );
     }
 
@@ -842,8 +882,20 @@ mod tests {
             80.0
         );
         assert_eq!(find_plan("Individual-ULTRA").unwrap().display_name, "Ultra");
+        // Upstream #4423: the versioned Go plan is a $10 grant labelled "Go".
+        assert_eq!(find_plan("individual-go-v1").unwrap().display_name, "Go");
+        assert_eq!(
+            find_plan("individual-go-v1").unwrap().monthly_credits_usd,
+            10.0
+        );
         assert!(find_plan("team").is_none());
         assert!(find_plan("").is_none());
+    }
+
+    #[test]
+    fn usd_labels_keep_currency_precision_below_one_hundred() {
+        assert_eq!(format_usd(8.7784), "$8.78");
+        assert_eq!(format_usd(150.75), "$151");
     }
 
     #[test]
