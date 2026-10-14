@@ -509,6 +509,9 @@ fn claude_probe_launch_args(session_id: &str) -> Vec<String> {
         "user".to_string(),
         "--allowed-tools".to_string(),
         String::new(),
+        // The probe never calls MCP tools, so ignore ambient MCP servers
+        // instead of waiting for unrelated user servers to initialize.
+        "--strict-mcp-config".to_string(),
     ];
     args.extend(claude_usage_settings_args());
     args.extend(["--session-id".to_string(), session_id.to_string()]);
@@ -1845,13 +1848,19 @@ mod tests {
         // Positional structure only: the settings pair is pinned once by
         // `claude_usage_settings_args` being the sole composer.
         assert_eq!(
-            args[..4],
-            ["--setting-sources", "user", "--allowed-tools", ""]
+            args[..5],
+            [
+                "--setting-sources",
+                "user",
+                "--allowed-tools",
+                "",
+                "--strict-mcp-config"
+            ]
         );
-        assert_eq!(args[4], claude_usage_settings_args()[0]);
-        assert_eq!(args[5], claude_usage_settings_args()[1]);
-        assert_eq!(args[6], "--session-id");
-        assert_eq!(args[7], first);
+        assert_eq!(args[5], claude_usage_settings_args()[0]);
+        assert_eq!(args[6], claude_usage_settings_args()[1]);
+        assert_eq!(args[7], "--session-id");
+        assert_eq!(args[8], first);
     }
 
     #[test]
