@@ -40,6 +40,7 @@ fn customized_settings() -> Settings {
         high_usage_threshold: 55.5,
         critical_usage_threshold: 80.0,
         predictive_pace_warning_enabled: true,
+        limit_reset_notifications_enabled: true,
         show_pace: false,
         show_as_used: false,
         reset_time_relative: false,
@@ -704,6 +705,43 @@ fn missing_keys_leave_settings_unchanged() {
         .expect("apply");
     assert_eq!(settings.theme, ThemePreference::Light);
     assert_eq!(settings.window_scale_percent, 150);
+}
+
+#[test]
+fn reset_notification_toggle_travels_in_both_directions() {
+    let mut source = Settings {
+        limit_reset_notifications_enabled: true,
+        ..Settings::default()
+    };
+    let exported = PreferencesDocument::from_json(
+        &PreferencesDocument::from_settings(&source)
+            .expect("export")
+            .to_json(),
+    )
+    .expect("reimport");
+    assert!(
+        exported
+            .to_json()
+            .contains("\"limit_reset_notifications_enabled\": true")
+    );
+
+    let mut target = Settings::default();
+    exported.apply_to(&mut target).expect("apply");
+    assert!(target.limit_reset_notifications_enabled);
+
+    // A document without the key keeps the receiving machine's choice.
+    parse(json!({}))
+        .expect("empty")
+        .apply_to(&mut target)
+        .expect("apply");
+    assert!(target.limit_reset_notifications_enabled);
+
+    source.limit_reset_notifications_enabled = false;
+    PreferencesDocument::from_settings(&source)
+        .expect("export")
+        .apply_to(&mut target)
+        .expect("apply");
+    assert!(!target.limit_reset_notifications_enabled);
 }
 
 #[test]

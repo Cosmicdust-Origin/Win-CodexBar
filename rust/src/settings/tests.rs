@@ -359,6 +359,21 @@ fn new_warning_and_reset_settings_are_backward_compatible() {
     assert!(!loaded.show_reset_when_exhausted);
     assert!(!loaded.predictive_pace_warning_enabled);
     assert!(!loaded.credential_expiry_notifications_enabled);
+    assert!(!loaded.limit_reset_notifications_enabled);
+}
+
+#[test]
+fn limit_reset_notifications_default_off_and_round_trip_when_enabled() {
+    assert!(!Settings::default().limit_reset_notifications_enabled);
+
+    let settings = Settings {
+        limit_reset_notifications_enabled: true,
+        ..Settings::default()
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("settings.json");
+    settings.save_to_path(&path).unwrap();
+    assert!(Settings::load_from_path(Some(&path)).limit_reset_notifications_enabled);
 }
 
 fn load_settings_json(json: &str) -> Settings {

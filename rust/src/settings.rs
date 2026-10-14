@@ -228,6 +228,10 @@ pub struct Settings {
     #[serde(default)]
     pub predictive_pace_warning_enabled: bool,
 
+    /// Announce when a session or weekly limit resets (opt-in).
+    #[serde(default)]
+    pub limit_reset_notifications_enabled: bool,
+
     /// Notify once per failure episode when a provider account needs sign-in again.
     #[serde(default)]
     pub credential_expiry_notifications_enabled: bool,
@@ -690,6 +694,7 @@ impl Default for Settings {
             reset_time_relative: true, // Show relative times by default
             show_reset_when_exhausted: false,
             predictive_pace_warning_enabled: false,
+            limit_reset_notifications_enabled: false,
             credential_expiry_notifications_enabled: false,
             session_quota_notifications_enabled: true,
             show_pace: true,
