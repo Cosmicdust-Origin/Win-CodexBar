@@ -54,6 +54,7 @@ fn project(id: &str, path: &str) -> ProjectUsage {
         latest_activity: None,
         top_model: None,
         top_sessions: Vec::new(),
+        is_projectless: false,
     }
 }
 

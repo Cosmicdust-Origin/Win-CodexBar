@@ -189,6 +189,10 @@ pub struct ProjectUsage {
     pub latest_activity: Option<DateTime<Utc>>,
     pub top_model: Option<String>,
     pub top_sessions: Vec<SessionUsage>,
+    /// Explicit desktop ownership marks this as an independent chat, not a project.
+    /// Presentation metadata only; totals and identity are unchanged.
+    #[serde(default)]
+    pub is_projectless: bool,
 }
 
 /// Complete workspaces snapshot published to the sidecar and presentation layer.
@@ -217,9 +221,14 @@ impl CodexLocalProjectUsageSnapshot {
             session.display_title = untitled_session_label(&session.id);
             session.cwd = None;
         }
+        let mut chat_number = 0usize;
         for project in &mut self.projects {
             if project.id == crate::codex_workspaces::CHATS_PROJECT_ID {
                 project.display_name = crate::codex_workspaces::CHATS_DISPLAY_NAME.to_string();
+            } else if project.is_projectless {
+                // Numbered in list order; the chat title may name a private topic.
+                chat_number += 1;
+                project.display_name = format!("Chat {chat_number}");
             } else {
                 project.display_name = "Workspace".to_string();
             }

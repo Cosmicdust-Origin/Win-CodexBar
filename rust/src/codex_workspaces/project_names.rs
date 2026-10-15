@@ -159,7 +159,7 @@ fn saved_name_for<'a>(roots: &'a [SavedRoot], key: &str) -> Option<&'a str> {
 }
 
 /// A key ending in a separator, so `/work` matches `/work/x` but not `/worker`.
-fn with_separator(key: &str) -> String {
+pub(super) fn with_separator(key: &str) -> String {
     if key.ends_with('/') {
         key.to_string()
     } else {
@@ -170,7 +170,7 @@ fn with_separator(key: &str) -> String {
 /// Comparison key for a path: forward slashes, no verbatim (`\\?\`) prefix,
 /// lexically normalized, and lowercase because Windows paths are
 /// case-insensitive.
-fn match_key(raw: &str) -> String {
+pub(super) fn match_key(raw: &str) -> String {
     let unified = raw.trim().replace('\\', "/");
     let body = unified
         .strip_prefix("//?/")

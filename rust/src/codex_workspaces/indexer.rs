@@ -13,6 +13,7 @@ use crate::core::{CostUsageDayRange, CostUsagePricing, JsonlScanner, sha256_hex}
 
 use super::freshness::is_reusable;
 use super::project_names::apply_saved_project_names;
+use super::projectless::apply_projectless_chats;
 use super::sidecar::{SidecarError, WorkspaceUsageSidecar};
 use super::thread_names::apply_session_names_and_ranking;
 use super::types::{
@@ -164,6 +165,7 @@ impl CodexWorkspacesIndex {
                         &scope.codex_home,
                         sqlite_env.as_deref(),
                     );
+                    apply_projectless_chats(&mut cached, &scope.codex_home, sqlite_env.as_deref());
                     return Ok(cached);
                 }
                 Ok(_) => {}
@@ -296,6 +298,7 @@ impl CodexWorkspacesIndex {
         let sqlite_env = non_empty_env("CODEX_SQLITE_HOME");
         apply_session_names_and_ranking(&mut snapshot, &scope.codex_home, sqlite_env.as_deref());
         apply_saved_project_names(&mut snapshot, &scope.codex_home, sqlite_env.as_deref());
+        apply_projectless_chats(&mut snapshot, &scope.codex_home, sqlite_env.as_deref());
 
         progress(Progress::phase(ProgressPhase::Saving));
         sidecar.publish_snapshot(&snapshot)?;
@@ -469,6 +472,7 @@ fn build_projects(sessions: &HashMap<String, SessionBucket>) -> Vec<ProjectUsage
                 latest_activity: latest,
                 top_model,
                 top_sessions: Vec::new(),
+                is_projectless: false,
             }
         })
         .collect()
@@ -1060,6 +1064,7 @@ mod tests {
                     cost_estimate: CostEstimate::default(),
                     top_model: Some("gpt-5".into()),
                 }],
+                is_projectless: false,
             }],
             daily: vec![],
             source_status: SourceStatus::Complete,
