@@ -20,7 +20,7 @@ fn api_key_lane_is_offered_alongside_auto_and_web() {
 async fn explicit_api_source_without_key_reports_missing_key() {
     // Resolution reads COMMAND_CODE_API_KEY and the keyring; skip on a machine
     // that has one so the test never reaches the network.
-    if std::env::var_os("COMMAND_CODE_API_KEY").is_some() {
+    if !no_api_key_resolvable() {
         return;
     }
     let provider = CommandCodeProvider::new();
