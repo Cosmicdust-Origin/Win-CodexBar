@@ -185,6 +185,78 @@ fn parses_current_snake_case_oauth_usage_response() {
 }
 
 #[test]
+fn spend_only_oauth_response_projects_the_monthly_cap_into_one_meter() {
+    use chrono::{Datelike, Timelike};
+
+    let response: OAuthUsageResponse = serde_json::from_str(
+        r#"{
+            "five_hour": null,
+            "seven_day": null,
+            "extra_usage": {"is_enabled": true, "used_credits": 1234, "monthly_limit": 5000, "currency": "USD"}
+        }"#,
+    )
+    .expect("spend-only OAuth response should parse");
+
+    let mut usage =
+        ClaudeOAuthFetcher::new().build_usage_snapshot(&response, &test_credentials("token"));
+    assert!(
+        usage.primary.is_informational,
+        "no session lane before projection"
+    );
+
+    let cost = super::apply_spend_only_extra_usage(&mut usage, &response)
+        .expect("spend-only cap should attach a cost");
+
+    assert!(!usage.primary.is_informational);
+    assert!((usage.primary.used_percent - 24.68).abs() < 0.001);
+    assert_eq!(usage.primary_label.as_deref(), Some("Monthly"));
+    assert!(usage.secondary.is_none());
+    assert!(cost.folded_into_primary);
+    assert_eq!(cost.limit, Some(50.0));
+    assert!((cost.used - 12.34).abs() < 0.001);
+
+    let resets_at = usage.primary.resets_at.expect("inferred monthly reset");
+    assert_eq!(
+        (resets_at.day(), resets_at.hour(), resets_at.minute()),
+        (1, 0, 0)
+    );
+    assert!(resets_at > chrono::Utc::now());
+}
+
+#[test]
+fn quota_oauth_response_keeps_its_session_and_attaches_no_cost() {
+    let response: OAuthUsageResponse = serde_json::from_str(
+        r#"{
+            "five_hour": {"utilization": 10.0, "resets_at": "2026-05-22T22:10:00Z"},
+            "extra_usage": {"is_enabled": true, "used_credits": 1234, "monthly_limit": 5000, "currency": "USD"}
+        }"#,
+    )
+    .expect("quota OAuth response should parse");
+
+    let mut usage =
+        ClaudeOAuthFetcher::new().build_usage_snapshot(&response, &test_credentials("token"));
+    assert!(super::apply_spend_only_extra_usage(&mut usage, &response).is_none());
+
+    assert!((usage.primary.used_percent - 10.0).abs() < f64::EPSILON);
+    assert!(usage.primary_label.is_none());
+}
+
+#[test]
+fn uncapped_spend_only_oauth_response_stays_without_a_meter() {
+    let response: OAuthUsageResponse = serde_json::from_str(
+        r#"{
+            "extra_usage": {"is_enabled": true, "used_credits": 1234, "currency": "USD"}
+        }"#,
+    )
+    .expect("uncapped OAuth response should parse");
+
+    let mut usage =
+        ClaudeOAuthFetcher::new().build_usage_snapshot(&response, &test_credentials("token"));
+    assert!(super::apply_spend_only_extra_usage(&mut usage, &response).is_none());
+    assert!(usage.primary.is_informational);
+}
+
+#[test]
 fn weekly_all_limit_wins_over_stale_seven_day_utilization() {
     let response: OAuthUsageResponse = serde_json::from_str(
         r#"{

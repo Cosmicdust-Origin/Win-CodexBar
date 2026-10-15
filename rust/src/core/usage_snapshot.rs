@@ -537,6 +537,12 @@ pub struct CostSnapshot {
     /// `None` keeps the shared title. Presentation only; not serialized.
     #[serde(skip)]
     pub card_title_key: Option<crate::locale::LocaleKey>,
+
+    /// Provider-owned presentation hint: the primary meter already shows this
+    /// cap, so the card keeps the spend and balance as a caption without a
+    /// second bar. Presentation only; not serialized.
+    #[serde(skip)]
+    pub folded_into_primary: bool,
 }
 
 impl CostSnapshot {
@@ -558,6 +564,7 @@ impl CostSnapshot {
             history_tokens: None,
             provenance: None,
             card_title_key: None,
+            folded_into_primary: false,
         }
     }
 
