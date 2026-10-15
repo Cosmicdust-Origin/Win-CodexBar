@@ -418,12 +418,15 @@ struct DailyAcc {
     unknown_tokens: u64,
 }
 
-/// Project order: latest activity first, then display name.
+/// Project order: latest activity first, then display name, then id.
+/// The id tie-break keeps same-named projects (and their privacy numbers) in
+/// one order across scans; projects are built from a `HashMap`.
 pub(super) fn sort_projects(projects: &mut [ProjectUsage]) {
     projects.sort_by(|a, b| {
         b.latest_activity
             .cmp(&a.latest_activity)
             .then_with(|| a.display_name.cmp(&b.display_name))
+            .then_with(|| a.id.cmp(&b.id))
     });
 }
 
@@ -1074,6 +1077,31 @@ mod tests {
         assert!(snap.projects[0].path.is_none());
         assert_eq!(snap.projects[0].top_sessions[0].display_title, "Session s1");
         assert!(snap.projects[0].top_sessions[0].cwd.is_none());
+    }
+
+    #[test]
+    fn same_named_projects_with_equal_activity_sort_the_same_on_every_scan() {
+        let project = |id: &str| ProjectUsage {
+            id: id.into(),
+            display_name: "app".into(),
+            path: Some(format!("/work/{id}/app")),
+            totals: UsageTotals::from_parts(10, 0, 5),
+            cost_estimate: CostEstimate::default(),
+            session_count: 1,
+            latest_activity: None,
+            top_model: None,
+            top_sessions: Vec::new(),
+            is_projectless: false,
+        };
+        let ids = |projects: &[ProjectUsage]| -> Vec<String> {
+            projects.iter().map(|p| p.id.clone()).collect()
+        };
+        let mut forward = vec![project("project-a"), project("project-b")];
+        let mut reverse = vec![project("project-b"), project("project-a")];
+        sort_projects(&mut forward);
+        sort_projects(&mut reverse);
+        assert_eq!(ids(&forward), ["project-a", "project-b"]);
+        assert_eq!(ids(&reverse), ids(&forward));
     }
 
     #[test]
