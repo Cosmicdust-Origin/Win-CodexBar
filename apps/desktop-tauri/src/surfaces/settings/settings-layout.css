@@ -1196,6 +1196,39 @@
   margin: 4px 0 0;
 }
 
+/* Provider groups (upstream 0.73.0 row padding: heading 7 to 5, child rows 6 to 4). */
+.usage-spend__card .usage-spend-provider {
+  padding: 5px 12px;
+}
+
+.usage-spend-provider__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.usage-spend-provider__name strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Subsection labels keep their case (upstream dropped uppercase styling). */
+.usage-spend-provider__subsection {
+  display: block;
+  margin: 0;
+  text-transform: none;
+}
+
+.usage-spend-provider__model {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 0;
+}
+
 .usage-spend__row-button {
   width: 100%;
   display: grid;

@@ -21,8 +21,10 @@ import type {
   CodexWorkspacesProjectUsage,
   CodexWorkspacesSessionUsage,
   SpendContract,
+  SpendTrendSource,
   UsageSpendSummary,
 } from "../../../types/bridge";
+import { SpendProviderIcon } from "../../../components/providers/SpendProviderIcon";
 import type { LocaleKey } from "../../../i18n/keys";
 import {
   costPeriodLabel,
@@ -430,10 +432,17 @@ function DashboardBody({
           ))}
       </div>
 
-      {summary.trend && summary.trend.sources.length > 0 && <UsageSpendTrendPanel trend={summary.trend} t={t} />}
+      {summary.trend && summary.trend.sources.length > 0 && (
+        <UsageSpendTrendPanel trend={summary.trend} t={t} renderSourceIcon={renderSpendSourceIcon} />
+      )}
       {!contractHidden && <UsageSpendDailyLedger daily={contract.daily} />}
     </>
   );
+}
+
+/** Brand artwork beside each explorer legend entry and inspector row (upstream chart legend). */
+function renderSpendSourceIcon(source: SpendTrendSource) {
+  return <SpendProviderIcon providerId={source.providerId} />;
 }
 
 function Stat({ label, value, large }: { label: string; value: string; large?: boolean }) {
