@@ -825,6 +825,8 @@ export interface CostSnapshotBridge {
   daily?: CostDailyPoint[];
   /** Provider-metered spend that is itself a primary usage signal. */
   alwaysVisible?: boolean;
+  /** The primary meter already shows this cap, so the cost block omits its bar. */
+  foldedIntoPrimary?: boolean;
   /** Provider-owned cost-block title (upstream `ProviderCostMenuCardStyle`); absent keeps the shared title. */
   titleKey?: LocaleKey;
 }
