@@ -10,6 +10,7 @@
 ## [Windows] Unreleased
 
 - Ollama: cookie mode reads the current **Usage credits** wallet on the settings page and shows its credit balance, as API-key mode already does, without inventing a quota percentage or changing older usage meters (upstream #4370).
+- Session depleted and restored alerts start fresh after you switch accounts: the first reading for the new account sets its baseline without an alert, and switching back does not announce a restore that happened while another account was active (upstream #4138).
 - Show a Windows path (`~\.local\bin\cswap.exe`) as the placeholder for the Claude account switcher (cswap) executable in Settings instead of a Unix path (upstream v0.74.0).
 - Add a **token activity** grid to Usage & Spend: a year of daily token totals for Codex and Claude from local logs, independent of the selected period, with a tooltip per day and a day highlight. Days that were never scanned or can't be totalled show as gaps instead of zero. The yearly scan keeps its own Codex cache and skips Pi sessions, and complete Claude walks (including the spend explorer's hourly history) are reused for 60 seconds instead of re-reading the logs on every rebuild (upstream v0.73.0).
 - Replace the Usage & Spend trend panel with a spend explorer: a stacked chart per source (Claude, Codex, extra accounts) in daily, weekly, or monthly buckets by period, with drill-down from months to days and from days to recorded hourly Claude spend, an inspector on hover, legend isolation per source, time-zone labels on the hour view, and separate empty states for unavailable spend and no usage. Unknown spend shows as a gap instead of zero (upstream v0.73.0).
@@ -21,6 +22,7 @@
 - Codex usage by project: show the project names saved in the Codex desktop app instead of folder names, and list chats the desktop app marks as independent (not tied to a project) in their own Independent chats section under Projects (upstream v0.72.0).
 - Usage & Spend projects: show a project's folder on a second line when another project in the list has the same name, and under Hide personal information label projects **Workspace #1**, **Workspace #2**, … with no paths (upstream v0.71.1).
 - Stop Claude usage probes from running your SessionStart hooks on every poll: the probe session now passes `disableAllHooks` alongside its Remote Control opt-out, leaving your saved settings untouched (upstream #4292).
+- Retry a timed-out Claude CLI usage probe once with a longer timeout (60 s, capped so the fetch still finishes inside the 75 s provider budget), and keep the cached CLI result after a failed probe. Auth failures are not retried (upstream #4155).
 - Show an optional **Live remaining (est.)** row for xAI beside the posted prepaid balance, from the current postpaid invoice preview (upstream #4419). A missing or failed preview hides only that row.
 - Show independent session and weekly usage for native saved Claude Code accounts, with account-scoped OAuth renewal and safe authentication warnings.
 - Offer Refresh login beside Switch only for Claude and Codex accounts that need sign-in. Repair the selected saved login without switching to another account.
