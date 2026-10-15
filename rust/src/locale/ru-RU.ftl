@@ -1602,3 +1602,7 @@ ProviderCodexBatterySaver = Экономия заряда для веб-OpenAI
 ProviderCodexBatterySaverHelp = Ограничивает фоновые обновления chatgpt.com, чтобы снизить расход батареи и трафика. Дополнения панели могут устаревать, пока вы не обновите их вручную.
 ProviderOptionNotUsedOnWindows = Пока не используется в Windows; выбор сохраняется на будущее.
 ClaudeSwapExecutablePathHelp = Путь к исполняемому файлу cswap (github.com/realiti4/claude-swap).
+# Claude cloud credits
+ProviderLabelCloudCredits = Облачные кредиты
+ProviderTextExpired = Истёк
+ProviderTextOfRemaining = Осталось { "{}" } из { "{}" }

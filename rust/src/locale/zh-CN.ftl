@@ -1602,3 +1602,7 @@ ProviderCodexBatterySaver = OpenAI 网页省电
 ProviderCodexBatterySaverHelp = 限制 chatgpt.com 后台刷新，以减少电池和网络消耗。仪表板附加信息可能在手动刷新前保持旧数据。
 ProviderOptionNotUsedOnWindows = Windows 上尚未使用；该选择会保存，待支持后生效。
 ClaudeSwapExecutablePathHelp = cswap 可执行文件的路径 (github.com/realiti4/claude-swap)。
+# Claude cloud credits
+ProviderLabelCloudCredits = 云端额度
+ProviderTextExpired = 已过期
+ProviderTextOfRemaining = 剩余 { "{}" } / { "{}" }
