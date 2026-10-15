@@ -399,6 +399,17 @@ export function hourlyTicks(model: TrendModel): TrendTick[] {
   return ticks;
 }
 
+/** Every `tickStride`-th day, week or month slot, labelled at its center. */
+export function dailyTicks(model: TrendModel, label: (slot: TrendSlot) => string): TrendTick[] {
+  const stride = tickStride(model);
+  return model.slots
+    .filter((_, index) => index % stride === 0)
+    .map((slot) => {
+      const position = slotFraction(model, slot);
+      return { position: position.start + position.width / 2, label: label(slot), anchor: "middle" };
+    });
+}
+
 /** Position of a slot in the domain, 0..1. */
 export function slotFraction(model: TrendModel, slot: TrendInterval): { start: number; width: number } {
   const span = model.domain.end - model.domain.start;

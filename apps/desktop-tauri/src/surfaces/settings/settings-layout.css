@@ -1034,6 +1034,232 @@
   margin-left: auto;
 }
 
+/* ── Usage & Spend trend explorer (upstream 0.73.0 SpendDashboardTrendPanel) ── */
+
+.spend-trend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.spend-trend__header,
+.spend-trend__scope,
+.spend-trend__day-nav,
+.spend-trend__summary,
+.spend-trend__inspector-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.spend-trend__header h4 {
+  margin: 0;
+  flex: 1;
+}
+
+.spend-trend__scope > .settings-section__caption,
+.spend-trend__day-nav > select {
+  margin: 0;
+}
+
+.spend-trend__spacer {
+  flex: 1;
+}
+
+.spend-trend__summary {
+  justify-content: space-between;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.spend-trend__summary-label {
+  color: var(--text-secondary);
+  margin-right: 8px;
+}
+
+.spend-trend__summary-total {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.spend-trend__zone {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.spend-trend__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 210px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.spend-trend-chart {
+  display: flex;
+  align-items: flex-start;
+}
+
+.spend-trend-chart__y-axis {
+  position: relative;
+  flex: none;
+}
+
+.spend-trend-chart__y-axis span {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--text-primary) 85%, transparent);
+  white-space: nowrap;
+}
+
+.spend-trend-chart__scroller {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.spend-trend-chart__scroller.is-scrolling {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.spend-trend-chart__svg {
+  display: block;
+  overflow: visible;
+}
+
+.spend-trend-chart__svg:focus {
+  outline: none;
+}
+
+.spend-trend-chart__bucket:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.spend-trend-chart__grid {
+  stroke: color-mix(in srgb, var(--text-secondary) 15%, transparent);
+  stroke-width: 1;
+}
+
+.spend-trend-chart__rule {
+  stroke: color-mix(in srgb, var(--text-secondary) 45%, transparent);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.spend-trend-chart__hit {
+  cursor: pointer;
+}
+
+.spend-trend-chart__x-axis {
+  position: relative;
+  height: 20px;
+}
+
+.spend-trend-chart__tick {
+  position: absolute;
+  top: 4px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--text-primary) 85%, transparent);
+  white-space: nowrap;
+}
+
+.spend-trend-chart__tick--middle {
+  transform: translateX(-50%);
+}
+
+.spend-trend-chart__tick--end {
+  transform: translateX(-100%);
+}
+
+.spend-trend__inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 58px;
+  padding: 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--text-primary) 3.5%, transparent);
+  font-size: 13px;
+}
+
+.spend-trend__inspector-head select {
+  max-width: 240px;
+}
+
+.spend-trend__inspector-total {
+  margin-left: auto;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.spend-trend__inspector-rows,
+.spend-trend__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.spend-trend__legend {
+  gap: 8px;
+}
+
+.spend-trend__source {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.spend-trend__dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+}
+
+.spend-trend__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.spend-trend__legend-item.is-dimmed {
+  opacity: 0.6;
+}
+
+.spend-trend__legend-item.is-selected {
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+
+.spend-trend__legend-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* ── Provider detail pane (macOS PreferencesProviderDetailView) ──────
    The pane is a stack of grouped boxes like the other Settings panes:
    header, Usage, Visible usage items, Error, Menu bar metric,
