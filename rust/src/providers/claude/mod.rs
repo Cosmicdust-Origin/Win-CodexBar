@@ -12,8 +12,11 @@ pub mod quota_history;
 mod reset_credits;
 pub mod reset_observations;
 mod scoped_weekly;
+mod spend_window;
 mod trust_dialog;
 mod web_api;
+
+pub(crate) use spend_window::PACE_CAPABILITY;
 
 use async_trait::async_trait;
 use chrono::Utc;

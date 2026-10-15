@@ -8,8 +8,9 @@
 //!   `/v1/organization/usage/completions` (`group_by=model`) use `bucket_width=1d`,
 //!   `limit <= 31` and UTC-day-aligned 31-day ranges, following `has_more` / `next_page`
 //!   (at most 100 pages per range; a missing or repeated cursor is an error).
-//! - Token totals are `input + input_audio + output + output_audio`; cached input is a
-//!   subset of input and is never added on top.
+//! - Token totals are `input + output`: `input_tokens`/`output_tokens` already include the
+//!   audio breakdowns, so audio fields are never added again; cached input is a subset of
+//!   input and is never added on top.
 //! - Each Admin GET gets one transient retry (see [`RetryPolicy`]).
 //!
 //! The Admin path also returns a per-UTC-day [`crate::core::OpenAiApiUsageHistory`] (upstream's

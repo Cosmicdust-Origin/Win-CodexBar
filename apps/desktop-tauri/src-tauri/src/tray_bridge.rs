@@ -767,6 +767,7 @@ mod tests {
                 account_id: None,
                 daily: Vec::new(),
                 always_visible: false,
+                folded_into_primary: false,
                 title_key: None,
             }),
             plan_name: None,

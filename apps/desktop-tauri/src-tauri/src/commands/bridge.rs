@@ -155,6 +155,9 @@ pub struct CostSnapshotBridge {
     pub daily: Vec<CostDailyPointBridge>,
     #[serde(default)]
     pub always_visible: bool,
+    /// The primary meter already shows this cap, so the cost block omits its bar.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub folded_into_primary: bool,
     /// Provider-owned cost-block title as a locale key name; absent keeps the shared title.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title_key: Option<String>,
@@ -678,6 +681,7 @@ impl ProviderUsageSnapshot {
                     })
                     .collect(),
                 always_visible: c.always_visible,
+                folded_into_primary: c.folded_into_primary,
                 title_key: c.card_title_key.map(|key| key.name().to_string()),
             }),
             plan_name: usage.login_method.clone(),
