@@ -12,6 +12,7 @@ use crate::core::{
 use super::CLOUDFLARE_CHALLENGE_MESSAGE;
 use super::cloud_credits;
 use super::reset_credits;
+use super::spend_window;
 
 const CLOUDFLARE_BODY_PREFIX_BYTES: usize = 64 * 1024;
 
@@ -390,30 +391,7 @@ impl ClaudeWebApiFetcher {
         // Step 4: Fetch account info - optional
         let account = self.get_account_info(&headers).await.ok();
 
-        let (primary, secondary, model_specific) = self.build_rate_windows(&usage);
-
-        let mut snapshot = UsageSnapshot::new(primary);
-
-        if let Some(s) = secondary {
-            snapshot = snapshot.with_secondary(s);
-        }
-
-        if let Some(m) = model_specific {
-            snapshot = snapshot.with_model_specific(m);
-        }
-
-        append_web_extra_windows(
-            &mut snapshot,
-            usage
-                .seven_day_oauth_apps
-                .as_ref()
-                .map(|w| self.to_rate_window(w, Some(10080))),
-            super::scoped_weekly::scoped_weekly_windows(&usage.limits),
-            usage
-                .seven_day_routines
-                .as_ref()
-                .map(|w| self.to_rate_window(w, Some(10080))),
-        );
+        let (mut snapshot, mut cost) = self.build_usage_and_cost(&usage, extra_usage);
 
         if let Some(acc) = &account {
             if let Some(email) = &acc.email_address {
@@ -435,27 +413,6 @@ impl ClaudeWebApiFetcher {
         {
             result = result.with_inventory_item(item);
         }
-
-        // Add cost info if available
-        let mut cost = extra_usage.and_then(|extra| {
-            if !extra.is_enabled.unwrap_or(false) {
-                return None;
-            }
-            let used_cents = extra.used_credits.unwrap_or(0.0);
-            let limit_cents = extra.monthly_credit_limit;
-            let currency = extra.currency.unwrap_or_else(|| "USD".to_string());
-
-            let mut cost = CostSnapshot::new(
-                used_cents / 100.0, // Convert cents to dollars
-                currency,
-                "Monthly",
-            );
-
-            if let Some(limit) = limit_cents {
-                cost = cost.with_limit(limit / 100.0);
-            }
-            Some(cost)
-        });
 
         // Best-effort prepaid Extra usage balance (non-fatal).
         // Gate: cookie session is already available on this path; skip only when
@@ -771,6 +728,49 @@ impl ClaudeWebApiFetcher {
         (primary, secondary, model_specific)
     }
 
+    /// Compose the usage snapshot and Extra usage cost from one usage response.
+    ///
+    /// A spend-only account (a capped monthly spend with no session, weekly,
+    /// model, or scoped lane) has its cap projected into the primary meter.
+    /// Quota accounts keep their lanes and cost unchanged.
+    fn build_usage_and_cost(
+        &self,
+        usage: &UsageResponse,
+        extra_usage: Option<ExtraUsageResponse>,
+    ) -> (UsageSnapshot, Option<CostSnapshot>) {
+        let (primary, secondary, model_specific) = self.build_rate_windows(usage);
+
+        let mut snapshot = UsageSnapshot::new(primary);
+
+        if let Some(s) = secondary {
+            snapshot = snapshot.with_secondary(s);
+        }
+
+        if let Some(m) = model_specific {
+            snapshot = snapshot.with_model_specific(m);
+        }
+
+        append_web_extra_windows(
+            &mut snapshot,
+            usage
+                .seven_day_oauth_apps
+                .as_ref()
+                .map(|w| self.to_rate_window(w, Some(10080))),
+            super::scoped_weekly::scoped_weekly_windows(&usage.limits),
+            usage
+                .seven_day_routines
+                .as_ref()
+                .map(|w| self.to_rate_window(w, Some(10080))),
+        );
+
+        let mut cost = web_extra_cost(extra_usage);
+        if let Some(cost) = cost.as_mut() {
+            spend_window::project_spend_only(&mut snapshot, cost);
+        }
+
+        (snapshot, cost)
+    }
+
     /// Parse ISO8601 date string
     fn parse_iso8601(s: &str) -> Option<DateTime<Utc>> {
         DateTime::parse_from_rfc3339(s)
@@ -845,6 +845,29 @@ fn parse_prepaid_balance(body: &str) -> Option<PrepaidBalance> {
         amount_dollars: response.amount / 100.0,
         currency_code: currency,
     })
+}
+
+/// Monthly Extra usage cost from the web credits block (cents → dollars).
+/// `None` when Extra usage is disabled or absent.
+fn web_extra_cost(extra: Option<ExtraUsageResponse>) -> Option<CostSnapshot> {
+    let extra = extra?;
+    if !extra.is_enabled.unwrap_or(false) {
+        return None;
+    }
+    let used_cents = extra.used_credits.unwrap_or(0.0);
+    let limit_cents = extra.monthly_credit_limit;
+    let currency = extra.currency.unwrap_or_else(|| "USD".to_string());
+
+    let mut cost = CostSnapshot::new(
+        used_cents / 100.0, // Convert cents to dollars
+        currency,
+        "Monthly",
+    );
+
+    if let Some(limit) = limit_cents {
+        cost = cost.with_limit(limit / 100.0);
+    }
+    Some(cost)
 }
 
 /// Attach prepaid balance onto an existing same-currency cost, otherwise create
@@ -1266,6 +1289,81 @@ mod tests {
         assert_eq!(extra.is_enabled, Some(true));
         assert_eq!(extra.monthly_credit_limit, Some(2000.0));
         assert_eq!(extra.used_credits, Some(550.0));
+    }
+
+    #[test]
+    fn spend_only_web_response_projects_capped_spend_into_one_meter() {
+        let usage: super::UsageResponse = serde_json::from_str(
+            r#"{
+                "extra_usage": {
+                    "is_enabled": true,
+                    "monthly_credit_limit": 5000,
+                    "used_credits": 1234,
+                    "currency": "USD"
+                }
+            }"#,
+        )
+        .unwrap();
+
+        let fetcher = ClaudeWebApiFetcher::new();
+        let (snapshot, cost) = fetcher.build_usage_and_cost(&usage, usage.extra_usage.clone());
+        let cost = cost.expect("capped spend cost");
+
+        assert!(!snapshot.primary.is_informational);
+        assert!((snapshot.primary.used_percent - 24.68).abs() < 0.01);
+        assert_eq!(snapshot.primary_label.as_deref(), Some("Monthly"));
+        assert!(snapshot.secondary.is_none());
+        assert!(snapshot.extra_rate_windows.is_empty());
+        assert!(cost.folded_into_primary);
+        assert_eq!(cost.limit, Some(50.0));
+        assert!((cost.used - 12.34).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn quota_web_response_keeps_session_and_unfolded_cost() {
+        let usage: super::UsageResponse = serde_json::from_str(
+            r#"{
+                "five_hour": { "utilization": 10 },
+                "extra_usage": {
+                    "is_enabled": true,
+                    "monthly_credit_limit": 2000,
+                    "used_credits": 550,
+                    "currency": "USD"
+                }
+            }"#,
+        )
+        .unwrap();
+
+        let fetcher = ClaudeWebApiFetcher::new();
+        let (snapshot, cost) = fetcher.build_usage_and_cost(&usage, usage.extra_usage.clone());
+        let cost = cost.expect("quota cost");
+
+        assert!((snapshot.primary.used_percent - 10.0).abs() < f64::EPSILON);
+        assert!(snapshot.primary_label.is_none());
+        assert!(!cost.folded_into_primary);
+        assert_eq!(cost.limit, Some(20.0));
+    }
+
+    #[test]
+    fn disabled_extra_usage_web_response_has_no_meter_or_cost() {
+        let usage: super::UsageResponse = serde_json::from_str(
+            r#"{
+                "extra_usage": {
+                    "is_enabled": false,
+                    "monthly_credit_limit": 5000,
+                    "used_credits": 1234,
+                    "currency": "USD"
+                }
+            }"#,
+        )
+        .unwrap();
+
+        let fetcher = ClaudeWebApiFetcher::new();
+        let (snapshot, cost) = fetcher.build_usage_and_cost(&usage, usage.extra_usage.clone());
+
+        assert!(cost.is_none());
+        assert!(snapshot.primary.is_informational);
+        assert!(snapshot.primary_label.is_none());
     }
 
     #[test]

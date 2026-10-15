@@ -174,6 +174,11 @@ pub(super) fn load(scope: &str) -> AccountState {
     if file.version != STATE_VERSION {
         return AccountState::default();
     }
+    account_state(file, scope)
+}
+
+/// The stored state for one account scope. Other scopes never leak in.
+fn account_state(file: StateFile, scope: &str) -> AccountState {
     file.accounts.get(scope).cloned().unwrap_or_default()
 }
 
