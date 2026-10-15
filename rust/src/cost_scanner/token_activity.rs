@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::Instant;
 
-use super::claude_incomplete::ClaudeIncompleteTracker;
+use super::claude_incomplete::{ClaudeIncompleteReport, ClaudeIncompleteTracker};
 use super::claude_pricing::ClaudeScanPricingResolver;
 use super::today::day_key;
 use super::{
@@ -217,17 +217,27 @@ fn claude_token_activity(days: u32, keys: &[String]) -> Vec<TokenActivityDay> {
         .read_failures
         .saturating_add(roots.read_failures)
         .saturating_add(traversal_read_failures);
-    // Preliminary rows only invalidate the days they fall on, so they are
-    // judged per day below instead of failing the whole walk.
-    scan.incomplete_requests = 0;
+    // Dated preliminary rows only invalidate the days they fall on, so they
+    // are judged per day below. An undated one cannot be placed on a day and
+    // still fails the whole walk.
+    let incomplete_report = incomplete.resolve(&seen);
+    scan.incomplete_requests = undated_incomplete_requests(&incomplete_report);
     let complete = scan.is_complete();
-    let incomplete_days: HashSet<String> = incomplete.resolve(&seen).by_day.into_keys().collect();
+    let incomplete_days: HashSet<String> = incomplete_report.by_day.into_keys().collect();
     let result = claude_days(keys, &totals, &incomplete_days, complete);
     // A failed or partial walk is never memoized, so the next refresh retries.
     if complete {
         claude_memo().put(memo_key, Instant::now(), result.clone());
     }
     result
+}
+
+fn undated_incomplete_requests(report: &ClaudeIncompleteReport) -> u32 {
+    let dated = report
+        .by_day
+        .values()
+        .fold(0u32, |sum, count| sum.saturating_add(*count));
+    report.total.saturating_sub(dated)
 }
 
 fn claude_days(
@@ -325,6 +335,21 @@ mod tests {
             days.iter()
                 .all(|day| day.total_tokens.is_none() && !day.is_scanned)
         );
+    }
+
+    #[test]
+    fn only_undated_incomplete_requests_fail_the_claude_walk() {
+        let dated_only = ClaudeIncompleteReport {
+            total: 3,
+            by_day: HashMap::from([("2026-01-02".to_string(), 2), ("2026-01-03".to_string(), 1)]),
+            ..ClaudeIncompleteReport::default()
+        };
+        assert_eq!(undated_incomplete_requests(&dated_only), 0);
+        let with_undated = ClaudeIncompleteReport {
+            total: 4,
+            ..dated_only
+        };
+        assert_eq!(undated_incomplete_requests(&with_undated), 1);
     }
 
     #[test]
