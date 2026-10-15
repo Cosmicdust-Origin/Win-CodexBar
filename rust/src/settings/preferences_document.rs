@@ -188,6 +188,7 @@ pub const EXCLUDED_KEYS: &[&str] = &[
     "cost_summary_display_style",
     // Kept out of the portable set, as upstream (0.70.0) keeps them.
     "menu_bar_color_pace",
+    "menu_bar_pace_reserve_positive",
     "stacked_tray_top_provider",
     "stacked_tray_bottom_provider",
     "credential_expiry_notifications_enabled",

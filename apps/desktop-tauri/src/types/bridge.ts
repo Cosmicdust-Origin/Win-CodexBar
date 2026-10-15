@@ -248,6 +248,8 @@ export interface SettingsSnapshot {
   quotaWarningMarkersVisible: boolean;
   workdayTickStyle: WorkdayTickStyle;
   menuBarColorPace: boolean;
+  /** Signed pace shows reserve as `+` (deficit as `-`) instead of the default deficit-positive sign. */
+  menuBarPaceReservePositive: boolean;
   /** Settings sidebar lists providers alphabetically, enabled first. Display only. */
   providersSortedAlphabetically: boolean;
   showAsUsed: boolean;
@@ -405,6 +407,7 @@ export interface SettingsUpdate {
   quotaWarningMarkersVisible?: boolean;
   workdayTickStyle?: WorkdayTickStyle;
   menuBarColorPace?: boolean;
+  menuBarPaceReservePositive?: boolean;
   providersSortedAlphabetically?: boolean;
   showAsUsed?: boolean;
   showAllTokenAccountsInMenu?: boolean;

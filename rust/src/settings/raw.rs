@@ -162,6 +162,8 @@ pub(super) struct RawSettings {
     #[serde(default)]
     menu_bar_color_pace: bool,
     #[serde(default)]
+    menu_bar_pace_reserve_positive: bool,
+    #[serde(default)]
     providers_sorted_alphabetically: bool,
     show_as_used: bool,
     enable_animations: bool,
@@ -368,6 +370,7 @@ impl Default for RawSettings {
             quota_warning_markers_visible: s.quota_warning_markers_visible,
             workday_tick_style: Some(s.workday_tick_style.as_str().to_string()),
             menu_bar_color_pace: s.menu_bar_color_pace,
+            menu_bar_pace_reserve_positive: s.menu_bar_pace_reserve_positive,
             providers_sorted_alphabetically: s.providers_sorted_alphabetically,
             show_as_used: s.show_as_used,
             enable_animations: s.enable_animations,
@@ -745,6 +748,7 @@ impl From<RawSettings> for Settings {
                 .and_then(WorkdayTickStyle::parse)
                 .unwrap_or_default(),
             menu_bar_color_pace: raw.menu_bar_color_pace,
+            menu_bar_pace_reserve_positive: raw.menu_bar_pace_reserve_positive,
             providers_sorted_alphabetically: raw.providers_sorted_alphabetically,
             show_as_used: raw.show_as_used,
             enable_animations: raw.enable_animations,

@@ -117,6 +117,7 @@ fn secret_settings() -> Settings {
     settings.stay_awake_enabled = true;
     settings.credential_expiry_notifications_enabled = true;
     settings.menu_bar_color_pace = true;
+    settings.menu_bar_pace_reserve_positive = true;
     settings.stacked_tray_top_provider = Some("claude".to_string());
     settings.stacked_tray_bottom_provider = Some("codex".to_string());
     settings
@@ -842,6 +843,7 @@ fn export_never_contains_secrets_or_machine_state() {
         "stacked_tray",
         "credential_expiry",
         "menu_bar_color_pace",
+        "menu_bar_pace_reserve_positive",
     ] {
         assert!(!text.contains(secret), "export leaked `{secret}`");
     }

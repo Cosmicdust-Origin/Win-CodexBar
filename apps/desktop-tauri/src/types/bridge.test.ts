@@ -101,6 +101,7 @@ describe("Language type", () => {
       quotaWarningMarkersVisible: true,
       workdayTickStyle: "subtle",
       menuBarColorPace: false,
+      menuBarPaceReservePositive: false,
       providersSortedAlphabetically: false,
       showAsUsed: false,
       showAllTokenAccountsInMenu: true,
