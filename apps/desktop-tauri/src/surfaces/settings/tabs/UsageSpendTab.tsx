@@ -60,7 +60,6 @@ export default function UsageSpendTab({ settings, set, saving }: TabProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [view, setView] = useState<BreakdownView>("providers");
 
   const load = useCallback(async (forceRefresh = false, silent = false) => {
@@ -83,11 +82,6 @@ export default function UsageSpendTab({ settings, set, saving }: TabProps) {
   useEffect(() => {
     void load(false);
   }, [load]);
-
-  // A selected day belongs to one time range; changing the range clears it.
-  useEffect(() => {
-    setSelectedDay(null);
-  }, [period]);
 
   // Upstream 0.55.0 #3106 parity: provider token/cost publications refresh the
   // pane silently while it is open. A settings save (Track costs, OpenCodex)
@@ -214,8 +208,6 @@ export default function UsageSpendTab({ settings, set, saving }: TabProps) {
             loading={loading}
             view={view}
             onView={setView}
-            selectedDay={selectedDay}
-            onSelectDay={setSelectedDay}
             hidePersonalInfo={settings.hidePersonalInfo ?? false}
             t={t}
           />
@@ -350,8 +342,6 @@ function DashboardBody({
   loading,
   view,
   onView,
-  selectedDay,
-  onSelectDay,
   hidePersonalInfo,
   t,
 }: {
@@ -360,8 +350,6 @@ function DashboardBody({
   loading: boolean;
   view: BreakdownView;
   onView: (view: BreakdownView) => void;
-  selectedDay: string | null;
-  onSelectDay: (day: string | null) => void;
   hidePersonalInfo: boolean;
   t: Translate;
 }) {
@@ -425,9 +413,7 @@ function DashboardBody({
           ))}
       </div>
 
-      {!contractHidden && (
-        <UsageSpendTrendPanel contract={contract} selectedDay={selectedDay} onSelectDay={onSelectDay} t={t} />
-      )}
+      {summary.trend && summary.trend.sources.length > 0 && <UsageSpendTrendPanel trend={summary.trend} t={t} />}
       {!contractHidden && <UsageSpendDailyLedger daily={contract.daily} />}
     </>
   );

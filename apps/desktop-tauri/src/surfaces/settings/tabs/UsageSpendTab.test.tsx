@@ -186,6 +186,32 @@ describe("UsageSpendTab", () => {
     expect(copied.rows.map((entry) => entry.providerId)).toEqual(["codex", "zai"]);
   });
 
+  it("draws the trend explorer from the published trend without hidden sources", async () => {
+    tauriMocks.getUsageSpendSummary.mockImplementation(async (options?: { period?: string }) => ({
+      ...summary(options?.period ?? "rolling:30"),
+      trend: {
+        startDay: "2026-10-05",
+        endDay: "2026-10-11",
+        timeZone: "UTC",
+        sources: [
+          { id: "claude", providerId: "claude", displayName: "Claude", knownZero: false },
+          { id: "codex", providerId: "codex", displayName: "Codex", knownZero: false },
+        ],
+        daily: [
+          { sourceId: "claude", day: "2026-10-07", costUsd: 3.5 },
+          { sourceId: "codex", day: "2026-10-08", costUsd: 9 },
+        ],
+        hourly: [],
+        hourlyDays: [],
+      },
+    }));
+    renderTab({ spendDashboardHiddenSourceIds: ["claude"] });
+    const panel = await screen.findByTestId("spend-trend");
+    expect(within(panel).getByTestId("spend-trend-source-codex")).toBeTruthy();
+    expect(within(panel).queryByTestId("spend-trend-source-claude")).toBeNull();
+    expect(within(panel).getByTestId("spend-trend-summary").textContent).toContain("$9.00");
+  });
+
   it("blanks the Codex detail when Codex is hidden", async () => {
     renderTab({ spendDashboardHiddenSourceIds: ["codex"] });
     await screen.findByText("USD");

@@ -552,6 +552,54 @@ export interface UsageSpendSummary {
   dashboardTimezone: string;
   /** False when "Track costs" is off: nothing was scanned and the summary is empty. */
   costTrackingEnabled?: boolean;
+  /** Per-source spend series for the trend explorer; absent while Track costs is off. */
+  trend?: SpendTrend;
+}
+
+export interface SpendTrendSource {
+  id: string;
+  providerId: string;
+  displayName: string;
+  /** The whole window is a covered, priced zero for this source. */
+  knownZero: boolean;
+}
+
+export interface SpendTrendDailyPoint {
+  sourceId: string;
+  day: string;
+  /** null is unknown (unscanned or unpriced); 0 is a covered zero. */
+  costUsd: number | null;
+}
+
+export interface SpendTrendHourlyPoint {
+  sourceId: string;
+  /** RFC 3339 UTC instant the local hour began. */
+  hour: string;
+  costUsd: number | null;
+}
+
+export interface SpendTrendHourSlot {
+  start: string;
+  offsetMinutes: number;
+}
+
+/** One local day with hourly data, as its real (23, 24 or 25) hour slots. */
+export interface SpendTrendHourlyDay {
+  day: string;
+  start: string;
+  end: string;
+  hours: SpendTrendHourSlot[];
+}
+
+export interface SpendTrend {
+  /** First and last reporting day of the window, inclusive. */
+  startDay: string;
+  endDay: string;
+  timeZone: string;
+  sources: SpendTrendSource[];
+  daily: SpendTrendDailyPoint[];
+  hourly: SpendTrendHourlyPoint[];
+  hourlyDays: SpendTrendHourlyDay[];
 }
 
 export type CostProvenance = "listPriceEstimate" | "vendorMetered" | "mixed" | "unknown";
