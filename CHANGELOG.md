@@ -9,6 +9,7 @@
 
 ## [Windows] Unreleased
 
+- OpenAI API: each Admin refresh also reads the last hour of 1-minute usage from the Admin Usage API (input plus output tokens, cached input included, Batch API traffic kept out of limit headroom) and carries a Tokens/min grid with a reporting frontier, so buckets that arrive late show as pending instead of zero. The backend can also load 15-minute, 1-hour or 6-hour windows, read per-project rate-limit caps, and measure headroom against manual per-model organization limits stored in settings. The per-refresh request can be turned off, and a failure never affects the daily usage. The chart, menu bar token and Settings controls come in a later release (upstream #4495).
 - Add **Parallel** prepaid balance: reads the account balance and any pending debit from the platform.parallel.ai console using your browser session or a pasted Cookie header. A signed-out console moves on to the next browser session and reports an expired session when none remain (upstream #4479, #4508).
 - Add **fal** account credit balance: reads the credit balance and account name from fal's billing API with your API key (`FAL_KEY` or Settings) and explains when the key lacks the billing read permission (upstream #4438).
 - Add **FLORA** workspace balance: reads the workspace's available balance, your member limit, and this month's spend with your API key and workspace ID (`FLORA_API_KEY` / `FLORA_WORKSPACE_ID` or Settings), and explains when spend is unavailable or the key lacks billing permission (upstream #4439).
