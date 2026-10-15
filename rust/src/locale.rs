@@ -1937,6 +1937,12 @@ locale_keys! {
     ProviderLabelCloudCredits,
     ProviderTextExpired,
     ProviderTextOfRemaining,
+    AntigravityProfileHomesLabel,
+    AntigravityProfileHomesHelp,
+    AntigravityProfileHomesAdd,
+    AntigravityProfileHomesRemove,
+    AntigravityProfileHomesEmpty,
+    AntigravityProfileHomesPickFailed,
 }
 
 #[cfg(test)]

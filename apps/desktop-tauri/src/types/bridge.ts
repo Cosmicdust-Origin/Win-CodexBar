@@ -266,6 +266,8 @@ export interface SettingsSnapshot {
   switcherShortcuts: Record<string, string>;
   /** Extra Codex home or sessions directories scanned for local cost estimates. */
   codexCustomSessionsDirs: string[];
+  /** Extra Gemini profile homes whose Antigravity local history is combined with the default home. */
+  antigravityAdditionalProfileHomes: string[];
   agentSessionsEnabled?: boolean;
   /** Hold system awake while a local agent session is live. */
   stayAwakeEnabled?: boolean;
@@ -419,6 +421,7 @@ export interface SettingsUpdate {
   /** Overrides only; replaces the stored map. `{}` restores the defaults. */
   switcherShortcuts?: Record<string, string>;
   codexCustomSessionsDirs?: string[];
+  antigravityAdditionalProfileHomes?: string[];
   agentSessionsEnabled?: boolean;
   stayAwakeEnabled?: boolean;
   agentSessionSshHosts?: string[];

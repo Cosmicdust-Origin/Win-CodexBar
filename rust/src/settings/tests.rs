@@ -2418,3 +2418,27 @@ fn custom_quota_warnings_with_explicit_enabled_round_trip() {
         }
     );
 }
+
+#[test]
+fn antigravity_additional_profile_homes_default_empty_and_round_trip() {
+    let defaulted: Settings = serde_json::from_str(r#"{ "enabled_providers": [] }"#)
+        .expect("missing additional Gemini homes default to empty");
+    assert!(defaulted.antigravity_additional_profile_homes.is_empty());
+
+    let json = serde_json::to_string(&Settings::default()).expect("serialize default settings");
+    assert!(!json.contains("antigravity_additional_profile_homes"));
+
+    let configured = Settings {
+        antigravity_additional_profile_homes: vec!["D:\\gemini-work".to_string()],
+        ..Settings::default()
+    };
+    let json = serde_json::to_string(&configured).expect("serialize additional Gemini homes");
+    assert!(json.contains(r#""antigravity_additional_profile_homes":["D:\\gemini-work"]"#));
+
+    let loaded: Settings =
+        serde_json::from_str(&json).expect("deserialize additional Gemini homes");
+    assert_eq!(
+        loaded.antigravity_additional_profile_homes,
+        vec!["D:\\gemini-work"]
+    );
+}

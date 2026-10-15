@@ -1641,6 +1641,12 @@ export const ALL_LOCALE_KEYS = [
   "ProviderCodexBatterySaverHelp",
   "ProviderOptionNotUsedOnWindows",
   "ClaudeSwapExecutablePathHelp",
+  "AntigravityProfileHomesLabel",
+  "AntigravityProfileHomesHelp",
+  "AntigravityProfileHomesAdd",
+  "AntigravityProfileHomesRemove",
+  "AntigravityProfileHomesEmpty",
+  "AntigravityProfileHomesPickFailed",
 ] as const;
 
 export type LocaleKey = (typeof ALL_LOCALE_KEYS)[number];

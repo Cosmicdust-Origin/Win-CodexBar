@@ -177,6 +177,7 @@ function settings(overrides: Partial<SettingsSnapshot> = {}): SettingsSnapshot {
     globalShortcut: "Ctrl+Shift+U",
     switcherShortcuts: {},
     codexCustomSessionsDirs: [],
+    antigravityAdditionalProfileHomes: [],
     uiLanguage: "english",
     uiLanguageFollowsSystem: false,
     theme: "dark",

@@ -300,6 +300,12 @@ pub struct Settings {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub codex_custom_sessions_dirs: Vec<String>,
 
+    /// Extra Gemini home directories (each one's `.gemini`) whose Antigravity
+    /// local token history is combined with the primary home. Empty keeps the
+    /// single-home default. Affects local history only, not sign-in or quotas.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub antigravity_additional_profile_homes: Vec<String>,
+
     /// Discover local and configured SSH Codex/Claude sessions.
     #[serde(default)]
     pub agent_sessions_enabled: bool,
@@ -710,6 +716,7 @@ impl Default for Settings {
             global_shortcut: default_global_shortcut(), // Ctrl+Shift+U by default
             switcher_shortcuts: BTreeMap::new(),
             codex_custom_sessions_dirs: Vec::new(),
+            antigravity_additional_profile_homes: Vec::new(),
             agent_sessions_enabled: false,
             stay_awake_enabled: false,
             agent_session_ssh_hosts: Vec::new(),
