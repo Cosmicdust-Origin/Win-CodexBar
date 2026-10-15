@@ -994,6 +994,13 @@
   cursor: pointer;
 }
 
+.usage-spend__project-path {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .usage-spend__controls {
   margin-top: 20px;
 }

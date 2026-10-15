@@ -319,6 +319,59 @@ describe("UsageSpendTab", () => {
     expect(within(chats).queryByText("Elsewhere")).toBeNull();
   });
 
+  it("captions a project with its path only when another project shares its name", async () => {
+    tauriMocks.getUsageSpendSummary.mockImplementation(async (options?: { period?: string }) =>
+      withContract(summary(options?.period ?? "rolling:30"), {
+        projects: [
+          usageProject("p1", "app", 3, false, "C:/work/app"),
+          usageProject("p2", "app", 2, false, "D:/personal/app"),
+          usageProject("p3", "Win-CodexBar", 1, false, "C:/code/Win-CodexBar"),
+        ],
+      }),
+    );
+    renderTab();
+    await screen.findByText("USD");
+    fireEvent.click(screen.getByRole("tab", { name: "UsageSpendProjects" }));
+
+    expect(await screen.findByText("C:/work/app")).toBeInTheDocument();
+    expect(screen.getByText("D:/personal/app")).toBeInTheDocument();
+    expect(screen.queryByText("C:/code/Win-CodexBar")).toBeNull();
+  });
+
+  it("hides project paths under Hide personal information", async () => {
+    tauriMocks.getUsageSpendSummary.mockImplementation(async (options?: { period?: string }) =>
+      withContract(summary(options?.period ?? "rolling:30"), {
+        projects: [
+          usageProject("p1", "app", 3, false, "C:/work/app"),
+          usageProject("p2", "app", 2, false, "D:/personal/app"),
+        ],
+      }),
+    );
+    renderTab({ hidePersonalInfo: true });
+    await screen.findByText("USD");
+    fireEvent.click(screen.getByRole("tab", { name: "UsageSpendProjects" }));
+
+    expect(await screen.findAllByText("app")).toHaveLength(2);
+    expect(screen.queryByText("C:/work/app")).toBeNull();
+    expect(screen.queryByText("D:/personal/app")).toBeNull();
+    expect(document.querySelector('[title*="C:/work"]')).toBeNull();
+  });
+
+  it("shows the numbered privacy labels without paths", async () => {
+    tauriMocks.getUsageSpendSummary.mockImplementation(async (options?: { period?: string }) =>
+      withContract(summary(options?.period ?? "rolling:30"), {
+        projects: [usageProject("p1", "Workspace #1", 3), usageProject("p2", "Workspace #2", 2)],
+      }),
+    );
+    renderTab({ hidePersonalInfo: true });
+    await screen.findByText("USD");
+    fireEvent.click(screen.getByRole("tab", { name: "UsageSpendProjects" }));
+
+    expect(await screen.findByText("Workspace #1")).toBeInTheDocument();
+    expect(screen.getByText("Workspace #2")).toBeInTheDocument();
+    expect(document.querySelectorAll(".usage-spend__project-path")).toHaveLength(0);
+  });
+
   it("leaves the chats region out when no independent chat was found", async () => {
     tauriMocks.getUsageSpendSummary.mockImplementation(async (options?: { period?: string }) =>
       withContract(summary(options?.period ?? "rolling:30"), { projects: [usageProject("repo", "Win-CodexBar", 3)] }),
@@ -341,11 +394,12 @@ function usageProject(
   displayName: string,
   sessionCount: number,
   isProjectless = false,
+  path: string | null = null,
 ): CodexWorkspacesProjectUsage {
   return {
     id,
     displayName,
-    path: null,
+    path,
     totals: { inputTokens: 10, cachedInputTokens: 0, outputTokens: 5, totalTokens: 15 },
     costEstimate: { knownUsd: 1.5, unknownTokens: 0 },
     sessionCount,
