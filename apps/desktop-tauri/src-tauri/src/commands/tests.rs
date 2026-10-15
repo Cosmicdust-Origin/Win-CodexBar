@@ -1504,6 +1504,119 @@ fn usage_item_descriptors_skip_card_hidden_windows() {
     );
 }
 
+fn claude_snapshot_with_sections(source_label: &str) -> ProviderUsageSnapshot {
+    let metadata = instantiate_provider(ProviderId::Claude).metadata().clone();
+    let result = ProviderFetchResult {
+        usage: codexbar::core::UsageSnapshot::new(codexbar::core::RateWindow::new(10.0)),
+        cost: Some(codexbar::core::CostSnapshot::new(0.0, "USD", "Extra usage").with_balance(5.0)),
+        wayfinder_usage: None,
+        open_ai_api_usage: None,
+        inventory: Vec::new(),
+        reset_credits: None,
+        display_details: Vec::new(),
+        source_label: source_label.to_string(),
+        has_successful_claude_cli_quota: false,
+        pace_authoritative: true,
+        account_identity: None,
+        last_good_owner: None,
+    };
+    let mut snapshot = ProviderUsageSnapshot::from_fetch_result(
+        ProviderId::Claude,
+        &metadata,
+        &result,
+        None,
+        None,
+    );
+    snapshot.inventory = vec![super::bridge::ProviderInventoryItemSnapshot {
+        id: "reset-credits".to_string(),
+        title: "Limit Reset Credits".to_string(),
+        available_count: 2,
+        next_expires_at: None,
+    }];
+    snapshot.subscription = Some(super::bridge::SubscriptionMetadataSnapshot {
+        starts_at: None,
+        expires_at: None,
+        renews_at: Some("2026-12-01T00:00:00+00:00".to_string()),
+        renews_at_is_date_only: true,
+        expires_at_is_date_only: false,
+    });
+    snapshot
+}
+
+#[test]
+fn usage_item_descriptors_offer_independent_claude_sections() {
+    let snapshot = claude_snapshot_with_sections("web");
+    let items =
+        super::usage_item_descriptors(Some(&snapshot), &Settings::default(), ProviderId::Claude);
+    let sections: Vec<(&str, &str, bool, bool)> = items
+        .iter()
+        .filter(|item| item.id.starts_with("section:"))
+        .map(|item| {
+            (
+                item.id.as_str(),
+                item.title.as_str(),
+                item.available,
+                item.requires_cost_summary,
+            )
+        })
+        .collect();
+    assert_eq!(
+        sections,
+        [
+            ("section:subscription", "Plan renewal / expiry", true, false),
+            (
+                "section:claude-reset-credits",
+                "Limit reset credits",
+                true,
+                false
+            ),
+            ("section:claude-extra-usage", "Extra usage", true, true),
+        ]
+    );
+
+    // Admin API spend is not Extra usage and has no Extra usage choice.
+    let admin = claude_snapshot_with_sections("admin-api");
+    let items =
+        super::usage_item_descriptors(Some(&admin), &Settings::default(), ProviderId::Claude);
+    assert!(
+        !items
+            .iter()
+            .any(|item| item.id == "section:claude-extra-usage")
+    );
+
+    // The same sections are never offered for another provider.
+    let items =
+        super::usage_item_descriptors(Some(&snapshot), &Settings::default(), ProviderId::Codex);
+    assert!(!items.iter().any(|item| item.id.starts_with("section:")));
+}
+
+#[test]
+fn usage_item_descriptors_keep_hidden_claude_sections_restorable() {
+    let mut settings = Settings::default();
+    settings.set_hidden_usage_item_ids(
+        ProviderId::Claude,
+        vec![
+            "section:claude-reset-credits".to_string(),
+            "section:unknown".to_string(),
+        ],
+    );
+    let items = super::usage_item_descriptors(None, &settings, ProviderId::Claude);
+    let ids: Vec<(&str, &str, bool)> = items
+        .iter()
+        .map(|item| (item.id.as_str(), item.title.as_str(), item.available))
+        .collect();
+    assert_eq!(
+        ids,
+        [(
+            "section:claude-reset-credits",
+            "Limit reset credits (unavailable)",
+            false
+        )]
+    );
+    // Section IDs never become "metric:section:..." placeholders.
+    assert!(!items.iter().any(|item| item.id.starts_with("metric:")));
+}
+
 #[test]
 fn pace_stage_serializes_to_snake_case_string() {
     use codexbar::core::PaceStage;

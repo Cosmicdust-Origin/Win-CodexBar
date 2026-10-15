@@ -1650,3 +1650,8 @@ AntigravityProfileHomesAdd = フォルダーを追加
 AntigravityProfileHomesRemove = 削除
 AntigravityProfileHomesEmpty = 追加のプロファイルフォルダーはありません。
 AntigravityProfileHomesPickFailed = フォルダーの選択画面を開けませんでした。
+# Claude optional usage rows and plan dates
+UsageItemPlanRenewalExpiry = プランの更新日 / 有効期限
+UsageItemHiddenByCostSummary = 費用サマリー表示スタイルが「非表示」の間は表示されません。
+PlanRenewsOn = 更新日: { "{}" }
+PlanExpiresOn = プランの有効期限: { "{}" }

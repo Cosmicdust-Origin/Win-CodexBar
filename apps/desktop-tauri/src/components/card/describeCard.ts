@@ -20,6 +20,11 @@ export interface MenuCardPresence {
   localUsage: ProviderChartData["localUsage"] | null;
   wayfinderUsage: ProviderUsageSnapshot["wayfinderUsage"] | null;
   hasDetails: boolean;
+  /**
+   * Plan renewal / expiry line under the quota rows. The compact Overview
+   * drops it when quota bars are present (upstream 0.75.0 #4484).
+   */
+  planDateNote: string | null;
 }
 
 /**
@@ -49,6 +54,7 @@ export function describeCard(
   visibleMetrics: MetricEntry[],
   costSummaryDisplayStyle: CostSummaryDisplayStyle = "detailed",
   compactOverview = false,
+  planNote: string | null = null,
 ): MenuCardPresence {
   const hasError = !!provider.error;
   const hasMetrics = !hasError && visibleMetrics.length > 0;
@@ -64,9 +70,15 @@ export function describeCard(
   const localUsage = hasError ? null : chartData?.localUsage ?? null;
   const wayfinderUsage =
     !hasError && provider.providerId === "wayfinder" ? provider.wayfinderUsage ?? null : null;
+  const planDateNote = !hasError && planNote && (!compactOverview || !hasMetrics) ? planNote : null;
   const hasDetails = compactOverview
-    ? hasMetrics || showsDetailSections || !!wayfinderUsage
-    : hasMetrics || hasDetailSections || hasCost || !!localUsage || !!wayfinderUsage;
+    ? hasMetrics || showsDetailSections || !!wayfinderUsage || !!planDateNote
+    : hasMetrics ||
+      hasDetailSections ||
+      hasCost ||
+      !!localUsage ||
+      !!wayfinderUsage ||
+      !!planDateNote;
   return {
     hasMetrics,
     hasDetailSections,
@@ -75,5 +87,6 @@ export function describeCard(
     localUsage,
     wayfinderUsage,
     hasDetails,
+    planDateNote,
   };
 }
