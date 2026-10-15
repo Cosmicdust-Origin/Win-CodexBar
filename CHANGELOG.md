@@ -9,6 +9,7 @@
 
 ## [Windows] Unreleased
 
+- Show a Windows path (`~\.local\bin\cswap.exe`) as the placeholder for the Claude account switcher (cswap) executable in Settings instead of a Unix path (upstream v0.74.0).
 - Add a **token activity** grid to Usage & Spend: a year of daily token totals for Codex and Claude from local logs, independent of the selected period, with a tooltip per day and a day highlight. Days that were never scanned or can't be totalled show as gaps instead of zero. The yearly scan keeps its own Codex cache and skips Pi sessions, and complete Claude walks (including the spend explorer's hourly history) are reused for 60 seconds instead of re-reading the logs on every rebuild (upstream v0.73.0).
 - Replace the Usage & Spend trend panel with a spend explorer: a stacked chart per source (Claude, Codex, extra accounts) in daily, weekly, or monthly buckets by period, with drill-down from months to days and from days to recorded hourly Claude spend, an inspector on hover, legend isolation per source, time-zone labels on the hour view, and separate empty states for unavailable spend and no usage. Unknown spend shows as a gap instead of zero (upstream v0.73.0).
 - Show provider **brand icons** in Usage & Spend: the provider headings, explorer legend and amount inspector use the official artwork for Antigravity, Bedrock, Claude, Codex, Mistral, Muse and Vertex AI, while account and model rows stay monochrome. Single-model providers no longer repeat the Models heading, and the breakdown rows are tighter (upstream v0.73.0).
