@@ -9,6 +9,7 @@
 
 ## [Windows] Unreleased
 
+- OpenCode Go: reuse unchanged local history scans (keyed by `opencode.db` and its `-wal` sidecar size and modification time, at most one 4 MiB payload kept), and in Auto overlay Console quota from a stored or automatically discovered browser session before falling back to the local estimate; cookie source Off never reads a browser (upstream #4410, #4445).
 - JetBrains AI: read current quota from newer `JbaiQuota` and Junie `quota_update` records in `idea.log`, keeping same-IDE freshness and the XML fallback (upstream #4457).
 - Raycast: automatic cookie import walks every supported browser in the shared order and uses the first accepted session, instead of reading Chrome alone (upstream #4443, 0aef66c73).
 - Price Codex **codex-auto-review** requests made from a ChatGPT account at $0 from 2026-10-06 07:00 UTC onward: tokens stay in totals, the model is no longer listed as unpriced, and an explicit custom price for the model still applies (upstream #4452, #4453).
