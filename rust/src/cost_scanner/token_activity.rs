@@ -8,7 +8,9 @@
 use chrono::{Duration, NaiveDate, Utc};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::time::Instant;
 
 use super::claude_incomplete::ClaudeIncompleteTracker;
 use super::claude_pricing::ClaudeScanPricingResolver;
@@ -17,8 +19,11 @@ use super::{
     ClaudeFileScanResult, CostScanner, CostSummary, add_claude_record_to_daily_tokens,
     add_codex_days_map_to_summary, scan_claude_file_with_pricing,
 };
-use crate::core::CostUsageDayRange;
+use crate::core::{CostScanOptions, CostUsageDayRange, JsonlScanner};
 use crate::cost_reporting_period::cost_bucket_zone;
+
+/// Directory under the cache root that holds the activity-only Codex cache.
+const CODEX_ACTIVITY_CACHE_DIR: &str = "token-activity";
 
 /// Days the annual grid covers, today included.
 pub const TOKEN_ACTIVITY_DAYS: u32 = 365;
@@ -39,7 +44,7 @@ pub fn daily_token_activity(provider: &str, days: u32) -> Vec<TokenActivityDay> 
     let today = cost_bucket_zone().date(Utc::now());
     let keys = window_keys(today, days);
     match provider {
-        "codex" => codex_token_activity(days, &keys),
+        "codex" => codex_token_activity(codex_activity_scanner(days, None), &keys),
         "claude" => claude_token_activity(days, &keys),
         _ => Vec::new(),
     }
@@ -52,8 +57,30 @@ fn window_keys(today: NaiveDate, days: u32) -> Vec<String> {
         .collect()
 }
 
-fn codex_token_activity(days: u32, keys: &[String]) -> Vec<TokenActivityDay> {
-    let (_summary, _stats, cache) = CostScanner::new(days).scan_codex_detailed_with_cache(None);
+/// Scanner for the year-long Codex activity walk.
+///
+/// Activity reads only per-day totals, so it skips the Pi/OMP mirror pass
+/// (its summary was never read). It also keeps a Codex cache of its own under
+/// `{root}/token-activity/`: the shared `codex-v1.json` records the coverage of
+/// the 7/30-day cost scans, and a shorter scan there shrinks that coverage and
+/// forces every file in a year to be re-parsed on the next refresh. Activity
+/// writing into the same file would make both sides thrash and race.
+fn codex_activity_scanner(days: u32, shared_cache_root: Option<&Path>) -> CostScanner {
+    let scanner = CostScanner::new(days).with_options(CostScanOptions {
+        include_pi_sessions: false,
+        ..CostScanOptions::default()
+    });
+    let cache_root = shared_cache_root
+        .map(Path::to_path_buf)
+        .or_else(JsonlScanner::default_cache_root);
+    match cache_root {
+        Some(root) => scanner.with_cache_root(root.join(CODEX_ACTIVITY_CACHE_DIR)),
+        None => scanner,
+    }
+}
+
+fn codex_token_activity(scanner: CostScanner, keys: &[String]) -> Vec<TokenActivityDay> {
+    let (_summary, _stats, cache) = scanner.scan_codex_detailed_with_cache(None);
     let mut totals = HashMap::new();
     for (key, models) in &cache.days {
         let Some(day) = CostUsageDayRange::parse_day_key(key) else {
@@ -96,11 +123,64 @@ fn codex_days(
         .collect()
 }
 
+/// Identity of one Claude year walk. The walk depends on the window length,
+/// the local day it ends on, and the discovered project roots.
+#[derive(Debug, PartialEq, Eq)]
+struct ClaudeActivityKey {
+    days: u32,
+    today: String,
+    roots: Vec<PathBuf>,
+}
+
+/// One-entry memo that reuses a value while its key matches and it is younger
+/// than `ttl`.
+struct TimedMemo<K, V> {
+    entry: Option<(K, Instant, V)>,
+}
+
+impl<K: PartialEq, V: Clone> TimedMemo<K, V> {
+    const fn new() -> Self {
+        Self { entry: None }
+    }
+
+    fn get(&self, key: &K, now: Instant, ttl: std::time::Duration) -> Option<V> {
+        let (stored_key, stored_at, value) = self.entry.as_ref()?;
+        (stored_key == key && now.saturating_duration_since(*stored_at) <= ttl)
+            .then(|| value.clone())
+    }
+
+    fn put(&mut self, key: K, stored_at: Instant, value: V) {
+        self.entry = Some((key, stored_at, value));
+    }
+}
+
+/// The Claude walk reads every transcript in the year and has no incremental
+/// cache, so a complete result is reused for the cost scan debounce interval
+/// (`CostScanOptions::default().refresh_min_interval_secs`, 60 s).
+static CLAUDE_ACTIVITY_MEMO: Mutex<TimedMemo<ClaudeActivityKey, Vec<TokenActivityDay>>> =
+    Mutex::new(TimedMemo::new());
+
+fn claude_memo() -> MutexGuard<'static, TimedMemo<ClaudeActivityKey, Vec<TokenActivityDay>>> {
+    CLAUDE_ACTIVITY_MEMO
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+}
+
 fn claude_token_activity(days: u32, keys: &[String]) -> Vec<TokenActivityDay> {
     let scanner = CostScanner::new(days);
     let roots = scanner.claude_projects_roots();
     if roots.paths.is_empty() {
         return claude_days(keys, &HashMap::new(), &HashSet::new(), false);
+    }
+    let memo_key = ClaudeActivityKey {
+        days,
+        today: keys.last().cloned().unwrap_or_default(),
+        roots: roots.paths.clone(),
+    };
+    let ttl = std::time::Duration::from_secs(CostScanOptions::default().refresh_min_interval_secs);
+    let cached = claude_memo().get(&memo_key, Instant::now(), ttl);
+    if let Some(cached) = cached {
+        return cached;
     }
     let cutoff = Utc::now() - Duration::days(i64::from(days));
     let mut totals: HashMap<String, u64> = keys.iter().map(|key| (key.clone(), 0)).collect();
@@ -140,8 +220,14 @@ fn claude_token_activity(days: u32, keys: &[String]) -> Vec<TokenActivityDay> {
     // Preliminary rows only invalidate the days they fall on, so they are
     // judged per day below instead of failing the whole walk.
     scan.incomplete_requests = 0;
+    let complete = scan.is_complete();
     let incomplete_days: HashSet<String> = incomplete.resolve(&seen).by_day.into_keys().collect();
-    claude_days(keys, &totals, &incomplete_days, scan.is_complete())
+    let result = claude_days(keys, &totals, &incomplete_days, complete);
+    // A failed or partial walk is never memoized, so the next refresh retries.
+    if complete {
+        claude_memo().put(memo_key, Instant::now(), result.clone());
+    }
+    result
 }
 
 fn claude_days(
@@ -163,6 +249,7 @@ fn claude_days(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::ProviderId;
 
     fn date(year: i32, month: u32, day: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(year, month, day).unwrap()
@@ -252,5 +339,108 @@ mod tests {
             json,
             serde_json::json!({"day": "2026-01-01", "totalTokens": null, "isScanned": true})
         );
+    }
+
+    /// One recent Codex token_count row in today's partition (synthetic).
+    fn write_codex_activity_fixture(sessions_root: &Path, input_tokens: u64) {
+        let at = chrono::Local::now() - Duration::minutes(5);
+        let day = at.date_naive();
+        let day_dir = sessions_root
+            .join(day.format("%Y").to_string())
+            .join(day.format("%m").to_string())
+            .join(day.format("%d").to_string());
+        std::fs::create_dir_all(&day_dir).unwrap();
+        let ts = at.with_timezone(&Utc).format("%Y-%m-%dT%H:%M:%S%.3fZ");
+        let body = format!(
+            r#"{{"timestamp":"{ts}","type":"event_msg","payload":{{"type":"token_count","info":{{"model":"gpt-5","total_token_usage":{{"input_tokens":{input_tokens},"cached_input_tokens":0,"output_tokens":5}}}}}}}}
+"#
+        );
+        std::fs::write(day_dir.join("rollout-activity.jsonl"), body).unwrap();
+    }
+
+    #[test]
+    fn codex_activity_scanner_skips_pi_and_gets_its_own_cache_root() {
+        let shared = Path::new("shared-cache");
+        let scanner = codex_activity_scanner(365, Some(shared));
+        assert!(!scanner.options.include_pi_sessions);
+        assert_eq!(scanner.cache_root, Some(shared.join("token-activity")));
+    }
+
+    #[test]
+    fn codex_activity_leaves_the_shared_cost_coverage_alone() {
+        let root = tempfile::tempdir().unwrap();
+        let sessions = root.path().join("sessions");
+        let shared = root.path().join("cache");
+        write_codex_activity_fixture(&sessions, 100);
+
+        let cost = CostScanner::new(7)
+            .with_options(CostScanOptions::app_driven())
+            .with_cache_root(&shared)
+            .with_sessions_dirs(vec![sessions.clone()]);
+        cost.scan_codex_detailed(None);
+        let before = JsonlScanner::load_cache(ProviderId::Codex, Some(&shared));
+        assert!(before.scan_since_key.is_some());
+
+        let keys = window_keys(Utc::now().date_naive(), TOKEN_ACTIVITY_DAYS);
+        let activity = codex_activity_scanner(TOKEN_ACTIVITY_DAYS, Some(&shared))
+            .with_sessions_dirs(vec![sessions]);
+        let days = codex_token_activity(activity, &keys);
+
+        let after = JsonlScanner::load_cache(ProviderId::Codex, Some(&shared));
+        assert_eq!(after.scan_since_key, before.scan_since_key);
+        assert_eq!(after.scan_until_key, before.scan_until_key);
+        let own = JsonlScanner::load_cache(
+            ProviderId::Codex,
+            Some(&shared.join(CODEX_ACTIVITY_CACHE_DIR)),
+        );
+        assert!(own.scan_since_key < before.scan_since_key);
+        assert!(days.iter().any(|day| day.is_scanned));
+        assert!(days.iter().any(|day| day.total_tokens.unwrap_or(0) > 0));
+    }
+
+    #[test]
+    fn codex_activity_second_refresh_hits_its_own_debounce() {
+        let root = tempfile::tempdir().unwrap();
+        let sessions = root.path().join("sessions");
+        let shared = root.path().join("cache");
+        write_codex_activity_fixture(&sessions, 100);
+
+        let activity = codex_activity_scanner(TOKEN_ACTIVITY_DAYS, Some(&shared))
+            .with_sessions_dirs(vec![sessions]);
+        let (_, first, _) = activity.clone().scan_codex_detailed_with_cache(None);
+        assert!(!first.used_cache_debounce);
+        let (_, second, _) = activity.scan_codex_detailed_with_cache(None);
+        assert!(second.used_cache_debounce);
+    }
+
+    #[test]
+    fn timed_memo_reuses_a_value_only_within_ttl_for_the_same_key() {
+        let ttl = std::time::Duration::from_secs(60);
+        let start = Instant::now();
+        let mut memo = TimedMemo::new();
+        assert_eq!(memo.get(&"a", start, ttl), None::<u32>);
+
+        memo.put("a", start, 7u32);
+        assert_eq!(memo.get(&"a", start + ttl, ttl), Some(7));
+        assert_eq!(
+            memo.get(&"a", start + ttl + std::time::Duration::from_millis(1), ttl),
+            None
+        );
+        assert_eq!(memo.get(&"b", start, ttl), None);
+    }
+
+    #[test]
+    fn claude_memo_key_changes_with_window_day_and_roots() {
+        let roots = [PathBuf::from("projects")];
+        let key = |days, today: &str, roots: &[PathBuf]| ClaudeActivityKey {
+            days,
+            today: today.to_string(),
+            roots: roots.to_vec(),
+        };
+        let base = key(365, "2026-01-05", &roots);
+        assert_eq!(base, key(365, "2026-01-05", &roots));
+        assert_ne!(base, key(30, "2026-01-05", &roots));
+        assert_ne!(base, key(365, "2026-01-06", &roots));
+        assert_ne!(base, key(365, "2026-01-05", &[]));
     }
 }
