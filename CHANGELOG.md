@@ -9,6 +9,7 @@
 
 ## [Windows] Unreleased
 
+- Command Code: add an **API key** usage source (Settings > Providers > Command Code, or `COMMAND_CODE_API_KEY`). Auto uses the key before browser cookies, the **API** source reads billing with the key only, and a rejected key reports an expired key instead of falling back to cookies. The Browser cookies source is unchanged (upstream #4462).
 - Ollama: cookie mode reads the current **Usage credits** wallet on the settings page and shows its credit balance, as API-key mode already does, without inventing a quota percentage or changing older usage meters (upstream #4370).
 - Session depleted and restored alerts start fresh after you switch accounts: the first reading for the new account sets its baseline without an alert, and switching back does not announce a restore that happened while another account was active (upstream #4138).
 - Show a Windows path (`~\.local\bin\cswap.exe`) as the placeholder for the Claude account switcher (cswap) executable in Settings instead of a Unix path (upstream v0.74.0).
