@@ -121,6 +121,7 @@ pub enum ProviderId {
     Aerostack,
     Parallel,
     Fal,
+    Flora,
 }
 
 impl ProviderId {
@@ -234,6 +235,7 @@ impl ProviderId {
             ProviderId::Aerostack,
             ProviderId::Parallel,
             ProviderId::Fal,
+            ProviderId::Flora,
         ]
     }
 
@@ -347,6 +349,7 @@ impl ProviderId {
             ProviderId::Aerostack => "aerostack",
             ProviderId::Parallel => "parallel",
             ProviderId::Fal => "fal",
+            ProviderId::Flora => "flora",
         }
     }
 
@@ -462,6 +465,7 @@ impl ProviderId {
             ProviderId::Aerostack => "Aerostack",
             ProviderId::Parallel => "Parallel",
             ProviderId::Fal => "fal",
+            ProviderId::Flora => "FLORA",
         }
     }
 
@@ -582,6 +586,7 @@ impl ProviderId {
             ProviderId::Aerostack => None,
             ProviderId::Parallel => Some("platform.parallel.ai"),
             ProviderId::Fal => None,
+            ProviderId::Flora => None,
         }
     }
 
@@ -735,6 +740,7 @@ impl ProviderId {
             "aerostack" => Some(ProviderId::Aerostack),
             "parallel" | "parallel.ai" => Some(ProviderId::Parallel),
             "fal" => Some(ProviderId::Fal),
+            "flora" => Some(ProviderId::Flora),
             _ => None,
         }
     }
@@ -1464,6 +1470,7 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::Aerostack => "#6366F1",
         ProviderId::Parallel => "#1D1C1A",
         ProviderId::Fal => "#7C3AED",
+        ProviderId::Flora => "#111111",
     }
 }
 
@@ -1478,7 +1485,7 @@ mod tests {
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 107);
+        assert_eq!(all.len(), 108);
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Pi));
@@ -1565,6 +1572,7 @@ mod tests {
         assert!(all.contains(&ProviderId::Aerostack));
         assert!(all.contains(&ProviderId::Parallel));
         assert!(all.contains(&ProviderId::Fal));
+        assert!(all.contains(&ProviderId::Flora));
     }
 
     #[test]

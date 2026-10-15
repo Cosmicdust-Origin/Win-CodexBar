@@ -71,6 +71,11 @@ pub fn validate_provider_workspace_value(
         ProviderId::LLMProxy => validate_llmproxy_base_url(trimmed),
         ProviderId::LLMMan => crate::providers::llmman::validated_llmman_base_url(trimmed)
             .map_err(|err| err.to_string()),
+        ProviderId::Flora => validate_id(trimmed, "FLORA workspace ID", |value| {
+            value.strip_prefix("ws_").is_some_and(|id| {
+                !id.is_empty() && id.bytes().all(|byte| byte.is_ascii_alphanumeric())
+            })
+        }),
         ProviderId::Exa => {
             if trimmed.is_empty() || trimmed == "." || trimmed == ".." {
                 return Err(
@@ -252,6 +257,31 @@ mod tests {
         );
         assert!(validate_provider_workspace_value(ProviderId::GitKraken, "org id").is_err());
         assert!(validate_provider_workspace_value(ProviderId::GitKraken, "org\n123").is_err());
+    }
+
+    #[test]
+    fn validates_flora_workspace_ids() {
+        assert_eq!(
+            validate_provider_workspace_value(ProviderId::Flora, " ws_abc123 ").unwrap(),
+            "ws_abc123"
+        );
+        assert_eq!(
+            validate_provider_workspace_value(ProviderId::Flora, "  ").unwrap(),
+            ""
+        );
+        for invalid in [
+            "abc123",
+            "ws_",
+            "ws_abc-123",
+            "ws_abc/123",
+            "https://app.flora.ai/ws_abc123",
+            "wrk_abc123",
+        ] {
+            assert!(
+                validate_provider_workspace_value(ProviderId::Flora, invalid).is_err(),
+                "{invalid} must be rejected"
+            );
+        }
     }
 
     #[test]

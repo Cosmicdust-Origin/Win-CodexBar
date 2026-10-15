@@ -459,7 +459,8 @@ impl TokenAccountSupport {
             | ProviderId::Cosmic
             | ProviderId::Aerostack
             | ProviderId::Parallel
-            | ProviderId::Fal => None,
+            | ProviderId::Fal
+            | ProviderId::Flora => None,
         }
     }
 

@@ -143,6 +143,7 @@ See the full history in [CHANGELOG.md](CHANGELOG.md).
 | X API | Browser cookies / manual Cookie header | Prepaid balance, purchased and free credits |
 | Parallel | Browser cookies / manual Cookie header | Prepaid account balance, pending debit |
 | fal | API Key | Account credit balance |
+| FLORA | API Key + workspace ID | Workspace available balance, member limit, month-to-date spend |
 
 </details>
 

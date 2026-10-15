@@ -11,6 +11,7 @@
 
 - Add **Parallel** prepaid balance: reads the account balance and any pending debit from the platform.parallel.ai console using your browser session or a pasted Cookie header. A signed-out console moves on to the next browser session and reports an expired session when none remain (upstream #4479, #4508).
 - Add **fal** account credit balance: reads the credit balance and account name from fal's billing API with your API key (`FAL_KEY` or Settings) and explains when the key lacks the billing read permission (upstream #4438).
+- Add **FLORA** workspace balance: reads the workspace's available balance, your member limit, and this month's spend with your API key and workspace ID (`FLORA_API_KEY` / `FLORA_WORKSPACE_ID` or Settings), and explains when spend is unavailable or the key lacks billing permission (upstream #4439).
 - Ollama: cookie mode reads the current **Usage credits** wallet on the settings page and shows its credit balance, as API-key mode already does, without inventing a quota percentage or changing older usage meters (upstream #4370).
 - Session depleted and restored alerts start fresh after you switch accounts: the first reading for the new account sets its baseline without an alert, and switching back does not announce a restore that happened while another account was active (upstream #4138).
 - Show a Windows path (`~\.local\bin\cswap.exe`) as the placeholder for the Claude account switcher (cswap) executable in Settings instead of a Unix path (upstream v0.74.0).

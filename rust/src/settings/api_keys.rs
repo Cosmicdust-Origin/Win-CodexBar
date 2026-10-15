@@ -856,6 +856,17 @@ pub fn get_api_key_providers() -> Vec<ProviderConfigInfo> {
             dashboard_url: Some("https://fal.ai/dashboard/keys"),
         },
         ProviderConfigInfo {
+            id: ProviderId::Flora,
+            name: "FLORA",
+            requires_api_key: true,
+            api_key_env_var: Some("FLORA_API_KEY"),
+            api_key_help: Some("Needs billing permission on the workspace. Or set FLORA_API_KEY."),
+            config_file_path: None,
+            dashboard_url: Some(
+                "https://app.flora.ai/projects?openSettings=true&initialTab=apiKeys",
+            ),
+        },
+        ProviderConfigInfo {
             id: ProviderId::Cosmic,
             name: "Cosmic AI",
             requires_api_key: true,

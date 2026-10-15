@@ -372,6 +372,7 @@ fn workspace_provider(provider_id: &str) -> Option<codexbar::core::ProviderId> {
         "muse" => ProviderId::Muse,
         "exa" => ProviderId::Exa,
         "cosmic" => ProviderId::Cosmic,
+        "flora" => ProviderId::Flora,
         _ => return None,
     })
 }
@@ -512,6 +513,11 @@ mod tests {
     #[test]
     fn maps_cosmic_project_provider() {
         assert_eq!(workspace_provider("cosmic"), Some(ProviderId::Cosmic));
+    }
+
+    #[test]
+    fn maps_flora_workspace_provider() {
+        assert_eq!(workspace_provider("flora"), Some(ProviderId::Flora));
     }
 
     #[test]

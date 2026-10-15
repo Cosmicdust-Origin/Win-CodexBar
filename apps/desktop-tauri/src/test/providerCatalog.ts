@@ -104,4 +104,5 @@ export const TEST_PROVIDER_CATALOG: Array<[string, string]> = [
   ["xapi", "X API"],
   ["parallel", "Parallel"],
   ["fal", "fal"],
+  ["flora", "FLORA"],
 ];

@@ -539,6 +539,40 @@ Authorization: Key <API key>
   unavailable, and Refresh can retry it.
 - Response bodies are never echoed in errors.
 
+### FLORA
+
+FLORA is disabled by default. In Settings → Providers → FLORA, enter an **API
+key** (or set `FLORA_API_KEY`) and the **workspace ID** (`ws_…`, or set
+`FLORA_WORKSPACE_ID`). API keys cannot list their workspaces, so the workspace ID
+is required. The workspace ID is stored in the provider's workspace slot and is
+validated before any request. The key needs billing permission on that workspace.
+
+The provider makes one read-only request for the current UTC month, from the
+first day through today:
+
+```text
+GET https://app.flora.ai/api/v1/workspaces/<ws_id>/usage?start_date=YYYY-MM-01&end_date=YYYY-MM-DD
+Authorization: Bearer <API key>
+```
+
+Rows in the **Workspace balance** section:
+
+- **Available** shows `available_cost`. The secondary text is "Workspace pool"
+  for a workspace balance and "Your allowance" for a per-caller balance.
+- **Member limit** appears only for a per-caller balance with a finite
+  `member_limit.limit_cost`. The secondary text is "Monthly" or "All time".
+- **Spent this month** shows `spend.total_cost` when spend is reported, with a
+  **Runs this month** row for a whole-number `classified_runs`. When spend is
+  unavailable it shows "Unavailable" with the reason (no usage reporting, billing
+  permission missing, or totals not yet computed).
+- The currency is `currency` when it is a three-letter uppercase code, otherwise
+  USD. The provider reports identity as "API key" and has no quota percentage.
+
+Errors: 401 reports a rejected key; 403 reports that the key needs billing
+permission on the workspace; 404 reports an unknown workspace ID; other HTTP
+errors report their status. A response without a finite `available_cost` is
+reported as unrecognized. Response bodies are never echoed in errors.
+
 ### Aerostack
 
 Aerostack is disabled by default. In Settings → Providers → Aerostack, enter an
