@@ -412,6 +412,9 @@ pub(crate) fn load_ledger_from_roots(
     }
     files.sort();
     for file in &files {
+        if last_written_before(file, start_unix_ms) {
+            continue;
+        }
         scan_file(file, start_unix_ms, end_unix_ms, &mut builder);
         if builder.exceeded_limit {
             return Err(IdentifiedUsageError::InvalidReport);
@@ -428,6 +431,24 @@ pub(crate) fn load_ledger_from_roots(
     ledger.conflicting_ids = conflicts;
     ledger.validate(start_unix_ms, end_unix_ms)?;
     Ok(ledger)
+}
+
+/// Clock-skew allowance between a record's timestamp and the file's mtime.
+const MTIME_SKEW_MARGIN_MS: i64 = 24 * 60 * 60 * 1000;
+
+/// A file last modified before the window cannot hold an in-window record,
+/// so the scan (and the remote SSH budget) can skip it. Unreadable metadata
+/// keeps the file so the scan still decides.
+fn last_written_before(file: &Path, start_unix_ms: i64) -> bool {
+    let Some(modified_ms) = fs::metadata(file)
+        .and_then(|metadata| metadata.modified())
+        .ok()
+        .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
+        .and_then(|elapsed| i64::try_from(elapsed.as_millis()).ok())
+    else {
+        return false;
+    };
+    modified_ms.saturating_add(MTIME_SKEW_MARGIN_MS) < start_unix_ms
 }
 
 /// Recursively list `*.jsonl` files. Returns `Ok(false)` when a nested

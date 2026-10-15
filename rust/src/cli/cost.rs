@@ -373,12 +373,12 @@ fn print_text_output(
             println!("{title}");
         }
 
-        if let Some(history) = result.token_history.as_ref() {
-            print_local_token_history(history);
-        } else if group_by == CostGroupBy::Project && result.provider == "codex" {
+        if group_by == CostGroupBy::Project && result.provider == "codex" {
             print_codex_project_output(result, period, hide_personal_info);
         } else if group_by == CostGroupBy::Project {
             println!("  Project grouping is only available for Codex local projects");
+        } else if let Some(history) = result.token_history.as_ref() {
+            print_local_token_history(history);
         } else if group_by == CostGroupBy::Session && result.provider == "codex" {
             print_codex_session_output(result, period);
         } else if group_by == CostGroupBy::Session {
@@ -596,7 +596,10 @@ fn render_codex_project_lines<E: std::fmt::Display>(
     snapshot: &Result<crate::codex_workspaces::CodexLocalProjectUsageSnapshot, E>,
 ) -> Vec<String> {
     let mut lines = Vec::new();
-    if !cost_history_established {
+    let catalog_partial = snapshot
+        .as_ref()
+        .is_ok_and(|snapshot| snapshot.source_status.is_partial());
+    if !cost_history_established || catalog_partial {
         lines.push(PARTIAL_HISTORY_NOTICE.to_string());
     }
     let snapshot = match snapshot {
@@ -1152,6 +1155,18 @@ mod tests {
         let lines = render_codex_project_lines(false, &unavailable);
         assert_eq!(lines[0], PARTIAL_HISTORY_NOTICE);
         assert_eq!(lines[1], "  Project history unavailable: locked");
+
+        let mut locked_catalog = project_snapshot(Vec::new());
+        locked_catalog.source_status = crate::codex_workspaces::SourceStatus::CatalogLocked;
+        let lines = render_codex_project_lines(true, &Ok::<_, String>(locked_catalog));
+        assert_eq!(lines[0], PARTIAL_HISTORY_NOTICE);
+        assert_eq!(
+            lines
+                .iter()
+                .filter(|line| *line == PARTIAL_HISTORY_NOTICE)
+                .count(),
+            1
+        );
     }
 
     #[test]

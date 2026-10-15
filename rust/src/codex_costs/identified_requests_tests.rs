@@ -253,6 +253,35 @@ fn local_scan_identifies_owned_requests_and_reports_exclusions() {
 }
 
 #[test]
+fn files_last_written_before_the_window_are_skipped() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("sessions");
+    let ts = "2023-11-14T12:00:00Z";
+    let body = usage_record("s1", "r1", ts, usage(10, 0, 1), usage(10, 0, 1));
+    let name = "rollout-2023-11-14T12-00-00-s1.jsonl";
+    session_file(&root, name, "s1", &body);
+    let path = root.join("2023").join("11").join("14").join(name);
+    let set_mtime = |unix_ms: i64| {
+        let time = std::time::UNIX_EPOCH + std::time::Duration::from_millis(unix_ms as u64);
+        fs::File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(time)
+            .unwrap();
+    };
+
+    set_mtime(DAY_START - 2 * 24 * 60 * 60 * 1000);
+    let ledger = load_ledger_from_roots(std::slice::from_ref(&root), DAY_START, END).unwrap();
+    assert!(ledger.records.is_empty());
+
+    // Inside the clock-skew margin the file is still scanned.
+    set_mtime(DAY_START - 60 * 60 * 1000);
+    let ledger = load_ledger_from_roots(&[root], DAY_START, END).unwrap();
+    assert_eq!(ledger.records.len(), 1);
+}
+
+#[test]
 fn copied_parent_legacy_counters_are_not_excluded_from_a_fork() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("sessions");
