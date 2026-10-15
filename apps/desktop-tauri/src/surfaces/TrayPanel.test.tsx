@@ -1337,4 +1337,20 @@ describe("TrayPanel provider grid", () => {
       );
     });
   });
+
+  it("keeps the Refresh row hover highlight unless the Menu setting turns it off", async () => {
+    const on = renderTrayPanel([provider("codex", "Codex", 61)]);
+    await screen.findByRole("button", { name: "Refresh" });
+    const surface = () => on.container.querySelector(".menu-surface")!;
+    expect(surface()).not.toHaveClass("menu-surface--hover-highlight-off");
+    on.unmount();
+
+    const off = renderTrayPanel([provider("codex", "Codex", 61)], {
+      highlightMenuCardsOnHover: false,
+    });
+    await screen.findByRole("button", { name: "Refresh" });
+    expect(off.container.querySelector(".menu-surface")).toHaveClass(
+      "menu-surface--hover-highlight-off",
+    );
+  });
 });

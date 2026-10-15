@@ -607,6 +607,7 @@ WindowRestore = Restaurar
 WindowClose = Fechar
 ShowAsUsedLabel = Mostrar como usado
 ShowAsUsedHelper = Exibir barras de uso conforme consumido em vez de restante.
+HighlightMenuCardsOnHoverLabel = Destacar cartões do menu ao passar o cursor
 OverviewLayoutLabel = Layout de visão geral
 OverviewLayoutHelper = Escolha a quantidade de informações que a Visão geral mostra.
 OverviewLayoutDetailed = Detalhado

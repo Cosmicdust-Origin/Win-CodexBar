@@ -639,6 +639,7 @@ WindowRestore = Restore
 WindowClose = Close
 ShowAsUsedLabel = Show as used
 ShowAsUsedHelper = Display usage bars as consumed rather than remaining.
+HighlightMenuCardsOnHoverLabel = Highlight menu cards on hover
 OverviewLayoutLabel = Overview layout
 OverviewLayoutHelper = Choose how much information Overview shows.
 OverviewLayoutDetailed = Detailed

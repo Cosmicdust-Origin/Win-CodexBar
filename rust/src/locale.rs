@@ -1041,6 +1041,7 @@ locale_keys! {
     WindowClose,
     ShowAsUsedLabel,
     ShowAsUsedHelper,
+    HighlightMenuCardsOnHoverLabel,
     OverviewLayoutLabel,
     OverviewLayoutHelper,
     OverviewLayoutDetailed,

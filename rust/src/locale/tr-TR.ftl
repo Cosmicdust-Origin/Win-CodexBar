@@ -641,6 +641,7 @@ ShowAsUsedLabel = Kullanılan olarak göster
 ShowAsUsedHelper = Kullanım çubuklarını kalan yerine tüketilen olarak göster.
 ShowAllTokenAccountsLabel = Tüm token hesaplarını göster
 ShowAllTokenAccountsHelper = Sağlayıcı menülerinde token hesaplarını daraltmak yerine tümünü listele.
+HighlightMenuCardsOnHoverLabel = Üzerine gelindiğinde menü kartlarını vurgula
 OverviewLayoutLabel = Genel bakış düzeni
 OverviewLayoutHelper = Genel bakışta ne kadar bilgi gösterileceğini seçin.
 OverviewLayoutDetailed = Ayrıntılı

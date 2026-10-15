@@ -198,6 +198,11 @@ pub struct Settings {
     #[serde(default = "default_true")]
     pub quota_warning_markers_visible: bool,
 
+    /// Tray panel Refresh row highlights under the pointer. Keyboard focus
+    /// stays highlighted either way.
+    #[serde(default = "default_true")]
+    pub highlight_menu_cards_on_hover: bool,
+
     /// How workday boundaries appear on weekly usage bars.
     #[serde(default)]
     pub workday_tick_style: WorkdayTickStyle,
@@ -698,6 +703,7 @@ impl Default for Settings {
             menu_bar_icon_style: MenuBarIconStyle::Bars,
             merged_overview_selected_providers: Vec::new(),
             quota_warning_markers_visible: true,
+            highlight_menu_cards_on_hover: true,
             workday_tick_style: WorkdayTickStyle::Subtle,
             menu_bar_color_pace: false,
             menu_bar_pace_reserve_positive: false,

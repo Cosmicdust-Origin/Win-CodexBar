@@ -609,6 +609,7 @@ ShowAsUsedLabel = 顯示為已用
 ShowAsUsedHelper = 以已使用百分比而非剩餘顯示用量條。
 ShowAllTokenAccountsLabel = 顯示所有權杖賬戶
 ShowAllTokenAccountsHelper = 在提供者選單中列出所有權杖賬戶，而不是摺疊顯示。
+HighlightMenuCardsOnHoverLabel = 滑鼠停留時反白選單卡片
 OverviewLayoutLabel = 概覽版面配置
 OverviewLayoutHelper = 選擇概覽顯示的資訊量。
 OverviewLayoutDetailed = 詳細

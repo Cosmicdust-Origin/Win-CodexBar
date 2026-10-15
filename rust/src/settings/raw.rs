@@ -157,6 +157,8 @@ pub(super) struct RawSettings {
     merged_overview_selected_providers: Vec<String>,
     #[serde(default = "default_true")]
     quota_warning_markers_visible: bool,
+    #[serde(default = "default_true")]
+    highlight_menu_cards_on_hover: bool,
     #[serde(default)]
     workday_tick_style: Option<String>,
     #[serde(default)]
@@ -368,6 +370,7 @@ impl Default for RawSettings {
             menu_bar_icon_style: Some(s.menu_bar_icon_style.as_str().to_string()),
             merged_overview_selected_providers: s.merged_overview_selected_providers,
             quota_warning_markers_visible: s.quota_warning_markers_visible,
+            highlight_menu_cards_on_hover: s.highlight_menu_cards_on_hover,
             workday_tick_style: Some(s.workday_tick_style.as_str().to_string()),
             menu_bar_color_pace: s.menu_bar_color_pace,
             menu_bar_pace_reserve_positive: s.menu_bar_pace_reserve_positive,
@@ -742,6 +745,7 @@ impl From<RawSettings> for Settings {
                 raw.merged_overview_selected_providers,
             ),
             quota_warning_markers_visible: raw.quota_warning_markers_visible,
+            highlight_menu_cards_on_hover: raw.highlight_menu_cards_on_hover,
             workday_tick_style: raw
                 .workday_tick_style
                 .as_deref()

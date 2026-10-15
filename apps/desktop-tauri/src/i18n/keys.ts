@@ -771,6 +771,7 @@ export const ALL_LOCALE_KEYS = [
   "WindowClose",
   "ShowAsUsedLabel",
   "ShowAsUsedHelper",
+  "HighlightMenuCardsOnHoverLabel",
   "OverviewLayoutLabel",
   "OverviewLayoutHelper",
   "OverviewLayoutDetailed",
