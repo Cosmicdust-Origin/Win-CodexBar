@@ -103,4 +103,5 @@ export const TEST_PROVIDER_CATALOG: Array<[string, string]> = [
   ["workbuddy", "WorkBuddy"],
   ["xapi", "X API"],
   ["parallel", "Parallel"],
+  ["fal", "fal"],
 ];

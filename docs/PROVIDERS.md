@@ -514,6 +514,31 @@ Origin: https://platform.parallel.ai
 - Parallel's upstream plugin reads only Chrome. This port uses the shared browser
   order and the explicit browser selection in Preferences.
 
+### fal
+
+fal is disabled by default. In Settings → Providers → fal, enter an **API key**
+with billing read access (the BILLING or READONLY preset), or set `FAL_KEY`. The
+key is stored with the other API keys and is never written to logs.
+
+The provider makes one read-only request:
+
+```text
+GET https://api.fal.ai/v1/account/billing?expand=credits
+Authorization: Key <API key>
+```
+
+- The **Credit balance** row shows `credits.current_balance` in the reported
+  currency (`credits.currency` when it is a three-letter uppercase code, otherwise
+  USD). A numeric string such as `"12.50"` is accepted.
+- The account name (`username`) is shown as the organization. The provider
+  reports identity as "API key".
+- The balance is informational: it has no quota percentage and no cost.
+- 401 reports a rejected key; 403 reports that the key needs the
+  `billing:usage:read` permission; other HTTP errors report their status. A
+  successful response without a readable balance reports the balance as
+  unavailable, and Refresh can retry it.
+- Response bodies are never echoed in errors.
+
 ### Aerostack
 
 Aerostack is disabled by default. In Settings → Providers → Aerostack, enter an

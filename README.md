@@ -142,6 +142,7 @@ See the full history in [CHANGELOG.md](CHANGELOG.md).
 | WorkBuddy | Browser cookies / manual Cookie header | Monthly credits left, plan, cycle reset |
 | X API | Browser cookies / manual Cookie header | Prepaid balance, purchased and free credits |
 | Parallel | Browser cookies / manual Cookie header | Prepaid account balance, pending debit |
+| fal | API Key | Account credit balance |
 
 </details>
 

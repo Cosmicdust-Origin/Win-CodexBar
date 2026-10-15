@@ -11,6 +11,7 @@ use crate::providers::AtlasCloudProvider;
 use crate::providers::ClawRouterProvider;
 use crate::providers::CosmicProvider;
 use crate::providers::ExaProvider;
+use crate::providers::FalProvider;
 use crate::providers::IBMBobProvider;
 use crate::providers::LangdockProvider;
 use crate::providers::LinkupProvider;
@@ -153,6 +154,7 @@ pub fn instantiate(id: ProviderId) -> Box<dyn Provider> {
         ProviderId::Cosmic => Box::new(CosmicProvider::new()),
         ProviderId::Aerostack => Box::new(AerostackProvider::new()),
         ProviderId::Parallel => Box::new(ParallelProvider::new()),
+        ProviderId::Fal => Box::new(FalProvider::new()),
     }
 }
 
@@ -268,7 +270,8 @@ pub fn pace_capability(id: ProviderId) -> ProviderPaceCapability {
         | ProviderId::Vercel
         | ProviderId::Cosmic
         | ProviderId::Aerostack
-        | ProviderId::Parallel => ProviderPaceCapability::UNSUPPORTED,
+        | ProviderId::Parallel
+        | ProviderId::Fal => ProviderPaceCapability::UNSUPPORTED,
     }
 }
 
@@ -384,7 +387,8 @@ pub fn limit_reset_policy(id: ProviderId) -> ProviderLimitResetPolicy {
         | ProviderId::Vercel
         | ProviderId::Cosmic
         | ProviderId::Aerostack
-        | ProviderId::Parallel => ProviderLimitResetPolicy::DEFAULT,
+        | ProviderId::Parallel
+        | ProviderId::Fal => ProviderLimitResetPolicy::DEFAULT,
     }
 }
 #[cfg(test)]
