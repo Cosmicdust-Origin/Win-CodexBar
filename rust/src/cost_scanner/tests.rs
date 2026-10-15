@@ -3576,6 +3576,10 @@ mod period;
 #[path = "tests/archived.rs"]
 mod archived;
 
+#[cfg(test)]
+#[path = "tests/codex_auto_review.rs"]
+mod codex_auto_review;
+
 /// #755: a background scan paused with `no_progress` and no retained report
 /// used to sum every cached day, so Today and 30d showed the same totals.
 #[test]

@@ -320,6 +320,20 @@ fn add_codex_tokens_to_summary(
         return None;
     }
 
+    // Included Auto-review requests (upstream #4452): the tokens stay in the
+    // totals, the cost is an exact $0, and the row is not marked unpriced.
+    // Explicit custom rates still price the model in the spend contract.
+    if crate::core::codex_included_pricing::is_included_model_key(model) {
+        let model_key = crate::core::codex_included_pricing::AUTO_REVIEW_MODEL.to_string();
+        add_summary_tokens(summary, tokens);
+        summary.by_model.entry(model_key.clone()).or_insert(0.0);
+        add_tokens(
+            summary.by_model_tokens.entry(model_key).or_default(),
+            tokens,
+        );
+        return Some(0.0);
+    }
+
     let is_routing_unpriced = is_unpriced_codex_routing_model(model);
     let model_key = if CostUsagePricing::is_codex_unattributed_model(model) {
         CostUsagePricing::CODEX_UNATTRIBUTED_MODEL.to_string()

@@ -4,6 +4,7 @@ mod adaptive_refresh;
 mod aws_signing;
 mod blocking_quota;
 mod claude_routed_pricing;
+pub(crate) mod codex_included_pricing;
 mod codex_routed_pricing;
 mod cost_cache_budget;
 mod cost_pricing;
