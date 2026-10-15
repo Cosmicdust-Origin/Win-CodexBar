@@ -271,6 +271,11 @@ pub struct SubscriptionMetadataSnapshot {
     pub starts_at: Option<String>,
     pub expires_at: Option<String>,
     pub renews_at: Option<String>,
+    /// Date-only values are UTC midnight and must be formatted in UTC.
+    #[serde(default)]
+    pub renews_at_is_date_only: bool,
+    #[serde(default)]
+    pub expires_at_is_date_only: bool,
 }
 
 /// Display-only provider inventory. Redemption identifiers never cross the
@@ -692,6 +697,8 @@ impl ProviderUsageSnapshot {
                     starts_at: subscription.starts_at.map(|date| date.to_rfc3339()),
                     expires_at: subscription.expires_at.map(|date| date.to_rfc3339()),
                     renews_at: subscription.renews_at.map(|date| date.to_rfc3339()),
+                    renews_at_is_date_only: subscription.renews_at_is_date_only,
+                    expires_at_is_date_only: subscription.expires_at_is_date_only,
                 }
             }),
             source_label: result.source_label.clone(),
