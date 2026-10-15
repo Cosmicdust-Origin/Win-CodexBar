@@ -1222,7 +1222,7 @@ mod tests {
         let row = super::cloud_credits_row(&usage, chrono::Utc::now()).expect("cloud credits row");
         assert_eq!(row.title(), "Cloud credits");
         assert_eq!(row.value(), "$12.00 of $20.00 remaining");
-        assert_eq!(row.secondary_value(), Some("Expires 2099-01-01T00:00:00Z"));
+        assert_eq!(row.secondary_value(), Some("Expires 2099-01-01"));
         assert!(usage.extra_usage.is_none());
         assert!(usage.seven_day.is_none());
     }

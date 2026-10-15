@@ -11,7 +11,7 @@
 //! the generic detail path. A missing or malformed block yields no row and
 //! leaves the usage windows untouched.
 
-use chrono::{DateTime, SecondsFormat, Utc};
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
 use crate::core::{ProviderDisplayDetail, format_currency};
@@ -126,10 +126,7 @@ impl CloudCredits {
         // The expired state omits the timestamp: its label is already
         // localized, and an English "Expired <time>" fragment would not be.
         if let Some(expiry) = self.expires_at.filter(|_| !expired) {
-            row = row.with_secondary_value(format!(
-                "Expires {}",
-                expiry.to_rfc3339_opts(SecondsFormat::Secs, true)
-            ))?;
+            row = row.with_secondary_value(format!("Expires {}", expiry.format("%Y-%m-%d")))?;
         }
         Some(row)
     }
@@ -163,7 +160,7 @@ mod tests {
         assert_eq!(row.title(), "Cloud credits");
         assert_eq!(row.section_title(), None);
         assert_eq!(row.value(), "$12.00 of $20.00 remaining");
-        assert_eq!(row.secondary_value(), Some("Expires 2099-01-01T00:00:00Z"));
+        assert_eq!(row.secondary_value(), Some("Expires 2099-01-01"));
         let progress = row.progress().expect("progress");
         assert_eq!(progress.used(), 8.0);
         assert_eq!(progress.total(), 20.0);
@@ -232,7 +229,7 @@ mod tests {
 
         assert_eq!(row.value(), "Unavailable");
         assert!(row.progress().is_none());
-        assert_eq!(row.secondary_value(), Some("Expires 2099-01-01T00:00:00Z"));
+        assert_eq!(row.secondary_value(), Some("Expires 2099-01-01"));
     }
 
     #[test]
