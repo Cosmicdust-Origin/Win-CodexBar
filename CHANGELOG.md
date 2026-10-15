@@ -21,6 +21,7 @@
 - Codex usage by project: show the project names saved in the Codex desktop app instead of folder names, and list chats the desktop app marks as independent (not tied to a project) in their own Independent chats section under Projects (upstream v0.72.0).
 - Usage & Spend projects: show a project's folder on a second line when another project in the list has the same name, and under Hide personal information label projects **Workspace #1**, **Workspace #2**, … with no paths (upstream v0.71.1).
 - Stop Claude usage probes from running your SessionStart hooks on every poll: the probe session now passes `disableAllHooks` alongside its Remote Control opt-out, leaving your saved settings untouched (upstream #4292).
+- Retry a timed-out Claude CLI usage probe once with a longer timeout (60 s, capped so the fetch still finishes inside the 75 s provider budget), and keep the cached CLI result after a failed probe. Auth failures are not retried (upstream #4155).
 - Show an optional **Live remaining (est.)** row for xAI beside the posted prepaid balance, from the current postpaid invoice preview (upstream #4419). A missing or failed preview hides only that row.
 - Show independent session and weekly usage for native saved Claude Code accounts, with account-scoped OAuth renewal and safe authentication warnings.
 - Offer Refresh login beside Switch only for Claude and Codex accounts that need sign-in. Repair the selected saved login without switching to another account.
