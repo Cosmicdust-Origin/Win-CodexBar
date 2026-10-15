@@ -1,6 +1,7 @@
 //! Command Code provider implementation.
 //!
-//! Uses a browser session cookie to fetch monthly and purchased credit balances.
+//! Fetches monthly and purchased credit balances with a Command Code API key
+//! (`/alpha/billing/*`) or a browser session cookie (`/internal/billing/*`).
 
 mod plan_cache;
 
@@ -13,13 +14,64 @@ use std::sync::{LazyLock, Mutex};
 
 use crate::core::{
     CostSnapshot, FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    ProviderMetadata, ProviderStateKind, RateWindow, SourceMode, UsageSnapshot,
 };
 use plan_cache::CommandCodePlanCache;
 
 const COMMAND_CODE_API_BASE: &str = "https://api.commandcode.ai";
-const COMMAND_CODE_CREDITS_PATH: &str = "/internal/billing/credits";
-const COMMAND_CODE_SUBSCRIPTIONS_PATH: &str = "/internal/billing/subscriptions";
+/// Billing resources. The route prefix comes from [`Credential`]: `/internal`
+/// for a web session, `/alpha` for an API key (upstream #4462).
+const COMMAND_CODE_CREDITS_PATH: &str = "/billing/credits";
+const COMMAND_CODE_SUBSCRIPTIONS_PATH: &str = "/billing/subscriptions";
+const COMMAND_CODE_CREDENTIAL_TARGET: &str = "codexbar-commandcode";
+const COMMAND_CODE_API_KEY_ENV: &str = "COMMAND_CODE_API_KEY";
+/// Shown for a rejected API key. Hyper-style `ExpiredSession` classification
+/// uses this exact text, so keep it in sync with `error_state_kind`.
+const API_KEY_REJECTED: &str = "Command Code API key is invalid or expired. Replace it in Settings or update COMMAND_CODE_API_KEY.";
+
+/// Credential for one billing request. Browser sessions and API keys use
+/// different route prefixes (upstream `CommandCodeUsageFetcher.Credential`).
+#[derive(Clone, Copy)]
+enum Credential<'a> {
+    Cookie(&'a str),
+    ApiKey(&'a str),
+}
+
+impl<'a> Credential<'a> {
+    fn secret(self) -> &'a str {
+        match self {
+            Self::Cookie(value) | Self::ApiKey(value) => value,
+        }
+    }
+
+    fn billing_path(self, resource: &str) -> String {
+        let prefix = match self {
+            Self::Cookie(_) => "/internal",
+            Self::ApiKey(_) => "/alpha",
+        };
+        format!("{prefix}{resource}")
+    }
+
+    /// Source label stored on the fetch result (`web` keeps the cookie lane's
+    /// existing label).
+    fn source_label(self) -> &'static str {
+        match self {
+            Self::Cookie(_) => "web",
+            Self::ApiKey(_) => "api",
+        }
+    }
+}
+
+/// The configured API key, from the explicit provider key, the keyring, or
+/// `COMMAND_CODE_API_KEY`. Returns the shared resolver's error when none is set.
+fn resolve_command_code_key(explicit: Option<&str>) -> Result<String, ProviderError> {
+    crate::providers::resolve_api_key(
+        explicit,
+        COMMAND_CODE_CREDENTIAL_TARGET,
+        &[COMMAND_CODE_API_KEY_ENV],
+    )
+    .map(|key| key.trim().to_string())
+}
 
 /// Rolling-limit window durations reported under `windowLimits` (upstream
 /// `CommandCodeUsageFetcher`): five-hour and weekly rolling caps.
@@ -139,11 +191,17 @@ pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
 pub struct CommandCodeProvider {
     metadata: ProviderMetadata,
     client: Client,
+    api_base: String,
 }
 
 impl CommandCodeProvider {
     pub fn new() -> Self {
+        Self::with_api_base(COMMAND_CODE_API_BASE)
+    }
+
+    fn with_api_base(api_base: impl Into<String>) -> Self {
         Self {
+            api_base: api_base.into(),
             metadata: ProviderMetadata {
                 id: ProviderId::CommandCode,
                 display_name: "Command Code",
@@ -167,18 +225,30 @@ impl CommandCodeProvider {
     async fn fetch_web(&self, cookie_header: &str) -> Result<ProviderFetchResult, ProviderError> {
         let cookie_header =
             normalize_cookie_header(cookie_header).ok_or_else(|| ProviderError::NoCookies)?;
+        self.fetch_billing(Credential::Cookie(&cookie_header)).await
+    }
+
+    /// API-key lane (upstream #4462): `/alpha/billing/*` with a bearer key.
+    async fn fetch_api_key(&self, api_key: &str) -> Result<ProviderFetchResult, ProviderError> {
+        self.fetch_billing(Credential::ApiKey(api_key)).await
+    }
+
+    async fn fetch_billing(
+        &self,
+        credential: Credential<'_>,
+    ) -> Result<ProviderFetchResult, ProviderError> {
         let now = Utc::now();
-        let fingerprint = crate::core::sha256_hex(cookie_header.as_bytes());
+        let fingerprint = crate::core::sha256_hex(credential.secret().as_bytes());
         let credits = self
             .get_json(
-                &format!("{COMMAND_CODE_API_BASE}{COMMAND_CODE_CREDITS_PATH}"),
-                &cookie_header,
+                &self.billing_url(credential, COMMAND_CODE_CREDITS_PATH),
+                credential,
             )
             .await?;
         let subscription_result = self
             .get_json(
-                &format!("{COMMAND_CODE_API_BASE}{COMMAND_CODE_SUBSCRIPTIONS_PATH}"),
-                &cookie_header,
+                &self.billing_url(credential, COMMAND_CODE_SUBSCRIPTIONS_PATH),
+                credential,
             )
             .await;
         let lookup = if subscription_result.is_ok() {
@@ -187,24 +257,41 @@ impl CommandCodeProvider {
             SubscriptionLookup::Unavailable
         };
         let subscription = resolve_subscription_payload(subscription_result, &fingerprint, now);
-        result_from_payloads(&credits, subscription.as_ref(), lookup)
+        let mut result = result_from_payloads(&credits, subscription.as_ref(), lookup)?;
+        result.source_label = credential.source_label().to_string();
+        Ok(result)
     }
 
-    async fn get_json(&self, url: &str, cookie_header: &str) -> Result<Value, ProviderError> {
-        let response = self
-            .client
-            .get(url)
-            .header("Cookie", cookie_header)
-            .header("Accept", "application/json, text/plain, */*")
-            .header("Origin", "https://commandcode.ai")
-            .header("Referer", "https://commandcode.ai/")
-            .send()
-            .await?;
+    fn billing_url(&self, credential: Credential<'_>, resource: &str) -> String {
+        format!("{}{}", self.api_base, credential.billing_path(resource))
+    }
+
+    async fn get_json(
+        &self,
+        url: &str,
+        credential: Credential<'_>,
+    ) -> Result<Value, ProviderError> {
+        let request = self.client.get(url);
+        let request = match credential {
+            Credential::Cookie(cookie_header) => request
+                .header("Cookie", cookie_header)
+                .header("Accept", "application/json, text/plain, */*")
+                .header("Origin", "https://commandcode.ai")
+                .header("Referer", "https://commandcode.ai/"),
+            Credential::ApiKey(api_key) => request
+                .header("Authorization", format!("Bearer {api_key}"))
+                .header("Accept", "application/json"),
+        };
+        let response = request.send().await?;
 
         if response.status() == reqwest::StatusCode::UNAUTHORIZED
             || response.status() == reqwest::StatusCode::FORBIDDEN
         {
-            return Err(ProviderError::AuthRequired);
+            return Err(match credential {
+                Credential::Cookie(_) => ProviderError::AuthRequired,
+                // A rejected key reports an error; it never falls back to cookies.
+                Credential::ApiKey(_) => ProviderError::Other(API_KEY_REJECTED.into()),
+            });
         }
         if !response.status().is_success() {
             return Err(ProviderError::Other(format!(
@@ -404,6 +491,10 @@ mod plan_cache_integration_tests;
 #[cfg(test)]
 #[path = "granted_credits_tests.rs"]
 mod granted_credits_tests;
+
+#[cfg(test)]
+#[path = "api_key_tests.rs"]
+mod api_key_tests;
 
 fn result_from_payloads(
     credits_payload: &Value,
@@ -666,24 +757,59 @@ impl Provider for CommandCodeProvider {
 
     async fn fetch_usage(&self, ctx: &FetchContext) -> Result<ProviderFetchResult, ProviderError> {
         match ctx.source_mode {
-            SourceMode::Auto | SourceMode::Web => {
-                if let Some(cookie) = ctx.manual_cookie_header.as_deref() {
-                    return self.fetch_web(cookie).await;
-                }
-                self.fetch_with_cookie_refresh().await
+            // A configured key is taken before any cookie is read (upstream
+            // `CommandCodeProviderDescriptor` Auto strategy resolution).
+            SourceMode::Auto => match resolve_command_code_key(ctx.api_key.as_deref()) {
+                Ok(api_key) if !api_key.is_empty() => self.fetch_api_key(&api_key).await,
+                _ => self.fetch_cookie_lane(ctx).await,
+            },
+            // The explicit API source is the key lane and never reads cookies.
+            SourceMode::OAuth => {
+                let api_key = resolve_command_code_key(ctx.api_key.as_deref())?;
+                self.fetch_api_key(&api_key).await
             }
-            SourceMode::OAuth | SourceMode::Cli => {
-                Err(ProviderError::UnsupportedSource(ctx.source_mode))
-            }
+            SourceMode::Web => self.fetch_cookie_lane(ctx).await,
+            SourceMode::Cli => Err(ProviderError::UnsupportedSource(ctx.source_mode)),
         }
     }
 
     fn available_sources(&self) -> Vec<SourceMode> {
-        vec![SourceMode::Auto, SourceMode::Web]
+        vec![SourceMode::Auto, SourceMode::OAuth, SourceMode::Web]
     }
 
     fn supports_web(&self) -> bool {
         true
+    }
+
+    fn owns_credential_lane_routing(&self) -> bool {
+        true
+    }
+
+    fn error_state_kind(&self, error: &ProviderError) -> ProviderStateKind {
+        match error {
+            ProviderError::Other(message) if message == API_KEY_REJECTED => {
+                ProviderStateKind::ExpiredSession
+            }
+            _ => error.state_kind(),
+        }
+    }
+}
+
+impl CommandCodeProvider {
+    /// Cookie lane for Auto without a key and for Web. A manual header is used
+    /// as-is. `manual_cookie_missing` (cookie source `off`) never reads a
+    /// browser; otherwise the browser lookup runs lazily with its cache.
+    async fn fetch_cookie_lane(
+        &self,
+        ctx: &FetchContext,
+    ) -> Result<ProviderFetchResult, ProviderError> {
+        if let Some(cookie) = ctx.manual_cookie_header.as_deref() {
+            return self.fetch_web(cookie).await;
+        }
+        if ctx.manual_cookie_missing {
+            return Err(ProviderError::NoCookies);
+        }
+        self.fetch_with_cookie_refresh().await
     }
 }
 

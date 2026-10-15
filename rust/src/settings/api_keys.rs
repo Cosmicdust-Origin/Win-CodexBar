@@ -348,6 +348,17 @@ pub fn get_api_key_providers() -> Vec<ProviderConfigInfo> {
             dashboard_url: Some("https://console.aws.amazon.com/bedrock"),
         },
         ProviderConfigInfo {
+            id: ProviderId::CommandCode,
+            name: "Command Code",
+            requires_api_key: false,
+            api_key_env_var: Some("COMMAND_CODE_API_KEY"),
+            api_key_help: Some(
+                "Used by Auto when set and by the API usage source. Without a key, Auto uses browser cookies. Set it here or in COMMAND_CODE_API_KEY.",
+            ),
+            config_file_path: None,
+            dashboard_url: Some("https://commandcode.ai/studio"),
+        },
+        ProviderConfigInfo {
             id: ProviderId::Codebuff,
             name: "Codebuff",
             requires_api_key: true,
