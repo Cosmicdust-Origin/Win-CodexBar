@@ -70,7 +70,10 @@ impl OllamaProvider {
     }
 
     /// Fetch usage by scraping ollama.com/settings
-    async fn fetch_usage_web(&self, ctx: &FetchContext) -> Result<UsageSnapshot, ProviderError> {
+    async fn fetch_usage_web(
+        &self,
+        ctx: &FetchContext,
+    ) -> Result<ProviderFetchResult, ProviderError> {
         let cookies = resolve_cookie_source(ctx)?;
 
         let client = crate::core::credentialed_http_client_builder()
@@ -87,7 +90,7 @@ impl OllamaProvider {
                 if ctx.manual_cookie_header.is_none() {
                     cache_validated_session_cookie(&cookies);
                 }
-                self.parse_usage_html(&html)
+                self.parse_usage_result(&html)
             }
             Err(ProviderError::AuthRequired) if ctx.manual_cookie_header.is_none() => {
                 // Cached/imported session expired — clear and re-import once.
@@ -97,7 +100,7 @@ impl OllamaProvider {
                     .ok_or(ProviderError::AuthRequired)?;
                 let html = fetch_settings_html_at(&client, &fresh, start_url).await?;
                 cache_validated_session_cookie(&fresh);
-                self.parse_usage_html(&html)
+                self.parse_usage_result(&html)
             }
             Err(err) => Err(err),
         }
@@ -247,8 +250,7 @@ fn parse_api_balance(bytes: &[u8]) -> Result<ProviderFetchResult, ProviderError>
     if let Some(purchased) = purchased {
         let purchased = purchased.as_object().ok_or_else(fail)?;
         let balance = balance_amount(purchased.get("balance_usd")).ok_or_else(fail)?;
-        cost =
-            Some(CostSnapshot::new(0.0, "USD", OLLAMA_CREDIT_BALANCE_PERIOD).with_balance(balance));
+        cost = Some(credit_balance_cost(balance));
     }
 
     let has_monthly = monthly.is_some();
@@ -265,6 +267,13 @@ fn parse_api_balance(bytes: &[u8]) -> Result<ProviderFetchResult, ProviderError>
         result = result.with_cost(cost);
     }
     Ok(result)
+}
+
+/// Purchased-credit balance shared by the API path (`/api/balance`) and the
+/// cookie path (the settings page "Usage credits" wallet), so both modes expose
+/// the same balance-only cost.
+fn credit_balance_cost(balance: f64) -> CostSnapshot {
+    CostSnapshot::new(0.0, "USD", OLLAMA_CREDIT_BALANCE_PERIOD).with_balance(balance)
 }
 
 /// Upstream `amount()`: a finite JSON number, or a string of plain decimal digits.
@@ -317,8 +326,20 @@ fn ollama_session_action(
 }
 
 impl OllamaProvider {
+    /// Parse the settings page into the usage snapshot plus the wallet cost
+    /// (the same balance-only cost the API path reports).
+    fn parse_usage_result(&self, html: &str) -> Result<ProviderFetchResult, ProviderError> {
+        let usage = self.parse_usage_html(html)?;
+        let mut result = ProviderFetchResult::new(usage, "web");
+        if let Some(balance) = parse_credit_wallet_balance(html) {
+            result = result.with_cost(credit_balance_cost(balance));
+        }
+        Ok(result)
+    }
+
     /// Parse usage data from the Ollama settings HTML page
     fn parse_usage_html(&self, html: &str) -> Result<UsageSnapshot, ProviderError> {
+        let wallet_balance = parse_credit_wallet_balance(html);
         // Check if we're signed out
         if html.contains("Sign in")
             && !html.contains("Cloud Usage")
@@ -327,6 +348,7 @@ impl OllamaProvider {
                 .iter()
                 .any(|label| html.contains(label))
             && !html.contains("Session usage")
+            && wallet_balance.is_none()
         {
             return Err(ProviderError::AuthRequired);
         }
@@ -340,14 +362,25 @@ impl OllamaProvider {
             self.parse_usage_block(&["Session usage", "Hourly usage"], html, Some(5 * 60));
         let weekly_block = self.parse_usage_block(&["Weekly usage"], html, Some(7 * 24 * 60));
 
-        if monthly_block.is_none() && session_block.is_none() && weekly_block.is_none() {
+        if monthly_block.is_none()
+            && session_block.is_none()
+            && weekly_block.is_none()
+            && wallet_balance.is_none()
+        {
             return Err(ProviderError::Parse(
                 "Could not find usage data on Ollama settings page".to_string(),
             ));
         }
 
-        let primary =
-            rate_window_from_usage_block(monthly_block.as_ref().or(session_block.as_ref()));
+        // A wallet-only page reports no quota: keep the primary lane informational
+        // and hidden so no fake 0% meter is drawn (same as the API path).
+        let primary = match monthly_block.as_ref().or(session_block.as_ref()) {
+            Some(block) => rate_window_from_usage_block(Some(block)),
+            None if wallet_balance.is_some() => {
+                RateWindow::informational("No quota reported").hidden_on_card()
+            }
+            None => rate_window_from_usage_block(None),
+        };
         let mut usage = UsageSnapshot::new(primary);
         if monthly_block.is_some() {
             usage = usage.with_primary_label("Monthly");
@@ -430,6 +463,8 @@ impl OllamaProvider {
         for pattern in [
             r#"Included usage\s*</span\s*>\s*<span[^>]*>([^<]+)</span"#,
             r#"Cloud Usage\s*</span>\s*<span[^>]*>([^<]+)</span>"#,
+            // Current wallet heading carries the plan as a badge: "Usage credits" + <span>pro</span>.
+            r#"(?i)<h[1-6][^>]*>\s*Usage credits\s*<span[^>]*>\s*([^<]+)</span"#,
         ] {
             let re = Regex::new(pattern).ok()?;
             if let Some(plan) = re
@@ -482,13 +517,9 @@ impl Provider for OllamaProvider {
                         Err(_) => {}
                     }
                 }
-                let usage = self.fetch_usage_web(ctx).await?;
-                Ok(ProviderFetchResult::new(usage, "web"))
+                self.fetch_usage_web(ctx).await
             }
-            SourceMode::Web => {
-                let usage = self.fetch_usage_web(ctx).await?;
-                Ok(ProviderFetchResult::new(usage, "web"))
-            }
+            SourceMode::Web => self.fetch_usage_web(ctx).await,
             SourceMode::OAuth | SourceMode::Cli => {
                 Err(ProviderError::UnsupportedSource(ctx.source_mode))
             }
@@ -559,6 +590,52 @@ fn parse_dollar_used_percent(text: &str) -> Option<f64> {
     }
     let percent = used / limit * 100.0;
     percent.is_finite().then_some(percent)
+}
+
+/// Dollar amount inside a wallet element: `$` with optional thousands separators and cents.
+const OLLAMA_WALLET_AMOUNT: &str = r"(\$(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(?:\.[0-9]+)?)";
+
+/// Balance from the current settings page "Usage credits" wallet (upstream #4370).
+///
+/// The balance must be the first element after the wallet heading (only `<div>`
+/// openers and whitespace may precede it). Any closing tag or next heading ends
+/// that match, so a missing value cannot borrow a monthly-spend figure, prose, or
+/// an amount from another section. Script and style text is ignored. Returns
+/// `None` when no balance is reported.
+fn parse_credit_wallet_balance(html: &str) -> Option<f64> {
+    let page = strip_script_and_style(html).replace("&nbsp;", " ");
+    let heading = Regex::new(
+        r"(?i)<h[1-6][^>]*>\s*Usage credits(?:\s*<span[^>]*>[^<]*</span\s*>)?\s*</h[1-6]\s*>",
+    )
+    .ok()?;
+    let body = &page[heading.find(&page)?.end()..];
+    let balance = Regex::new(&format!(
+        r"(?i)^\s*(?:<div[^>]*>\s*)*<span[^>]*>\s*{OLLAMA_WALLET_AMOUNT}\s*</span\s*>"
+    ))
+    .ok()?;
+    let raw = balance.captures(body)?.get(1)?.as_str();
+    parse_wallet_amount(raw)
+}
+
+fn strip_script_and_style(html: &str) -> String {
+    let mut page = html.to_string();
+    for tag in ["script", "style"] {
+        if let Ok(re) = Regex::new(&format!(r"(?is)<{tag}\b[^>]*>.*?</{tag}\s*>")) {
+            page = re.replace_all(&page, "").into_owned();
+        }
+    }
+    page
+}
+
+/// Wallet amount as a finite dollar value. The leading `$` is required.
+fn parse_wallet_amount(raw: &str) -> Option<f64> {
+    let amount = raw
+        .trim()
+        .strip_prefix('$')?
+        .replace(',', "")
+        .parse::<f64>()
+        .ok()?;
+    amount.is_finite().then_some(amount)
 }
 
 fn rate_window_from_usage_block(block: Option<&UsageBlock>) -> RateWindow {
@@ -1111,6 +1188,149 @@ mod tests {
             ollama_session_action(true, false, true),
             OllamaSessionAction::ReimportBrowser
         );
+    }
+
+    /// Synthetic current settings-page wallet (upstream #4370 `OllamaCreditWalletTests.wallet`);
+    /// never a live capture.
+    const CREDIT_WALLET_FIXTURE: &str = r#"
+        <section>
+          <div>
+            <h2>Usage credits<span>pro</span></h2>
+            <span>$18.25</span>
+            <p>Refills to $30 in 3 weeks.</p>
+          </div>
+          <div>
+            <span>Monthly credits used</span>
+            <span>$4.50</span>
+          </div>
+        </section>
+    "#;
+
+    #[test]
+    fn credit_wallet_balance_reaches_cost_without_inventing_quota() {
+        let provider = OllamaProvider::new();
+        let result = provider
+            .parse_usage_result(CREDIT_WALLET_FIXTURE)
+            .expect("wallet page with a balance parses");
+
+        assert_eq!(result.source_label, "web");
+        assert!(result.usage.primary.is_informational);
+        assert!(result.usage.primary.hidden_on_card);
+        assert_eq!(result.usage.primary_label, None);
+        assert!(result.usage.secondary.is_none());
+        assert_eq!(result.usage.login_method.as_deref(), Some("pro"));
+
+        // Same balance-only cost shape the API path reports for purchased credits.
+        let cost = result.cost.expect("wallet balance becomes a cost");
+        assert_eq!(cost.period, "Credit balance");
+        assert_eq!(cost.used, 0.0);
+        assert_eq!(cost.limit, None);
+        assert_eq!(cost.balance, Some(18.25));
+    }
+
+    #[test]
+    fn credit_wallet_monthly_spending_cannot_become_missing_balance() {
+        let provider = OllamaProvider::new();
+        let html = CREDIT_WALLET_FIXTURE.replace("<span>$18.25</span>", "");
+
+        assert_eq!(parse_credit_wallet_balance(&html), None);
+        // Without a balance or quota the page has no usable data, matching the API path.
+        assert!(matches!(
+            provider.parse_usage_result(&html),
+            Err(ProviderError::Parse(_))
+        ));
+    }
+
+    #[test]
+    fn credit_wallet_balance_must_lead_its_section() {
+        // Labelled or prose text ahead of the amount is not the wallet balance.
+        let html = CREDIT_WALLET_FIXTURE.replace(
+            "<span>$18.25</span>",
+            "<span>Estimated balance $99.00</span>",
+        );
+        assert_eq!(parse_credit_wallet_balance(&html), None);
+
+        // A non-breaking space before the amount is still a complete element.
+        let html =
+            CREDIT_WALLET_FIXTURE.replace("<span>$18.25</span>", "<span>&nbsp;$18.25</span>");
+        assert_eq!(parse_credit_wallet_balance(&html), Some(18.25));
+    }
+
+    #[test]
+    fn credit_wallet_heading_must_be_a_heading_element() {
+        // Prose that merely mentions usage credits is not the wallet heading.
+        let html = r#"<div><p>Usage credits<span>$5.00</span></p></div>"#;
+        assert_eq!(parse_credit_wallet_balance(html), None);
+    }
+
+    #[test]
+    fn credit_wallet_does_not_borrow_amounts_outside_its_section() {
+        let after_section_end = r#"
+            <section><h2>Usage credits<span>pro</span></h2></section>
+            <section><span>$99.00</span></section>
+        "#;
+        assert_eq!(parse_credit_wallet_balance(after_section_end), None);
+
+        let after_next_heading = r#"
+            <section><h2>Usage credits</h2><h3>Billing</h3><span>$99.00</span></section>
+        "#;
+        assert_eq!(parse_credit_wallet_balance(after_next_heading), None);
+
+        let after_closing_tag = r#"
+            <div><h2>Usage credits</h2></div><div><span>$99.00</span></div>
+        "#;
+        assert_eq!(parse_credit_wallet_balance(after_closing_tag), None);
+    }
+
+    #[test]
+    fn credit_wallet_ignores_script_and_style_text() {
+        let html = r#"
+            <script>var x = "<h2>Usage credits</h2><span>$1.00</span>";</script>
+            <style>.a { color: red; }</style>
+        "#;
+        assert_eq!(parse_credit_wallet_balance(html), None);
+    }
+
+    #[test]
+    fn credit_wallet_coexists_with_unchanged_monthly_quota() {
+        let provider = OllamaProvider::new();
+        let html = format!(
+            r#"{CREDIT_WALLET_FIXTURE}
+            <div><span>Monthly usage</span><span>$7.50 of $60 used</span>
+            <div data-time="2026-10-30T15:14:29Z">Resets in 4 weeks.</div></div>"#
+        );
+        let result = provider
+            .parse_usage_result(&html)
+            .expect("wallet and monthly quota parse together");
+
+        assert_eq!(result.usage.primary.used_percent, 12.5);
+        assert_eq!(
+            result.usage.primary.window_minutes,
+            Some(OLLAMA_MONTHLY_WINDOW_MINUTES)
+        );
+        assert_eq!(
+            result.usage.primary.resets_at,
+            DateTime::parse_from_rfc3339("2026-10-30T15:14:29Z")
+                .ok()
+                .map(|date| date.with_timezone(&Utc))
+        );
+        assert_eq!(result.usage.primary_label.as_deref(), Some("Monthly"));
+        assert_eq!(result.cost.and_then(|cost| cost.balance), Some(18.25));
+    }
+
+    #[test]
+    fn credit_wallet_page_with_sign_in_link_is_not_treated_as_signed_out() {
+        let provider = OllamaProvider::new();
+        let html = format!(r#"<a href="/signin">Sign in</a>{CREDIT_WALLET_FIXTURE}"#);
+        let result = provider
+            .parse_usage_result(&html)
+            .expect("wallet balance proves a signed-in page");
+        assert_eq!(result.cost.and_then(|cost| cost.balance), Some(18.25));
+
+        assert!(matches!(
+            provider.parse_usage_html(r#"<a href="/signin">Sign in</a>"#),
+            Err(ProviderError::AuthRequired)
+        ));
     }
 
     #[test]
