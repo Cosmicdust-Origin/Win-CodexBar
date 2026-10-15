@@ -986,6 +986,8 @@ export interface ProviderUsageSnapshot {
   wayfinderUsage?: WayfinderUsageSnapshot | null;
   /** Per-UTC-day OpenAI Admin API history; only the `openaiapi` Admin path sets it. */
   openAiApiUsage?: OpenAiApiUsageSnapshot | null;
+  /** Last-hour Tokens/min grid; only the `openaiapi` Admin path sets it. */
+  throughput?: ProviderThroughputSnapshot | null;
   sessionEquivalentForecast?: SessionEquivalentForecastSnapshot | null;
   /** Recorded remaining-quota burndown; Codex and Claude only. */
   quotaBurndown?: QuotaBurndownSnapshot | null;
@@ -1063,6 +1065,45 @@ export interface OpenAiApiUsageSnapshot {
   projectId: string | null;
   /** Ascending by `startTime`; empty when the window had no data. */
   daily: OpenAiApiDailyUsageSnapshot[];
+}
+
+/** One minute of the Tokens/min grid. */
+export interface ThroughputMinuteSnapshot {
+  /** Minute start, epoch seconds. */
+  start: number;
+  totalTokens: number;
+  requests: number;
+  /** After the reporting frontier: not reported yet, never a real zero or a peak. */
+  isPending: boolean;
+}
+
+/** Per-model throughput, ranked by reported volume, then pending volume, then name. */
+export interface ThroughputModelSnapshot {
+  name: string;
+  latestTpm: number;
+  peakTpm: number;
+  totalTokens: number;
+  /** Peak non-pending tokens that count toward a rate limit (Batch API excluded). */
+  peakLimitCountedTokens: number;
+  /** Limit-counted tokens aligned with `ProviderThroughputSnapshot.minutes`. */
+  limitCountedTokensByMinute: number[];
+}
+
+export interface ProviderThroughputSnapshot {
+  /** Regular ascending one-minute grid. */
+  minutes: ThroughputMinuteSnapshot[];
+  /** Newest complete minute with reported traffic, epoch seconds. */
+  frontier: number | null;
+  latestTokensPerMinute: number | null;
+  peakTokensPerMinute: number;
+  peakAt: number | null;
+  fiveMinuteAverageTokensPerMinute: number;
+  models: ThroughputModelSnapshot[];
+  windowMinutes: number;
+  /** Epoch seconds. */
+  fetchedAt: number;
+  /** Project scope; `null` covers the whole organization (only then can limits apply). */
+  projectId: string | null;
 }
 
 export interface RefreshCompletePayload {

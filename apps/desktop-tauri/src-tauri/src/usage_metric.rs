@@ -496,6 +496,7 @@ mod tests {
             wayfinder_usage: None,
             quota_burndown: None,
             open_ai_api_usage: None,
+            throughput: None,
             session_equivalent_forecast: None,
         }
     }
