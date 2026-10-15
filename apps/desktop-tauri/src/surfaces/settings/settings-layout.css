@@ -1242,6 +1242,18 @@
   color: var(--text-secondary);
 }
 
+/* The folder list needs the full row, so stack the control under the label
+   instead of letting the auto-width control column squeeze the text. */
+.settings-field:has(.antigravity-profile-homes) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.settings-field:has(.antigravity-profile-homes) > .settings-field__control {
+  grid-column: 1 / -1;
+  display: block;
+  width: 100%;
+}
+
 /* Quota warnings: window label, Global / Custom / Off, then the values. */
 .quota-warning-row {
   display: grid;
