@@ -777,6 +777,11 @@ pub struct ProviderFetchResult {
     #[serde(skip)]
     pub open_ai_api_usage: Option<OpenAiApiUsageHistory>,
 
+    /// Last-hour tokens-per-minute grid (OpenAI Admin API 1-minute buckets). Transient
+    /// like [`Self::open_ai_api_usage`]: projected through the bridge, never serialized.
+    #[serde(skip)]
+    pub throughput: Option<super::ProviderThroughput>,
+
     /// Transient non-quota inventory for provider-specific display.
     ///
     /// The field is intentionally skipped by serde: it belongs to the current
@@ -830,6 +835,7 @@ impl ProviderFetchResult {
             cost: None,
             wayfinder_usage: None,
             open_ai_api_usage: None,
+            throughput: None,
             inventory: Vec::new(),
             reset_credits: None,
             display_details: Vec::new(),
@@ -883,6 +889,12 @@ impl ProviderFetchResult {
     /// Attach the per-day OpenAI Admin API history.
     pub fn with_open_ai_api_usage(mut self, history: OpenAiApiUsageHistory) -> Self {
         self.open_ai_api_usage = Some(history);
+        self
+    }
+
+    /// Attach the per-minute token throughput.
+    pub fn with_throughput(mut self, throughput: super::ProviderThroughput) -> Self {
+        self.throughput = Some(throughput);
         self
     }
 
@@ -975,6 +987,32 @@ mod tests {
 
         let decoded: ProviderFetchResult = serde_json::from_value(encoded).unwrap();
         assert!(decoded.open_ai_api_usage.is_none());
+    }
+
+    #[test]
+    fn throughput_is_transient_and_not_serialized() {
+        let usage = UsageSnapshot::new(RateWindow::new(25.0));
+        let result = ProviderFetchResult::new(usage, "admin-api").with_throughput(
+            super::super::ProviderThroughput {
+                minutes: Vec::new(),
+                frontier: None,
+                latest_tokens_per_minute: None,
+                peak_tokens_per_minute: 0,
+                peak_at: None,
+                five_minute_average_tokens_per_minute: 0.0,
+                models: Vec::new(),
+                window_minutes: 60,
+                fetched_at: 1_700_000_000,
+                project_id: None,
+            },
+        );
+
+        assert!(result.throughput.is_some());
+        let encoded = serde_json::to_value(&result).unwrap();
+        assert!(encoded.get("throughput").is_none());
+
+        let decoded: ProviderFetchResult = serde_json::from_value(encoded).unwrap();
+        assert!(decoded.throughput.is_none());
     }
 
     #[test]

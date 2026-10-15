@@ -1011,6 +1011,11 @@ pub struct FetchContext {
     /// (LiteLLM model activity, Claude workspace spend). Scoped to the provider
     /// being fetched; false everywhere the setting is not consulted.
     pub optional_details_enabled: bool,
+
+    /// OpenAI API: also fetch the last hour of 1-minute usage for the Tokens/min chart
+    /// (upstream `OPENAI_LIVE_MINUTES`). The app sets it from settings (default on);
+    /// paths with no throughput consumer leave it off to save the request.
+    pub live_usage_enabled: bool,
 }
 
 impl Default for FetchContext {
@@ -1033,6 +1038,7 @@ impl Default for FetchContext {
             browser_cookie_import: false,
             requires_optional_usage_completeness: false,
             optional_details_enabled: false,
+            live_usage_enabled: false,
         }
     }
 }
