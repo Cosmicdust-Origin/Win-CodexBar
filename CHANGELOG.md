@@ -10,6 +10,7 @@
 ## [Windows] Unreleased
 
 - Codex CLI: add opt-in `cost --identified-only` request subtotals across local and SSH (`--remote`) histories, deduplicating strong request identities and keeping partial results without estimating a combined price, plus `--group-by project` reports that show the partial-history notice even when no projects are listed (upstream #4447, #4472).
+- OpenCode Go: reuse unchanged local history scans (keyed by `opencode.db` and its `-wal` sidecar size and modification time, at most one 4 MiB payload kept), and in Auto overlay Console quota from a stored or automatically discovered browser session before falling back to the local estimate; cookie source Off never reads a browser (upstream #4410, #4445).
 - Add **Parallel** prepaid balance: reads the account balance and any pending debit from the platform.parallel.ai console using your browser session or a pasted Cookie header. A signed-out console moves on to the next browser session and reports an expired session when none remain (upstream #4479, #4508).
 - Add **fal** account credit balance: reads the credit balance and account name from fal's billing API with your API key (`FAL_KEY` or Settings) and explains when the key lacks the billing read permission (upstream #4438).
 - Add **FLORA** workspace balance: reads the workspace's available balance, your member limit, and this month's spend with your API key and workspace ID (`FLORA_API_KEY` / `FLORA_WORKSPACE_ID` or Settings), and explains when spend is unavailable or the key lacks billing permission (upstream #4439).
