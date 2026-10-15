@@ -493,14 +493,16 @@ fn javascript_hash_base36(text: &str) -> String {
 /// Arguments shared by every Claude CLI `/usage` probe.
 ///
 /// The remote-control startup hook can otherwise change the interactive
-/// session before the usage command is collected. Keep this override in one
-/// helper so future CLI probe paths cannot silently omit it.
+/// session before the usage command is collected. `disableAllHooks` stops the
+/// user's SessionStart hooks (git syncs, ssh, and so on) from running on every
+/// poll. Keep this override in one helper so future CLI probe paths cannot
+/// silently omit it.
 fn claude_usage_settings_args() -> [String; 2] {
     [
         "--settings".to_string(),
         // Issue #778 (Claude Code 2.1.293): `tui: default` stops the "Try the new
         // fullscreen renderer?" offer. Older builds ignore unknown settings keys.
-        r#"{"remoteControlAtStartup":false,"tui":"default"}"#.to_string(),
+        r#"{"remoteControlAtStartup":false,"disableAllHooks":true,"tui":"default"}"#.to_string(),
     ]
 }
 
@@ -1836,6 +1838,7 @@ mod tests {
             serde_json::from_str(&claude_usage_settings_args()[1]).unwrap();
         assert_eq!(settings["tui"], "default");
         assert_eq!(settings["remoteControlAtStartup"], false);
+        assert_eq!(settings["disableAllHooks"], true);
     }
 
     #[test]
@@ -1865,12 +1868,13 @@ mod tests {
     }
 
     #[test]
-    fn usage_probe_settings_disable_remote_control_startup() {
+    fn usage_probe_settings_disable_remote_control_startup_and_user_hooks() {
         assert_eq!(
             claude_usage_settings_args(),
             [
                 "--settings".to_string(),
-                r#"{"remoteControlAtStartup":false,"tui":"default"}"#.to_string(),
+                r#"{"remoteControlAtStartup":false,"disableAllHooks":true,"tui":"default"}"#
+                    .to_string(),
             ]
         );
     }
