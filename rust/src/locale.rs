@@ -1932,6 +1932,11 @@ locale_keys! {
     ProviderCodexBatterySaverHelp,
     ProviderOptionNotUsedOnWindows,
     ClaudeSwapExecutablePathHelp,
+
+    // Claude cloud credits (promotional balance detail row)
+    ProviderLabelCloudCredits,
+    ProviderTextExpired,
+    ProviderTextOfRemaining,
 }
 
 #[cfg(test)]

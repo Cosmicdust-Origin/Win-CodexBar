@@ -9,6 +9,7 @@
 
 ## [Windows] Unreleased
 
+- Show Claude **Cloud credits**, a promotional dollar balance, as a detail row in the tray card, Settings, and CLI when the Claude OAuth or Web usage response reports it. The row shows the remaining balance of the allowance, or Expired or Unavailable when applicable, and can be hidden from Visible usage items. It never changes the quota windows or prepaid Extra usage (upstream CodexBar 0.72.0).
 - Codex: publish the fresh weekly quota and reset credits after a confirmed weekly reset when the previously published usage had no reset-credit inventory. Both fresh reads must come from the exact OAuth source, report the same plan, and list the same available credits observed after the last published usage (upstream #4218).
 - Show an optional **Live remaining (est.)** row for xAI beside the posted prepaid balance, from the current postpaid invoice preview (upstream #4419). A missing or failed preview hides only that row.
 - Show independent session and weekly usage for native saved Claude Code accounts, with account-scoped OAuth renewal and safe authentication warnings.

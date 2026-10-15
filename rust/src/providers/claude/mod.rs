@@ -6,6 +6,7 @@ mod auto_precision;
 pub mod claude_swap;
 mod cli_reset;
 mod cli_screen;
+mod cloud_credits;
 mod oauth;
 pub mod quota_history;
 mod reset_credits;

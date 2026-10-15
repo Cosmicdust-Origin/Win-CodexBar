@@ -1602,3 +1602,7 @@ CosmicProjectIdTitle = Cosmic AI Project
 CosmicProjectIdLabel = Project ID
 CosmicProjectIdPlaceholder = cos_...
 CosmicProjectIdHelp = Required. Usage covers this project only. Or set COSMIC_PROJECT_ID.
+# Claude cloud credits
+ProviderLabelCloudCredits = Хмарні кредити
+ProviderTextExpired = Термін минув
+ProviderTextOfRemaining = Залишилося { "{}" } із { "{}" }

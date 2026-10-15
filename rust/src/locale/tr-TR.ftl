@@ -1600,3 +1600,7 @@ ProviderCodexBatterySaver = OpenAI web pil tasarrufu
 ProviderCodexBatterySaverHelp = Pil ve ağ kullanımını azaltmak için arka plandaki chatgpt.com yenilemelerini sınırlar. Pano ekstraları siz elle yenileyene kadar eski kalabilir.
 ProviderOptionNotUsedOnWindows = Henüz Windows'ta kullanılmıyor; seçim, desteklendiğinde kullanılmak üzere kaydedilir.
 ClaudeSwapExecutablePathHelp = cswap yürütülebilir dosyasının yolu (github.com/realiti4/claude-swap).
+# Claude cloud credits
+ProviderLabelCloudCredits = Bulut kredileri
+ProviderTextExpired = Süresi doldu
+ProviderTextOfRemaining = { "{}" } / { "{}" } kaldı
