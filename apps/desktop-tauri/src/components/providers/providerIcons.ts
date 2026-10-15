@@ -22,6 +22,7 @@ import crossmodel from "./icons/ProviderIcon-crossmodel.svg?raw";
 import cursor from "./icons/ProviderIcon-cursor.svg?raw";
 import deepgram from "./icons/ProviderIcon-deepgram.svg?raw";
 import deepinfra from "./icons/ProviderIcon-deepinfra.svg?raw";
+import devin from "./icons/ProviderIcon-devin.svg?raw";
 import devpass from "./icons/ProviderIcon-devpass.svg?raw";
 import fireworks from "./icons/ProviderIcon-fireworks.svg?raw";
 import aiand from "./icons/ProviderIcon-aiand.svg?raw";
@@ -135,6 +136,7 @@ const RAW: Record<string, string> = {
   cursor: tint(cursor),
   deepgram: tint(deepgram),
   deepinfra: tint(deepinfra),
+  devin: tint(devin),
   devpass: tint(devpass),
   fireworks: tint(fireworks),
   aiand: tint(aiand),
@@ -311,7 +313,7 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   chutes:      { id: "chutes",      brandColor: "#3184ff", fallbackLetter: "C" },
   litellm:     { id: "litellm",     brandColor: "#4c89f0", fallbackLetter: "L" },
   poe:         { id: "poe",         brandColor: "#5d5cde", fallbackLetter: "P" },
-  devin:       { id: "devin",       brandColor: "#317cff", fallbackLetter: "D" },
+  devin:       { id: "devin",       brandColor: "#317cff", fallbackLetter: "D", svgPath: RAW.devin },
   zed:         { id: "zed",         brandColor: "#084eff", fallbackLetter: "Z" },
   qwencloud:   { id: "qwencloud",   brandColor: "#615CED", fallbackLetter: "Q" },
   notion:      { id: "notion",      brandColor: "#337EA9", fallbackLetter: "N", svgPath: RAW.notion },
