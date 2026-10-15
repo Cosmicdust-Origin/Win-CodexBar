@@ -296,6 +296,8 @@ mod tests {
     const LOG_QUOTA: &str = "2026-10-05 15:30:55,732 [   8326] INFO - #c.i.m.l.c.q.QuotaManager2Impl - New quota state is: Available(current=346495.294, maximum=6489986.397, until=2028-09-22T21:00:00Z, tariffQuota=QuotaDetails(current=346495.294, maximum=1000000, available=653504.706), topUpQuota=QuotaDetails(current=0, maximum=5489986.397, available=5489986.397))";
     const LOG_QUOTA_LATER_NO_TOP_UP: &str = "2026-10-05 15:31:00,001 [   8326] INFO - #c.i.m.l.c.q.QuotaManager2Impl - New quota state is: Available(current=1, maximum=2, until=2028-09-22T21:00:00Z, tariffQuota=QuotaDetails(current=250, maximum=1000, available=750))";
     const LOG_REFILL: &str = "2026-10-05 15:30:56,100 [   8326] INFO - #c.i.m.l.c.q.QuotaManager2Impl - New quota refill state is: Known(next=2026-11-01T00:00:00Z, tariff=QuotaRefillInfoTariff(amount=1000000, duration=PT720H))";
+    /// Newer Junie relay record (synthetic license); the IDE stops logging `New quota state` after the Air migration.
+    const LOG_JUNIE_QUOTA: &str = r#"2026-10-12 04:47:16,090 [  67837]   INFO - #c.i.m.l.a.m.AiaActivationTransmitter - Received message from junie: quota_update:{"license":"TESTLICENSE","current":{"amount":"16966.18"},"maximum":{"amount":"6489986.397"},"until":1853269200000,"quotaID":{"quotaId":"TESTLICENSE"},"tariffQuota":{"current":{"amount":"16966.18"},"maximum":{"amount":"1000000.0"},"available":{"amount":"983033.82"}},"topUpQuota":{"current":{"amount":"0.0"},"maximum":{"amount":"5489986.397"},"available":{"amount":"5489986.397"}}}"#;
 
     const XML_MODIFIED_2020: u64 = 1_577_836_800;
     const XML_MODIFIED_2030: u64 = 1_893_456_000;
@@ -452,6 +454,28 @@ mod tests {
                 .map(IdeInstall::display_name)
                 .as_deref(),
             Some("IntelliJ IDEA 2025.3")
+        );
+    }
+
+    #[test]
+    fn detected_ide_newer_junie_log_replaces_xml_quota_and_drops_xml_refill() {
+        let fixture = roots();
+        write_ide_xml(
+            &fixture.config,
+            "IntelliJIdea2025.3",
+            &quota_xml(QUOTA_JSON, Some(REFILL_JSON)),
+            XML_MODIFIED_2020,
+        );
+        // Junie's record is the newest quota state and carries no refill record.
+        write_ide_log(&fixture.logs, "IntelliJIdea2025.3", &[LOG_JUNIE_QUOTA]);
+
+        let snapshot = read_snapshot(None, &fixture.roots).expect("snapshot");
+
+        assert!((snapshot.quota.used_percent() - 1.696618).abs() < 1e-6);
+        assert_eq!(top_up_value(&snapshot).as_deref(), Some("54.90 credits"));
+        assert!(
+            snapshot.refill.is_none(),
+            "a log without refill must not borrow the XML reset date"
         );
     }
 
