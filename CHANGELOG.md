@@ -10,6 +10,10 @@
 ## [Windows] Unreleased
 
 - Raycast: automatic cookie import walks every supported browser in the shared order and uses the first accepted session, instead of reading Chrome alone (upstream #4443, 0aef66c73).
+- Price Codex **codex-auto-review** requests made from a ChatGPT account at $0 from 2026-10-06 07:00 UTC onward: tokens stay in totals, the model is no longer listed as unpriced, and an explicit custom price for the model still applies (upstream #4452, #4453).
+- Show a spend-only Claude account's monthly cap (for example an Enterprise seat) as one primary meter with calendar-month pace and a midnight-UTC-on-the-1st reset inferred when Claude reports none, instead of a separate Extra usage bar; quota accounts keep their session and weekly lanes and Extra usage section unchanged. Fixes #4381 (upstream #4480)
+- Read the Charm Hyper balance from your signed-in browser session on the team dashboard, with plan and refresh rows when shown. The credits endpoint only accepts API keys, so session balances no longer depend on it. An expired session is reported as expired before any API-key fallback; API-key balances are unchanged (upstream #4435).
+- OpenAI API usage no longer counts audio tokens twice: Admin API input and output totals already include audio, so the daily token totals and the usage window now use them as reported (upstream #4495).
 - Ollama: cookie mode reads the current **Usage credits** wallet on the settings page and shows its credit balance, as API-key mode already does, without inventing a quota percentage or changing older usage meters (upstream #4370).
 - Session depleted and restored alerts start fresh after you switch accounts: the first reading for the new account sets its baseline without an alert, and switching back does not announce a restore that happened while another account was active (upstream #4138).
 - Show a Windows path (`~\.local\bin\cswap.exe`) as the placeholder for the Claude account switcher (cswap) executable in Settings instead of a Unix path (upstream v0.74.0).
