@@ -168,10 +168,13 @@ impl OpenAiLiveUsage {
                     .models
                     .iter()
                     .filter(|model| members.contains(model.name.as_str()));
-                let (tokens, requests) = pooled.fold((0, 0), |(tokens, requests), model| {
+                let (tokens, requests) = pooled.fold((0u64, 0u64), |(tokens, requests), model| {
                     (
-                        tokens + model.total_tokens() - model.batch_tokens,
-                        requests + model.requests - model.batch_requests,
+                        tokens.saturating_add(
+                            model.total_tokens().saturating_sub(model.batch_tokens),
+                        ),
+                        requests
+                            .saturating_add(model.requests.saturating_sub(model.batch_requests)),
                     )
                 });
                 (
