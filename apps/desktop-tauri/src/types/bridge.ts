@@ -644,6 +644,8 @@ export interface CodexWorkspacesProjectUsage {
   latestActivity: string | null;
   topModel: string | null;
   topSessions: CodexWorkspacesSessionUsage[];
+  /** Explicit desktop ownership: an independent chat, not a project folder. */
+  isProjectless: boolean;
 }
 
 export interface CodexLocalProjectUsageSnapshot {

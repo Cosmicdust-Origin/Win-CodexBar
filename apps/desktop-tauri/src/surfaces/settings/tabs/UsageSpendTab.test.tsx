@@ -28,6 +28,9 @@ const EN: Record<string, string> = {
   UsageSpendTrackingOffTitle: "Cost tracking is off",
   UsageSpendCopyJson: "Copy JSON",
   UsageSpendPeriodLabel: "Time range",
+  UsageSpendIndependentChats: "Independent chats",
+  UsageSpendIndependentChat: "Independent chat",
+  UsageSpendConversations: "conversations",
 };
 vi.mock("../../../hooks/useLocale", () => ({
   useLocale: () => ({ t: (key: string) => EN[key] ?? key }),
@@ -35,7 +38,14 @@ vi.mock("../../../hooks/useLocale", () => ({
 
 import UsageSpendTab from "./UsageSpendTab";
 import type { TabProps } from "../settingsTabs";
-import type { SettingsSnapshot, SpendContract, UsageSpendRow, UsageSpendSummary } from "../../../types/bridge";
+import type {
+  CodexWorkspacesProjectUsage,
+  CodexWorkspacesSessionUsage,
+  SettingsSnapshot,
+  SpendContract,
+  UsageSpendRow,
+  UsageSpendSummary,
+} from "../../../types/bridge";
 
 function contract(reportingPeriod: string): SpendContract {
   return {
@@ -234,4 +244,102 @@ describe("UsageSpendTab", () => {
     expect(screen.queryByLabelText("CostPeriodHistoryWindow")).toBeNull();
     expect(screen.queryByText("CostSummaryDisplayStyle")).toBeNull();
   });
+
+  it("lists independent chats in their own region, apart from the project rows", async () => {
+    tauriMocks.getUsageSpendSummary.mockImplementation(async (options?: { period?: string }) =>
+      withContract(summary(options?.period ?? "rolling:30"), {
+        projects: [usageProject("repo", "Win-CodexBar", 3), usageProject("chat-1", "Repair the local service", 2, true)],
+      }),
+    );
+    renderTab();
+    await screen.findByText("USD");
+    fireEvent.click(screen.getByRole("tab", { name: "UsageSpendProjects" }));
+
+    const chats = await screen.findByRole("region", { name: "Independent chats" });
+    expect(within(chats).getByText("Repair the local service")).toBeInTheDocument();
+    expect(within(chats).queryByText("Win-CodexBar")).toBeNull();
+    expect(screen.getByText("Win-CodexBar").closest('[role="region"]')).toBeNull();
+  });
+
+  it("labels each independent chat row with its conversation count", async () => {
+    tauriMocks.getUsageSpendSummary.mockImplementation(async (options?: { period?: string }) =>
+      withContract(summary(options?.period ?? "rolling:30"), {
+        projects: [usageProject("chat-1", "Repair the local service", 2, true)],
+      }),
+    );
+    renderTab();
+    await screen.findByText("USD");
+    fireEvent.click(screen.getByRole("tab", { name: "UsageSpendProjects" }));
+
+    const chats = await screen.findByRole("region", { name: "Independent chats" });
+    expect(within(chats).getByText(/^Independent chat · 2 conversations/)).toBeInTheDocument();
+  });
+
+  it("expands an independent chat to its own conversations", async () => {
+    tauriMocks.getUsageSpendSummary.mockImplementation(async (options?: { period?: string }) =>
+      withContract(summary(options?.period ?? "rolling:30"), {
+        projects: [usageProject("chat-1", "Repair the local service", 1, true)],
+        conversations: [chatSession("s-1", "chat-1", "Restart the daemon"), chatSession("s-2", "other", "Elsewhere")],
+      }),
+    );
+    renderTab();
+    await screen.findByText("USD");
+    fireEvent.click(screen.getByRole("tab", { name: "UsageSpendProjects" }));
+
+    const chats = await screen.findByRole("region", { name: "Independent chats" });
+    expect(within(chats).queryByText("Restart the daemon")).toBeNull();
+    fireEvent.click(within(chats).getByRole("button", { name: /Repair the local service/ }));
+    expect(within(chats).getByText("Restart the daemon")).toBeInTheDocument();
+    expect(within(chats).queryByText("Elsewhere")).toBeNull();
+  });
+
+  it("leaves the chats region out when no independent chat was found", async () => {
+    tauriMocks.getUsageSpendSummary.mockImplementation(async (options?: { period?: string }) =>
+      withContract(summary(options?.period ?? "rolling:30"), { projects: [usageProject("repo", "Win-CodexBar", 3)] }),
+    );
+    renderTab();
+    await screen.findByText("USD");
+    fireEvent.click(screen.getByRole("tab", { name: "UsageSpendProjects" }));
+
+    expect(await screen.findByText("Win-CodexBar")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Independent chats" })).toBeNull();
+  });
 });
+
+function withContract(base: UsageSpendSummary, overrides: Partial<SpendContract>): UsageSpendSummary {
+  return { ...base, contract: { ...base.contract, ...overrides } };
+}
+
+function usageProject(
+  id: string,
+  displayName: string,
+  sessionCount: number,
+  isProjectless = false,
+): CodexWorkspacesProjectUsage {
+  return {
+    id,
+    displayName,
+    path: null,
+    totals: { inputTokens: 10, cachedInputTokens: 0, outputTokens: 5, totalTokens: 15 },
+    costEstimate: { knownUsd: 1.5, unknownTokens: 0 },
+    sessionCount,
+    latestActivity: null,
+    topModel: "gpt-5",
+    topSessions: [],
+    isProjectless,
+  };
+}
+
+function chatSession(id: string, projectId: string, displayTitle: string): CodexWorkspacesSessionUsage {
+  return {
+    id,
+    projectId,
+    displayTitle,
+    cwd: null,
+    startedAt: null,
+    latestActivity: null,
+    totals: { inputTokens: 10, cachedInputTokens: 0, outputTokens: 5, totalTokens: 15 },
+    costEstimate: { knownUsd: 0.5, unknownTokens: 0 },
+    topModel: "gpt-5",
+  };
+}

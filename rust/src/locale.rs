@@ -1467,6 +1467,8 @@ locale_keys! {
     OverviewSpendPeriodTitle,
     UsageSpendModelsPeriodCaption,
     UsageSpendProjectsPeriodCaption,
+    UsageSpendIndependentChats,
+    UsageSpendIndependentChat,
 
     // Opt-in provider breakdowns (upstream 0.67.0)
     ProviderOptionalDetailsTitle,

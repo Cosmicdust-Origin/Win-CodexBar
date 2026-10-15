@@ -17,7 +17,12 @@ import {
   toggleHiddenSource,
   visibleUsageSpendSummary,
 } from "../../../lib/usageSpendDashboard";
-import type { SpendContract, UsageSpendSummary } from "../../../types/bridge";
+import type {
+  CodexWorkspacesProjectUsage,
+  CodexWorkspacesSessionUsage,
+  SpendContract,
+  UsageSpendSummary,
+} from "../../../types/bridge";
 import type { LocaleKey } from "../../../i18n/keys";
 import {
   costPeriodLabel,
@@ -474,70 +479,108 @@ function CoverageLine({ contract, t }: { contract: SpendContract; t: Translate }
   return <p className="settings-section__caption usage-spend__coverage">{parts.join(" · ")}</p>;
 }
 
+/** Rows shown before the show-all control, for projects and for independent chats alike. */
+const PROJECT_INITIAL_ROWS = 8;
+
 function ProjectsPanel({ contract, t }: { contract: SpendContract; t: Translate }) {
-  const [showAll, setShowAll] = useState(false);
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
-  const projects = showAll ? contract.projects : contract.projects.slice(0, 8);
+  // Independent chats are conversations with no project folder (upstream 0.72.0);
+  // they get their own region so they are not counted as projects.
+  const projectRows = contract.projects.filter((project) => !project.isProjectless);
+  const chatRows = contract.projects.filter((project) => project.isProjectless);
   const partial = contract.projectSourceStatus != null && contract.projectSourceStatus !== "complete";
 
   return (
     <div className="settings-section__group">
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-        <p className="settings-section__caption" style={{ marginTop: 4 }}>
-          {t("UsageSpendProjectsPeriodCaption").replace("{}", costPeriodLabel(contract.reportingPeriod, t))}
-          {partial ? ` · ${t("UsageSpendPartialHistory")}` : ""}.
-        </p>
-        {contract.projects.length > 8 && (
-          <button type="button" className="credential-btn credential-btn--secondary" onClick={() => setShowAll((value) => !value)}>
-            {showAll ? t("UsageSpendShowLess") : `${t("UsageSpendShowAll")} (${contract.projects.length})`}
-          </button>
-        )}
-      </div>
+      <p className="settings-section__caption" style={{ marginTop: 4 }}>
+        {t("UsageSpendProjectsPeriodCaption").replace("{}", costPeriodLabel(contract.reportingPeriod, t))}
+        {partial ? ` · ${t("UsageSpendPartialHistory")}` : ""}.
+      </p>
 
-      {projects.length === 0 ? (
+      {projectRows.length === 0 ? (
         <p className="settings-section__caption">{t("UsageSpendNoProjects")}</p>
       ) : (
-        <div style={{ display: "grid", gap: 6, marginTop: 10 }}>
-          {projects.map((project) => {
-            const isExpanded = expanded.has(project.id);
-            const partialCost = project.costEstimate.unknownTokens > 0;
-            return (
-              <div key={project.id} className="provider-detail-section" style={{ padding: "10px 12px" }}>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setExpanded((current) => {
-                      const next = new Set(current);
-                      if (next.has(project.id)) next.delete(project.id);
-                      else next.add(project.id);
-                      return next;
-                    })
-                  }
-                  aria-expanded={isExpanded}
-                  className="usage-spend__row-button"
-                >
-                  <span style={{ minWidth: 0 }}>
-                    <strong>{project.displayName}</strong>
-                    <span className="settings-section__caption" style={{ display: "block" }}>
-                      {project.sessionCount} {t("UsageSpendConversations")}
-                      {project.topModel ? ` · ${project.topModel}` : ""}
-                    </span>
-                  </span>
-                  <span>{partialCost ? "~" : ""}${project.costEstimate.knownUsd.toFixed(2)}</span>
-                  <span aria-hidden="true">{isExpanded ? "▾" : "▸"}</span>
-                </button>
+        <ProjectRowList rows={projectRows} conversations={contract.conversations} t={t} />
+      )}
 
-                {isExpanded && (
-                  <ProjectConversations
-                    conversations={contract.conversations.filter((session) => session.projectId === project.id)}
-                    t={t}
-                  />
-                )}
-              </div>
-            );
-          })}
+      {chatRows.length > 0 && (
+        <div role="region" aria-label={t("UsageSpendIndependentChats")} style={{ marginTop: 16 }}>
+          <h4 style={{ margin: "0 0 4px" }}>{t("UsageSpendIndependentChats")}</h4>
+          <ProjectRowList rows={chatRows} conversations={contract.conversations} independent t={t} />
         </div>
       )}
     </div>
+  );
+}
+
+function ProjectRowList({
+  rows,
+  conversations,
+  independent = false,
+  t,
+}: {
+  rows: CodexWorkspacesProjectUsage[];
+  conversations: CodexWorkspacesSessionUsage[];
+  independent?: boolean;
+  t: Translate;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const visible = showAll ? rows : rows.slice(0, PROJECT_INITIAL_ROWS);
+
+  return (
+    <>
+      <div style={{ display: "grid", gap: 6, marginTop: 10 }}>
+        {visible.map((project) => {
+          const isExpanded = expanded.has(project.id);
+          const partialCost = project.costEstimate.unknownTokens > 0;
+          return (
+            <div key={project.id} className="provider-detail-section" style={{ padding: "10px 12px" }}>
+              <button
+                type="button"
+                onClick={() =>
+                  setExpanded((current) => {
+                    const next = new Set(current);
+                    if (next.has(project.id)) next.delete(project.id);
+                    else next.add(project.id);
+                    return next;
+                  })
+                }
+                aria-expanded={isExpanded}
+                className="usage-spend__row-button"
+              >
+                <span style={{ minWidth: 0 }}>
+                  <strong>{project.displayName}</strong>
+                  <span className="settings-section__caption" style={{ display: "block" }}>
+                    {independent ? `${t("UsageSpendIndependentChat")} · ` : ""}
+                    {project.sessionCount} {t("UsageSpendConversations")}
+                    {project.topModel ? ` · ${project.topModel}` : ""}
+                  </span>
+                </span>
+                <span>{partialCost ? "~" : ""}${project.costEstimate.knownUsd.toFixed(2)}</span>
+                <span aria-hidden="true">{isExpanded ? "▾" : "▸"}</span>
+              </button>
+
+              {isExpanded && (
+                <ProjectConversations
+                  conversations={conversations.filter((session) => session.projectId === project.id)}
+                  t={t}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {rows.length > PROJECT_INITIAL_ROWS && (
+        <button
+          type="button"
+          className="credential-btn credential-btn--secondary"
+          style={{ marginTop: 8 }}
+          aria-expanded={showAll}
+          onClick={() => setShowAll((value) => !value)}
+        >
+          {showAll ? t("UsageSpendShowLess") : `${t("UsageSpendShowAll")} (${rows.length})`}
+        </button>
+      )}
+    </>
   );
 }
