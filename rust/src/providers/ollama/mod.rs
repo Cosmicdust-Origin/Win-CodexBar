@@ -393,7 +393,7 @@ impl OllamaProvider {
 
         // Parse account email
         if let Some(email) = self.parse_account_email(html) {
-            usage = usage.with_login_method(&email);
+            usage = usage.with_email(&email);
         }
 
         if let Some(weekly) = weekly_block.as_ref() {
@@ -1226,6 +1226,22 @@ mod tests {
         assert_eq!(cost.used, 0.0);
         assert_eq!(cost.limit, None);
         assert_eq!(cost.balance, Some(18.25));
+    }
+
+    #[test]
+    fn credit_wallet_email_is_account_email_and_plan_stays_login_method() {
+        // The account email must not overwrite the wallet plan badge (login_method).
+        let provider = OllamaProvider::new();
+        let html = format!(r#"<h2 id="header-email">user@example.com</h2>{CREDIT_WALLET_FIXTURE}"#);
+        let result = provider
+            .parse_usage_result(&html)
+            .expect("wallet page with an account email parses");
+
+        assert_eq!(result.usage.login_method.as_deref(), Some("pro"));
+        assert_eq!(
+            result.usage.account_email.as_deref(),
+            Some("user@example.com")
+        );
     }
 
     #[test]
