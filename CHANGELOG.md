@@ -9,6 +9,7 @@
 
 ## [Windows] Unreleased
 
+- Ollama: cookie mode reads the current **Usage credits** wallet on the settings page and shows its credit balance, as API-key mode already does, without inventing a quota percentage or changing older usage meters (upstream #4370).
 - Session depleted and restored alerts start fresh after you switch accounts: the first reading for the new account sets its baseline without an alert, and switching back does not announce a restore that happened while another account was active (upstream #4138).
 - Show a Windows path (`~\.local\bin\cswap.exe`) as the placeholder for the Claude account switcher (cswap) executable in Settings instead of a Unix path (upstream v0.74.0).
 - Add a **token activity** grid to Usage & Spend: a year of daily token totals for Codex and Claude from local logs, independent of the selected period, with a tooltip per day and a day highlight. Days that were never scanned or can't be totalled show as gaps instead of zero. The yearly scan keeps its own Codex cache and skips Pi sessions, and complete Claude walks (including the spend explorer's hourly history) are reused for 60 seconds instead of re-reading the logs on every rebuild (upstream v0.73.0).
