@@ -9,6 +9,7 @@
 
 ## [Windows] Unreleased
 
+- Show a spend-only Claude account's monthly cap (for example an Enterprise seat) as one primary meter with calendar-month pace and a midnight-UTC-on-the-1st reset inferred when Claude reports none, instead of a separate Extra usage bar; quota accounts keep their session and weekly lanes and Extra usage section unchanged. Fixes #4381 (upstream #4480)
 - Read the Charm Hyper balance from your signed-in browser session on the team dashboard, with plan and refresh rows when shown. The credits endpoint only accepts API keys, so session balances no longer depend on it. An expired session is reported as expired before any API-key fallback; API-key balances are unchanged (upstream #4435).
 - OpenAI API usage no longer counts audio tokens twice: Admin API input and output totals already include audio, so the daily token totals and the usage window now use them as reported (upstream #4495).
 - Ollama: cookie mode reads the current **Usage credits** wallet on the settings page and shows its credit balance, as API-key mode already does, without inventing a quota percentage or changing older usage meters (upstream #4370).
