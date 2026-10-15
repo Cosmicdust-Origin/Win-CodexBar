@@ -648,6 +648,20 @@ fn is_retryable_cli_probe_error(error: &ProviderError) -> bool {
     }
 }
 
+/// Whether the latest `/usage` panel shows only the "Loading usage data…"
+/// placeholder (upstream `isUsageStillLoading`). Earlier panels in the PTY
+/// capture are ignored, and any percentage means the data has rendered.
+fn claude_cli_usage_still_loading(visible: &str) -> bool {
+    let lower = visible.to_lowercase();
+    let panel = lower
+        .rfind("settings:")
+        .map(|start| &lower[start..])
+        .filter(|tail| tail.contains("usage"))
+        .unwrap_or(&lower);
+    let normalized: String = panel.chars().filter(|c| !c.is_whitespace()).collect();
+    normalized.contains("loadingusage") && !normalized.contains('%')
+}
+
 /// Timeout for the outer retry, given the time already spent in this fetch.
 /// Returns `None` when the remaining budget is too small for a useful probe.
 fn cli_retry_timeout(elapsed: Duration) -> Option<Duration> {
@@ -1128,12 +1142,22 @@ impl ClaudeProvider {
         tracing::debug!("Attempting CLI probe for Claude");
 
         let claude_path = resolve_claude_cli_path()?;
-        let combined = probe_cli_with_retry(started, |timeout| {
-            fetch_claude_cli_usage_text(claude_path.clone(), timeout)
+        let visible = probe_cli_with_retry(started, |timeout| {
+            let claude_path = claude_path.clone();
+            async move {
+                let combined = fetch_claude_cli_usage_text(claude_path, timeout).await?;
+                // Replay cursor redraws once; rendering is idempotent on rendered text.
+                let visible = cli_screen::render(&combined, true);
+                // Checked inside the probe so a loading stall gets the longer retry.
+                if claude_cli_usage_still_loading(&visible) {
+                    return Err(ProviderError::Parse(
+                        "Claude CLI /usage is still loading usage data.".to_string(),
+                    ));
+                }
+                Ok(visible)
+            }
         })
         .await?;
-        // Replay cursor redraws once; rendering is idempotent on rendered text.
-        let visible = cli_screen::render(&combined, true);
         if tracing::enabled!(tracing::Level::TRACE) {
             tracing::trace!(output = %redacted_probe_screen(&visible), "Claude CLI probe output");
         }
@@ -2784,6 +2808,40 @@ Usage:                 0 input, 0 output, 0 cache read
         assert!(!is_retryable_cli_probe_error(&ProviderError::Parse(
             "Claude CLI did not return usage data".to_string()
         )));
+    }
+
+    #[test]
+    fn cli_usage_still_loading_checks_only_the_latest_panel() {
+        let loading = "Claude Code v2.1.29\n22:47 | Opus 4.5 | 0%\n\nSettings:  Status   Config   Usage  (tab to cycle)\nLoading usage data…\nEsc to cancel\n";
+        assert!(claude_cli_usage_still_loading(loading));
+
+        let retained = "Settings:  Status   Config   Usage  (tab to cycle)\nCurrent session\n15% used\n\nSettings:  Status   Config   Usage  (tab to cycle)\nLoading usage data…\nEsc to cancel\n";
+        assert!(claude_cli_usage_still_loading(retained));
+
+        let rendered =
+            "Settings:StatusConfigUsage(tabtocycle)\nLoadingusagedata...\nCurrentsession\n6%used\n";
+        assert!(!claude_cli_usage_still_loading(rendered));
+        assert!(!claude_cli_usage_still_loading("Current session 12% used"));
+    }
+
+    #[tokio::test]
+    async fn cli_probe_loading_stall_retries_with_longer_timeout() {
+        let (result, calls) = run_scripted_cli_probe(
+            Instant::now(),
+            vec![
+                Err(ProviderError::Parse(
+                    "Claude CLI /usage is still loading usage data.".to_string(),
+                )),
+                Ok("Current session 12% used".to_string()),
+            ],
+        )
+        .await;
+
+        assert_eq!(result.expect("retry succeeds"), "Current session 12% used");
+        assert_eq!(
+            calls,
+            vec![CLAUDE_CLI_PROBE_TIMEOUT, CLAUDE_CLI_RETRY_PROBE_TIMEOUT]
+        );
     }
 
     #[test]
