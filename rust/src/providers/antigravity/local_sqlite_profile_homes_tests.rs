@@ -148,6 +148,29 @@ fn missing_home_roots_contribute_nothing_and_stay_complete() {
 }
 
 #[test]
+fn same_stem_in_a_different_relative_root_is_not_a_copy_across_homes() {
+    // A copy keeps its relative root (profile/antigravity-cli/conversations
+    // mirrors primary/antigravity-cli/conversations) and dedupes; the same stem
+    // under another relative root is a separate conversation, as it is in one home.
+    let dir = tempfile::tempdir().unwrap();
+    let timestamp = u64::try_from(Utc::now().timestamp()).unwrap();
+    let rows = [(1_i64, valid_turn_blob(100, timestamp))];
+    let primary = conversation_roots(&dir.path().join("primary"));
+    let profile = conversation_roots(&dir.path().join("profile"));
+    write_conversation(&primary[0], "conv-a", &rows);
+    write_conversation(&profile[0], "conv-a", &rows);
+    write_conversation(&profile[1], "conv-a", &rows);
+
+    let one_conversation = complete_summary(&primary[..1], SessionIdentity::FileStem);
+    let union = [primary, profile].concat();
+    let summary = complete_summary(&union, SessionIdentity::FileStem);
+
+    assert_eq!(summary.coverage, LocalHistoryCoverage::Complete);
+    assert_eq!(summary.session_count, 2);
+    assert_eq!(summary.total_tokens, one_conversation.total_tokens * 2);
+}
+
+#[test]
 fn path_identity_still_keeps_same_named_databases_in_one_home_distinct() {
     // Single-home default: the reader keys sessions by full path, so a same-named
     // database in another root of the same home is a different session.
