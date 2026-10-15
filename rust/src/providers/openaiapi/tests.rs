@@ -23,6 +23,7 @@ fn provider(server: &ServerGuard) -> OpenAIApiProvider {
         credit_grants: format!("{}{GRANTS_PATH}", server.url()),
         costs: format!("{}{COSTS_PATH}", server.url()),
         completions: format!("{}{COMPLETIONS_PATH}", server.url()),
+        projects: format!("{}/v1/organization/projects", server.url()),
     };
     provider.retry = RetryPolicy {
         base_delay: Duration::ZERO,

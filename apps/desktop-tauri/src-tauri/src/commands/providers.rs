@@ -480,6 +480,7 @@ pub(crate) fn build_fetch_context(
                 && token_account_kind == Some(codexbar::core::TokenAccountKind::ApiKey)),
         browser_cookie_import,
         optional_details_enabled: settings.optional_details_enabled(id),
+        live_usage_enabled: settings.live_usage_enabled(id),
         ..FetchContext::default()
     }
 }
@@ -1843,6 +1844,7 @@ mod reset_backfill_tests {
             fetch_duration_ms: None,
             wayfinder_usage: None,
             open_ai_api_usage: None,
+            throughput: None,
             session_equivalent_forecast: None,
             quota_burndown: None,
         }

@@ -41,6 +41,7 @@ mod api_keys;
 mod config_path;
 mod cost_time_zone;
 mod manual_cookies;
+mod model_rate_limits;
 mod optional_details;
 mod preferences_document;
 mod provider_workspace;
@@ -57,6 +58,7 @@ pub use config_path::{
 };
 pub use cost_time_zone::*;
 pub use manual_cookies::*;
+pub use model_rate_limits::{ModelRateLimit, rate_limit_number};
 pub use optional_details::provider_has_optional_details;
 pub use preferences_document::*;
 pub use provider_workspace::*;

@@ -78,6 +78,7 @@ fn fake_snapshot_with(
         pace_authoritative: true,
         account_organization: None,
         open_ai_api_usage: None,
+        throughput: None,
         tray_status_label: None,
         fetch_duration_ms: None,
         wayfinder_usage: None,
