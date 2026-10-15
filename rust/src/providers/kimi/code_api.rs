@@ -2,7 +2,8 @@
 //! upstream 0.48.0 enrichment (#2622): Code API / CLI usage snapshots are
 //! merged with the monthly membership pool + Code 7-day limit when a
 //! `kimi.com` web token is available (manual cookie → Kimi Desktop session →
-//! browser import; gated by Cookie Source Off).
+//! browser import; gated by Cookie Source Off). A Desktop session is checked
+//! again before each enrichment request (upstream #4416).
 
 use reqwest::Url;
 use std::path::{Path, PathBuf};
@@ -85,16 +86,19 @@ pub(crate) async fn fetch_via_code_api(
     snapshot.login_method = Some(plan_name.unwrap_or_else(|| login_method.to_string()));
 
     // Upstream #2622: enrich Code API + CLI usage with the monthly membership
-    // pool from a signed-in Kimi Desktop (or browser/manual) session.
-    for web_token in web::web_auth_tokens(ctx.manual_cookie_header.as_deref(), region) {
-        match web::fetch_subscription_for_enrichment_result(&client, &web_token, region).await {
+    // pool from a signed-in Kimi Desktop (or browser/manual) session. A
+    // Desktop session that changed before dispatch ends enrichment but keeps
+    // the Code quota snapshot (upstream #4416).
+    for web_credential in web::web_auth_credentials(ctx.manual_cookie_header.as_deref(), region) {
+        match web::fetch_subscription_for_enrichment_result(&client, &web_credential, region).await
+        {
             Ok(subscription) => {
                 if let Some(subscription) = subscription {
                     snapshot = super::apply_subscription_windows(snapshot, &subscription);
                 }
                 if !has_plan_name
                     && let Some(plan) =
-                        web::fetch_subscription_plan(&client, &web_token, region).await
+                        web::fetch_subscription_plan(&client, &web_credential, region).await
                 {
                     snapshot.login_method = Some(plan);
                 }

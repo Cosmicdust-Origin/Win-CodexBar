@@ -10,6 +10,7 @@
 ## [Windows] Unreleased
 
 - Devin: use Devin's official transparent hexagon mark for the provider icon in Settings and the CLI dashboard, instead of the settings-gear badge and the letter fallback (upstream #4458).
+- Kimi (China): use the current Kimi Desktop session from its Local Storage (`%APPDATA%\kimi-desktop`) for web usage and monthly membership enrichment, and check that session again before each request, so a signed-out, replaced, or expired Desktop token is never sent or recovered from an older record (upstream #4416, #3536).
 - Codex CLI: add opt-in `cost --identified-only` request subtotals across local and SSH (`--remote`) histories, deduplicating strong request identities and keeping partial results without estimating a combined price, plus `--group-by project` reports that show the partial-history notice even when no projects are listed (upstream #4447, #4472).
 - OpenCode Go: reuse unchanged local history scans (keyed by `opencode.db` and its `-wal` sidecar size and modification time, at most one 4 MiB payload kept), and in Auto overlay Console quota from a stored or automatically discovered browser session before falling back to the local estimate; cookie source Off never reads a browser (upstream #4410, #4445).
 - Add **Parallel** prepaid balance: reads the account balance and any pending debit from the platform.parallel.ai console using your browser session or a pasted Cookie header. A signed-out console moves on to the next browser session and reports an expired session when none remain (upstream #4479, #4508).
