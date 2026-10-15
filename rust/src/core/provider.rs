@@ -1172,6 +1172,18 @@ pub trait Provider: Send + Sync {
         false
     }
 
+    /// Whether the provider picks between its API-key and cookie lanes itself.
+    ///
+    /// When true, the shell keeps the usage source for Auto and API (OAuth)
+    /// under every cookie source instead of remapping it to Web or Cli. It
+    /// forwards a stored or token-account cookie header when the cookie source
+    /// is not `off`; `off` sets [`FetchContext::manual_cookie_missing`]. The
+    /// shell never reads a browser for this provider, which does that only on
+    /// its own cookie lane.
+    fn owns_credential_lane_routing(&self) -> bool {
+        false
+    }
+
     /// Whether the web lane is used only when the usage source is explicitly
     /// `web`. A cookie domain otherwise lets the shell turn Auto into Web
     /// (manual cookie present or browser import), which would replace a

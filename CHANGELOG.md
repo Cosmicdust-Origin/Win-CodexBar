@@ -9,6 +9,7 @@
 
 ## [Windows] Unreleased
 
+- Command Code: add an **API key** usage source (Settings > Providers > Command Code, or `COMMAND_CODE_API_KEY`). Auto uses the key before browser cookies, the **API** source reads billing with the key only, and a rejected key reports an expired key instead of falling back to cookies. The Browser cookies source is unchanged (upstream #4462).
 - JetBrains AI: read current quota from newer `JbaiQuota` and Junie `quota_update` records in `idea.log`, keeping same-IDE freshness and the XML fallback (upstream #4457).
 - Raycast: automatic cookie import walks every supported browser in the shared order and uses the first accepted session, instead of reading Chrome alone (upstream #4443, 0aef66c73).
 - Price Codex **codex-auto-review** requests made from a ChatGPT account at $0 from 2026-10-06 07:00 UTC onward: tokens stay in totals, the model is no longer listed as unpriced, and an explicit custom price for the model still applies (upstream #4452, #4453).
