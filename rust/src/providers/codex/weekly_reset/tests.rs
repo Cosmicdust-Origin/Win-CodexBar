@@ -1,6 +1,7 @@
 use super::*;
 use chrono::TimeZone;
 
+mod guards;
 mod missing_inventory;
 mod plan_change;
 
