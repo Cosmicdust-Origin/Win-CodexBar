@@ -62,7 +62,6 @@ export default function UsageSpendTab({ settings, set, saving }: TabProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [view, setView] = useState<BreakdownView>("providers");
 
   const load = useCallback(async (forceRefresh = false, silent = false) => {
@@ -85,11 +84,6 @@ export default function UsageSpendTab({ settings, set, saving }: TabProps) {
   useEffect(() => {
     void load(false);
   }, [load]);
-
-  // A selected day belongs to one time range; changing the range clears it.
-  useEffect(() => {
-    setSelectedDay(null);
-  }, [period]);
 
   // Upstream 0.55.0 #3106 parity: provider token/cost publications refresh the
   // pane silently while it is open. A settings save (Track costs, OpenCodex)
@@ -223,8 +217,7 @@ export default function UsageSpendTab({ settings, set, saving }: TabProps) {
             loading={loading}
             view={view}
             onView={setView}
-            selectedDay={selectedDay}
-            onSelectDay={setSelectedDay}
+            hidePersonalInfo={settings.hidePersonalInfo ?? false}
             t={t}
           />
         )
@@ -359,8 +352,7 @@ function DashboardBody({
   loading,
   view,
   onView,
-  selectedDay,
-  onSelectDay,
+  hidePersonalInfo,
   t,
 }: {
   summary: UsageSpendSummary;
@@ -369,12 +361,12 @@ function DashboardBody({
   loading: boolean;
   view: BreakdownView;
   onView: (view: BreakdownView) => void;
-  selectedDay: string | null;
-  onSelectDay: (day: string | null) => void;
+  hidePersonalInfo: boolean;
   t: Translate;
 }) {
   const totals = spendTotalsByCurrency(summary.rows);
   const contract = summary.contract;
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const views: { id: BreakdownView; label: string }[] = [
     { id: "providers", label: t("UsageSpendViewProviders") },
     { id: "projects", label: t("UsageSpendProjects") },
@@ -398,7 +390,7 @@ function DashboardBody({
 
       {/* Upstream v0.73.0 places the year of activity right after the currency groups. */}
       {tokenActivity.length > 0 && (
-        <TokenActivityGrid points={tokenActivity} selectedDay={selectedDay} onSelectDay={onSelectDay} t={t} />
+        <TokenActivityGrid points={tokenActivity} selectedDay={selectedDay} onSelectDay={setSelectedDay} t={t} />
       )}
 
       {!contractHidden && <TokenMix contract={contract} t={t} />}
@@ -427,7 +419,9 @@ function DashboardBody({
             t={t}
           />
         )}
-        {view === "projects" && <ProjectsPanel contract={contract} t={t} />}
+        {view === "projects" && (
+          <ProjectsPanel contract={contract} hidePersonalInfo={hidePersonalInfo} t={t} />
+        )}
         {view === "sessions" &&
           (contract.conversations.length === 0 ? (
             <p className="settings-section__caption">{t("UsageSpendNoSessions")}</p>
@@ -436,9 +430,7 @@ function DashboardBody({
           ))}
       </div>
 
-      {!contractHidden && (
-        <UsageSpendTrendPanel contract={contract} selectedDay={selectedDay} onSelectDay={onSelectDay} t={t} />
-      )}
+      {summary.trend && summary.trend.sources.length > 0 && <UsageSpendTrendPanel trend={summary.trend} t={t} />}
       {!contractHidden && <UsageSpendDailyLedger daily={contract.daily} />}
     </>
   );
@@ -498,7 +490,15 @@ function CoverageLine({ contract, t }: { contract: SpendContract; t: Translate }
 /** Rows shown before the show-all control, for projects and for independent chats alike. */
 const PROJECT_INITIAL_ROWS = 8;
 
-function ProjectsPanel({ contract, t }: { contract: SpendContract; t: Translate }) {
+function ProjectsPanel({
+  contract,
+  hidePersonalInfo,
+  t,
+}: {
+  contract: SpendContract;
+  hidePersonalInfo: boolean;
+  t: Translate;
+}) {
   // Independent chats are conversations with no project folder (upstream 0.72.0);
   // they get their own region so they are not counted as projects.
   const projectRows = contract.projects.filter((project) => !project.isProjectless);
@@ -515,13 +515,24 @@ function ProjectsPanel({ contract, t }: { contract: SpendContract; t: Translate 
       {projectRows.length === 0 ? (
         <p className="settings-section__caption">{t("UsageSpendNoProjects")}</p>
       ) : (
-        <ProjectRowList rows={projectRows} conversations={contract.conversations} t={t} />
+        <ProjectRowList
+          rows={projectRows}
+          conversations={contract.conversations}
+          hidePersonalInfo={hidePersonalInfo}
+          t={t}
+        />
       )}
 
       {chatRows.length > 0 && (
         <div role="region" aria-label={t("UsageSpendIndependentChats")} style={{ marginTop: 16 }}>
           <h4 style={{ margin: "0 0 4px" }}>{t("UsageSpendIndependentChats")}</h4>
-          <ProjectRowList rows={chatRows} conversations={contract.conversations} independent t={t} />
+          <ProjectRowList
+            rows={chatRows}
+            conversations={contract.conversations}
+            hidePersonalInfo={hidePersonalInfo}
+            independent
+            t={t}
+          />
         </div>
       )}
     </div>
@@ -531,11 +542,13 @@ function ProjectsPanel({ contract, t }: { contract: SpendContract; t: Translate 
 function ProjectRowList({
   rows,
   conversations,
+  hidePersonalInfo,
   independent = false,
   t,
 }: {
   rows: CodexWorkspacesProjectUsage[];
   conversations: CodexWorkspacesSessionUsage[];
+  hidePersonalInfo: boolean;
   independent?: boolean;
   t: Translate;
 }) {
@@ -549,6 +562,8 @@ function ProjectRowList({
         {visible.map((project) => {
           const isExpanded = expanded.has(project.id);
           const partialCost = project.costEstimate.unknownTokens > 0;
+          const path = hidePersonalInfo ? null : project.path;
+          const sharesName = rows.some((other) => other.id !== project.id && other.displayName === project.displayName);
           return (
             <div key={project.id} className="provider-detail-section" style={{ padding: "10px 12px" }}>
               <button
@@ -565,12 +580,17 @@ function ProjectRowList({
                 className="usage-spend__row-button"
               >
                 <span style={{ minWidth: 0 }}>
-                  <strong>{project.displayName}</strong>
+                  <strong title={path ?? project.displayName}>{project.displayName}</strong>
                   <span className="settings-section__caption" style={{ display: "block" }}>
                     {independent ? `${t("UsageSpendIndependentChat")} · ` : ""}
                     {project.sessionCount} {t("UsageSpendConversations")}
                     {project.topModel ? ` · ${project.topModel}` : ""}
                   </span>
+                  {path && sharesName && (
+                    <span className="settings-section__caption usage-spend__project-path" title={path}>
+                      {path}
+                    </span>
+                  )}
                 </span>
                 <span>{partialCost ? "~" : ""}${project.costEstimate.knownUsd.toFixed(2)}</span>
                 <span aria-hidden="true">{isExpanded ? "▾" : "▸"}</span>

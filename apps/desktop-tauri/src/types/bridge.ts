@@ -554,6 +554,8 @@ export interface UsageSpendSummary {
   costTrackingEnabled?: boolean;
   /** The last year of per-day tokens per local-log row, independent of the period. */
   tokenActivity?: TokenActivitySource[];
+  /** Per-source spend series for the trend explorer; absent while Track costs is off. */
+  trend?: SpendTrend;
 }
 
 export interface TokenActivityDay {
@@ -567,6 +569,52 @@ export interface TokenActivitySource {
   providerId: string;
   /** Oldest day first; the last entry is today in the cost bucket zone. */
   days: TokenActivityDay[];
+}
+
+export interface SpendTrendSource {
+  id: string;
+  providerId: string;
+  displayName: string;
+  /** The whole window is a covered, priced zero for this source. */
+  knownZero: boolean;
+}
+
+export interface SpendTrendDailyPoint {
+  sourceId: string;
+  day: string;
+  /** null is unknown (unscanned or unpriced); 0 is a covered zero. */
+  costUsd: number | null;
+}
+
+export interface SpendTrendHourlyPoint {
+  sourceId: string;
+  /** RFC 3339 UTC instant the local hour began. */
+  hour: string;
+  costUsd: number | null;
+}
+
+export interface SpendTrendHourSlot {
+  start: string;
+  offsetMinutes: number;
+}
+
+/** One local day with hourly data, as its real (23, 24 or 25) hour slots. */
+export interface SpendTrendHourlyDay {
+  day: string;
+  start: string;
+  end: string;
+  hours: SpendTrendHourSlot[];
+}
+
+export interface SpendTrend {
+  /** First and last reporting day of the window, inclusive. */
+  startDay: string;
+  endDay: string;
+  timeZone: string;
+  sources: SpendTrendSource[];
+  daily: SpendTrendDailyPoint[];
+  hourly: SpendTrendHourlyPoint[];
+  hourlyDays: SpendTrendHourlyDay[];
 }
 
 export type CostProvenance = "listPriceEstimate" | "vendorMetered" | "mixed" | "unknown";

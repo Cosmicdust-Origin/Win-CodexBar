@@ -483,6 +483,51 @@ fn privacy_redaction_numbers_chats_in_list_order_and_hides_paths() {
         .iter()
         .map(|p| p.display_name.as_str())
         .collect();
-    assert_eq!(names, ["Chat 1", "Workspace", "Chat 2"]);
+    assert_eq!(names, ["Chat 1", "Workspace #1", "Chat 2"]);
+    assert!(snap.projects.iter().all(|p| p.path.is_none()));
+}
+
+#[test]
+fn privacy_redaction_gives_same_named_workspaces_distinct_numbers_in_list_order() {
+    let mut snap = snapshot(
+        vec![
+            project("p1", "/Users/me/work/app"),
+            ProjectUsage {
+                display_name: "Private title".into(),
+                is_projectless: true,
+                ..project("c1", "/Users/me/chat-one")
+            },
+            project("p2", "/Users/me/personal/app"),
+            ProjectUsage {
+                display_name: crate::codex_workspaces::CHATS_DISPLAY_NAME.into(),
+                path: None,
+                ..project(crate::codex_workspaces::CHATS_PROJECT_ID, "/unused")
+            },
+            project("p3", "/Users/me/secret-repo"),
+        ],
+        Vec::new(),
+    );
+    assert_eq!(
+        find(&snap, "p1").display_name,
+        find(&snap, "p2").display_name
+    );
+
+    snap.redact_for_privacy();
+
+    let names: Vec<_> = snap
+        .projects
+        .iter()
+        .map(|p| p.display_name.as_str())
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "Workspace #1",
+            "Chat 1",
+            "Workspace #2",
+            "Chats",
+            "Workspace #3"
+        ]
+    );
     assert!(snap.projects.iter().all(|p| p.path.is_none()));
 }
