@@ -34,6 +34,8 @@ import type { TabProps } from "../settingsTabs";
 import ProjectConversations from "./ProjectConversations";
 import { UsageSpendProviderGroups } from "./UsageSpendProviderGroups";
 import { UsageSpendTrendPanel } from "./UsageSpendTrendPanel";
+import { TokenActivityGrid } from "./TokenActivityGrid";
+import { mergeTokenActivity, type TokenActivityPoint } from "../../../lib/tokenActivity";
 
 type Translate = (key: LocaleKey) => string;
 type BreakdownView = "providers" | "projects" | "sessions";
@@ -120,7 +122,13 @@ export default function UsageSpendTab({ settings, set, saving }: TabProps) {
   const contractHidden = summary ? isContractHidden(summary, hidden) : false;
   const periodTitle = costPeriodLabel(visible?.reportingPeriod ?? period, t);
 
-  const exportJson = visible ? JSON.stringify(visible, null, 2) : null;
+  const tokenActivity = useMemo(
+    () => (summary && tracking ? mergeTokenActivity(summary.tokenActivity, hidden) : []),
+    [summary, tracking, hidden],
+  );
+
+  // The year of token activity drives the grid only; exports keep their period-scoped shape.
+  const exportJson = visible ? JSON.stringify({ ...visible, tokenActivity: undefined }, null, 2) : null;
 
   const onShare = useCallback(() => {
     setShareError(null);
@@ -204,6 +212,7 @@ export default function UsageSpendTab({ settings, set, saving }: TabProps) {
         visible && (
           <DashboardBody
             summary={visible}
+            tokenActivity={tokenActivity}
             contractHidden={contractHidden}
             loading={loading}
             view={view}
@@ -338,6 +347,7 @@ function PeriodPicker({
 
 function DashboardBody({
   summary,
+  tokenActivity,
   contractHidden,
   loading,
   view,
@@ -346,6 +356,7 @@ function DashboardBody({
   t,
 }: {
   summary: UsageSpendSummary;
+  tokenActivity: TokenActivityPoint[];
   contractHidden: boolean;
   loading: boolean;
   view: BreakdownView;
@@ -355,6 +366,7 @@ function DashboardBody({
 }) {
   const totals = spendTotalsByCurrency(summary.rows);
   const contract = summary.contract;
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const views: { id: BreakdownView; label: string }[] = [
     { id: "providers", label: t("UsageSpendViewProviders") },
     { id: "projects", label: t("UsageSpendProjects") },
@@ -375,6 +387,11 @@ function DashboardBody({
           </dl>
         </div>
       ))}
+
+      {/* Upstream v0.73.0 places the year of activity right after the currency groups. */}
+      {tokenActivity.length > 0 && (
+        <TokenActivityGrid points={tokenActivity} selectedDay={selectedDay} onSelectDay={setSelectedDay} t={t} />
+      )}
 
       {!contractHidden && <TokenMix contract={contract} t={t} />}
       {!contractHidden && <CoverageLine contract={contract} t={t} />}

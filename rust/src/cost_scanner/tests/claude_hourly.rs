@@ -35,7 +35,8 @@ fn child_body() {
     )
     .unwrap();
 
-    let (daily, hourly) = get_claude_daily_and_hourly_cost_history(7);
+    let (daily, hourly, complete) = get_claude_daily_and_hourly_cost_history(7);
+    assert!(complete);
     assert_eq!(daily.len(), 7);
     let today_cost = daily.last().unwrap().1.expect("priced day");
     assert_eq!(hourly.len(), 2, "{hourly:?}");
@@ -47,7 +48,8 @@ fn child_body() {
     assert!(hourly[0].cost_usd.unwrap() > hourly[1].cost_usd.unwrap());
 
     std::fs::write(project.join("malformed.jsonl"), b"{malformed\n").unwrap();
-    let (_, hourly) = get_claude_daily_and_hourly_cost_history(7);
+    let (_, hourly, complete) = get_claude_daily_and_hourly_cost_history(7);
+    assert!(!complete);
     assert!(hourly.is_empty(), "a partial walk publishes no hours");
     println!("{CHILD_DONE}");
 }

@@ -3,7 +3,9 @@
 
 use chrono::Utc;
 use codexbar::cost_reporting_period::{CostReportingPeriod, CostTimeZone};
-use codexbar::cost_scanner::CostScanner;
+use codexbar::cost_scanner::{
+    CostScanner, TOKEN_ACTIVITY_DAYS, TokenActivityDay, daily_token_activity,
+};
 use codexbar::spend_contract::{
     SpendContract, build_contract_from_period_summary, build_local_spend_contract,
     build_local_spend_contract_for_period, build_local_spend_contract_from_summary,
@@ -87,10 +89,38 @@ pub struct UsageSpendSummary {
     /// False when "Track costs" is off: nothing was scanned and the summary
     /// is empty, so the pane shows "Cost tracking is off".
     pub cost_tracking_enabled: bool,
+    /// The last year of per-day tokens for each local-log row, independent of
+    /// the selected period; feeds the token activity grid.
+    pub token_activity: Vec<TokenActivitySource>,
     /// Per-source spend series for the trend explorer; absent while
     /// "Track costs" is off.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trend: Option<SpendTrend>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TokenActivitySource {
+    pub provider_id: String,
+    pub days: Vec<TokenActivityDay>,
+}
+
+/// Rows whose local logs can establish per-day coverage, keeping only those
+/// the pane lists. Pi stays out: its rows can also be projected into Codex or
+/// Claude, which would count the same usage twice.
+fn token_activity_sources(
+    provider_ids: &BTreeSet<String>,
+    codex: Vec<TokenActivityDay>,
+    claude: Vec<TokenActivityDay>,
+) -> Vec<TokenActivitySource> {
+    [("codex", codex), ("claude", claude)]
+        .into_iter()
+        .filter(|(id, days)| provider_ids.contains(*id) && !days.is_empty())
+        .map(|(id, days)| TokenActivitySource {
+            provider_id: id.to_string(),
+            days,
+        })
+        .collect()
 }
 
 #[derive(Debug, Clone)]
@@ -444,8 +474,8 @@ fn build_usage_spend_summary(
     codex_scan_options.include_pi_sessions = include_pi_in_native;
     // Any period other than 7d/30d costs one extra scan per provider.
     let (
-        (codex_7_summary, codex_30_summary, codex_period_summary),
-        (claude_7_summary, claude_30_summary, claude_period_summary),
+        (codex_7_summary, codex_30_summary, codex_period_summary, codex_activity),
+        (claude_7_summary, claude_30_summary, claude_period_summary, claude_activity),
         (pi_7_summary, pi_30_summary, pi_period_summary),
     ) = std::thread::scope(|scope| {
         let codex = scope.spawn(move || {
@@ -460,7 +490,8 @@ fn build_usage_spend_summary(
                     .with_options(codex_scan_options)
                     .scan_codex()
             });
-            (seven, thirty, selected)
+            let activity = daily_token_activity("codex", TOKEN_ACTIVITY_DAYS);
+            (seven, thirty, selected, activity)
         });
         let claude = scope.spawn(|| {
             let seven = CostScanner::new(7)
@@ -471,7 +502,8 @@ fn build_usage_spend_summary(
                 CostScanner::for_period(period)
                     .scan_claude_with_cancel_and_pi_sessions(None, include_pi_in_native)
             });
-            (seven, thirty, selected)
+            let activity = daily_token_activity("claude", TOKEN_ACTIVITY_DAYS);
+            (seven, thirty, selected, activity)
         });
         let pi = scope.spawn(|| {
             let seven = CostScanner::new(7).scan_pi();
@@ -564,6 +596,8 @@ fn build_usage_spend_summary(
             }
         }
     }
+
+    let token_activity = token_activity_sources(&provider_ids, codex_activity, claude_activity);
 
     let cached_by_id: HashMap<&str, &ProviderUsageSnapshot> = cached
         .iter()
@@ -780,9 +814,7 @@ fn build_usage_spend_summary(
 
     let contract = codex_period_contract;
     let claude_trend = rows.iter().any(|row| row.provider_id == "claude").then(|| {
-        let (daily, hourly) = codexbar::cost_scanner::get_claude_daily_and_hourly_cost_history(
-            period.sidecar_days(now),
-        );
+        let (daily, hourly) = claude_trend_history(period.sidecar_days(now), now);
         (claude_period_summary.known_zero, daily, hourly)
     });
     let trend = build_spend_trend(&rows, &contract, claude_trend, period, now);
@@ -795,6 +827,7 @@ fn build_usage_spend_summary(
         reporting_day,
         dashboard_timezone,
         cost_tracking_enabled: true,
+        token_activity,
         trend: Some(trend),
     }
 }
@@ -811,12 +844,58 @@ fn cost_tracking_off_summary(period: CostReportingPeriod) -> UsageSpendSummary {
             .to_string(),
         dashboard_timezone: codexbar::core::local_timezone_name(),
         cost_tracking_enabled: false,
+        token_activity: Vec::new(),
         trend: None,
     }
 }
 
 type DailyCosts = Vec<(String, Option<f64>)>;
 type HourlyCosts = Vec<codexbar::cost_scanner::HourlyCostPoint>;
+
+/// Window length, local reporting day, and cost bucket zone of one Claude
+/// trend walk.
+type ClaudeTrendKey = (u32, chrono::NaiveDate, String);
+
+struct ClaudeTrendMemo {
+    key: ClaudeTrendKey,
+    stored_at: std::time::Instant,
+    daily: DailyCosts,
+    hourly: HourlyCosts,
+}
+
+/// The Claude trend walk reads every transcript in the window with no
+/// incremental cache, so a complete result is reused for the cost scan
+/// debounce interval instead of re-walking on every summary rebuild.
+fn claude_trend_history(days: u32, now: chrono::DateTime<Utc>) -> (DailyCosts, HourlyCosts) {
+    static MEMO: Mutex<Option<ClaudeTrendMemo>> = Mutex::new(None);
+    let zone = codexbar::cost_reporting_period::cost_bucket_zone();
+    let key: ClaudeTrendKey = (days, zone.date(now), zone.identifier());
+    let ttl = std::time::Duration::from_secs(
+        codexbar::core::CostScanOptions::default().refresh_min_interval_secs,
+    );
+    if let Some(memo) = MEMO
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .as_ref()
+        .filter(|memo| memo.key == key && memo.stored_at.elapsed() <= ttl)
+    {
+        return (memo.daily.clone(), memo.hourly.clone());
+    }
+    let (daily, hourly, complete) =
+        codexbar::cost_scanner::get_claude_daily_and_hourly_cost_history(days);
+    // A partial walk is never reused, so the next rebuild retries it.
+    if complete {
+        *MEMO
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(ClaudeTrendMemo {
+            key,
+            stored_at: std::time::Instant::now(),
+            daily: daily.clone(),
+            hourly: hourly.clone(),
+        });
+    }
+    (daily, hourly)
+}
 /// Claude's window known-zero flag with its daily and hourly cost series.
 type ClaudeTrendSeries = (bool, DailyCosts, HourlyCosts);
 
@@ -1155,7 +1234,16 @@ mod cache_key_tests {
             reporting_day: "2026-10-01".to_string(),
             dashboard_timezone: "UTC".to_string(),
             cost_tracking_enabled: true,
+            token_activity: Vec::new(),
             trend: None,
+        }
+    }
+
+    fn activity_day(day: &str, total_tokens: Option<u64>) -> TokenActivityDay {
+        TokenActivityDay {
+            day: day.to_string(),
+            total_tokens,
+            is_scanned: true,
         }
     }
 
@@ -1186,6 +1274,32 @@ mod cache_key_tests {
             refreshing: false,
             stale_updated_at: None,
         }
+    }
+
+    #[test]
+    fn token_activity_keeps_listed_local_log_rows_only() {
+        let listed: BTreeSet<String> = ["codex".to_string(), "pi".to_string()].into();
+        let sources = token_activity_sources(
+            &listed,
+            vec![activity_day("2026-10-01", Some(5))],
+            vec![activity_day("2026-10-01", Some(7))],
+        );
+        let ids: Vec<_> = sources
+            .iter()
+            .map(|source| source.provider_id.as_str())
+            .collect();
+        assert_eq!(ids, ["codex"]);
+
+        let both: BTreeSet<String> = ["codex".to_string(), "claude".to_string()].into();
+        let sources = token_activity_sources(&both, Vec::new(), vec![activity_day("d", None)]);
+        let json = serde_json::to_value(&sources).expect("serialize");
+        assert_eq!(
+            json,
+            serde_json::json!([{
+                "providerId": "claude",
+                "days": [{"day": "d", "totalTokens": null, "isScanned": true}],
+            }])
+        );
     }
 
     #[test]
@@ -1255,6 +1369,7 @@ mod cache_key_tests {
         let summary = cost_tracking_off_summary(CostReportingPeriod::MonthToDate);
         assert!(!summary.cost_tracking_enabled);
         assert!(summary.rows.is_empty());
+        assert!(summary.token_activity.is_empty());
         assert_eq!(summary.reporting_period, "month-to-date");
         assert_eq!(summary.contract.known_cost_usd, None);
         assert!(summary.contract.daily.is_empty());

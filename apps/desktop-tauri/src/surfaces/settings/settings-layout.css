@@ -975,6 +975,222 @@
   margin: 0 0 12px;
 }
 
+/* Token activity grid: upstream SpendActivityPalette (dark is the :root default). */
+.token-activity {
+  --activity-l0: #30353a;
+  --activity-l1: #347d4e;
+  --activity-l2: #43985d;
+  --activity-l3: #58b872;
+  --activity-l4: #7ddf96;
+  --activity-gap-fill: #282d34;
+  --activity-gap-stroke: #8a959f;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-theme="light"] .token-activity {
+  --activity-l0: #ebedf0;
+  --activity-l1: #9be9a8;
+  --activity-l2: #40c463;
+  --activity-l3: #30a14e;
+  --activity-l4: #216e39;
+  --activity-gap-fill: #e1e6ec;
+  --activity-gap-stroke: #6d7888;
+}
+
+@media (prefers-contrast: more) {
+  .token-activity {
+    --activity-l0: #484c52;
+    --activity-l1: #469960;
+    --activity-l2: #58b872;
+    --activity-l3: #7ddf96;
+    --activity-l4: #adf0bc;
+  }
+
+  [data-theme="light"] .token-activity {
+    --activity-l0: #e1e5e9;
+    --activity-l1: #519c66;
+    --activity-l2: #34804c;
+    --activity-l3: #24693b;
+    --activity-l4: #17552e;
+  }
+}
+
+.token-activity__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.token-activity__title {
+  margin: 0;
+}
+
+.token-activity__summary {
+  margin: 2px 0 0;
+}
+
+.token-activity__modes {
+  margin: 0;
+}
+
+.token-activity__focus {
+  border-radius: 4px;
+  outline: none;
+}
+
+.token-activity__focus:focus-visible {
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.token-activity__scroller {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.token-activity__content {
+  position: relative;
+}
+
+.token-activity__months {
+  position: relative;
+  margin-bottom: 3px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--text-secondary);
+}
+
+.token-activity__months > span {
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
+}
+
+.token-activity__grid {
+  position: relative;
+}
+
+.token-activity__grid > svg {
+  display: block;
+}
+
+.token-activity__cell--l0 { fill: var(--activity-l0); }
+.token-activity__cell--l1 { fill: var(--activity-l1); }
+.token-activity__cell--l2 { fill: var(--activity-l2); }
+.token-activity__cell--l3 { fill: var(--activity-l3); }
+.token-activity__cell--l4 { fill: var(--activity-l4); }
+
+.token-activity__gap-fill {
+  fill: var(--activity-gap-fill);
+}
+
+.token-activity__gap-stroke {
+  fill: none;
+  stroke: var(--activity-gap-stroke);
+  stroke-width: 0.75;
+}
+
+.token-activity__selected > .token-activity__cell {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.token-activity__highlight {
+  fill: none;
+  stroke: var(--text-primary);
+  stroke-opacity: 0.7;
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+.token-activity__tooltip {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  /* The tooltip sits over the cells, so it needs the near-opaque panel fill;
+     the translucent elevated-surface tint leaves the cells showing through. */
+  background: var(--panel-bg);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.token-activity__tooltip > strong {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.token-activity__tooltip > span {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.token-activity__nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.token-activity__legend,
+.token-activity__caption {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.token-activity__legend {
+  justify-content: flex-end;
+}
+
+.token-activity__caption {
+  justify-content: space-between;
+}
+
+.token-activity__caption-gap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.token-activity__swatch {
+  flex: none;
+}
+
+.token-activity__swatch--gap {
+  margin-left: 6px;
+}
+
+.token-activity__empty {
+  margin: 0;
+  padding: 12px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.token-activity__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .usage-spend-provider__detail {
   display: block;
   margin: 4px 0 0;
