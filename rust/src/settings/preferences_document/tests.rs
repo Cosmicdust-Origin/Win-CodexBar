@@ -842,6 +842,7 @@ fn export_never_contains_secrets_or_machine_state() {
         "stacked_tray",
         "credential_expiry",
         "menu_bar_color_pace",
+        "highlight_menu_cards_on_hover",
     ] {
         assert!(!text.contains(secret), "export leaked `{secret}`");
     }

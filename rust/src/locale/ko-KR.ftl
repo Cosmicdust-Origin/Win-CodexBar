@@ -658,6 +658,7 @@ ShowAsUsedLabel = 사용된 양으로 표시
 ShowAsUsedHelper = 사용량 표시줄을 남은 양 대신 소비된 양으로 표시합니다.
 ShowAllTokenAccountsLabel = 모든 토큰 계정 표시
 ShowAllTokenAccountsHelper = 제공업체 메뉴에서 토큰 계정을 축소하지 않고 모두 나열합니다.
+HighlightMenuCardsOnHoverLabel = 마우스를 올리면 메뉴 카드 강조
 OverviewLayoutLabel = Overview 레이아웃
 OverviewLayoutHelper = Overview에 표시되는 정보의 양을 선택합니다.
 OverviewLayoutDetailed = 자세히

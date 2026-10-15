@@ -637,6 +637,7 @@ ShowAsUsedLabel = Показать как использовался
 ShowAsUsedHelper = Отображение полос использования как израсходованных, а не как оставшихся.
 ShowAllTokenAccountsLabel = Показать все токены-аккаунты
 ShowAllTokenAccountsHelper = Перечислите все учетные записи токенов в меню провайдера, а не сворачивайте их.
+HighlightMenuCardsOnHoverLabel = Подсвечивать карточки меню при наведении
 OverviewLayoutLabel = Компоновка обзора
 OverviewLayoutHelper = Выберите объём информации, отображаемой в обзоре.
 OverviewLayoutDetailed = Подробно

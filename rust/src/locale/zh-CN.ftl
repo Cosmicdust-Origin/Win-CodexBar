@@ -605,6 +605,7 @@ ShowAsUsedLabel = 显示为已用
 ShowAsUsedHelper = 以已使用百分比而非剩余显示用量条。
 ShowAllTokenAccountsLabel = 显示所有令牌账户
 ShowAllTokenAccountsHelper = 在服务商菜单中列出所有令牌账户，而不是折叠显示。
+HighlightMenuCardsOnHoverLabel = 鼠标悬停时高亮菜单卡片
 OverviewLayoutLabel = 概览布局
 OverviewLayoutHelper = 选择概览显示的信息量。
 OverviewLayoutDetailed = 详细
