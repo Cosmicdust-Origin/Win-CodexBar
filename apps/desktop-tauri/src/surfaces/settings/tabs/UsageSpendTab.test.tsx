@@ -43,6 +43,7 @@ import type {
   CodexWorkspacesSessionUsage,
   SettingsSnapshot,
   SpendContract,
+  TokenActivitySource,
   UsageSpendRow,
   UsageSpendSummary,
 } from "../../../types/bridge";
@@ -382,6 +383,37 @@ describe("UsageSpendTab", () => {
 
     expect(await screen.findByText("Win-CodexBar")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Independent chats" })).toBeNull();
+  });
+
+  it("draws the token activity year from visible sources only and keeps it out of Copy JSON", async () => {
+    const activity = (providerId: string, tokens: number): TokenActivitySource => ({
+      providerId,
+      days: [
+        { day: "2026-10-10", totalTokens: tokens, isScanned: true },
+        { day: "2026-10-11", totalTokens: tokens, isScanned: true },
+      ],
+    });
+    tauriMocks.getUsageSpendSummary.mockImplementation(async (options?: { period?: string }) => ({
+      ...summary(options?.period ?? "rolling:30"),
+      tokenActivity: [activity("codex", 1_000), activity("claude", 50_000)],
+    }));
+    renderTab({ spendDashboardHiddenSourceIds: ["claude"] });
+
+    const grid = await screen.findByTestId("token-activity");
+    expect(within(grid).getByRole("heading", { name: "TokenActivityTitle" })).toBeInTheDocument();
+    const cell = grid.querySelector("[data-day='2026-10-11'] title");
+    expect(cell?.textContent).toMatch(/: 1K$/);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy JSON" }));
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1));
+    const copied = JSON.parse(vi.mocked(navigator.clipboard.writeText).mock.calls[0][0]) as UsageSpendSummary;
+    expect(copied.tokenActivity).toBeUndefined();
+  });
+
+  it("leaves the token activity grid out without activity", async () => {
+    renderTab();
+    await screen.findByText("USD");
+    expect(screen.queryByTestId("token-activity")).toBeNull();
   });
 });
 

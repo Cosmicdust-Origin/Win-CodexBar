@@ -44,6 +44,7 @@ mod hourly;
 mod read_receipt;
 mod stats;
 mod today;
+mod token_activity;
 mod window;
 pub use claude_incomplete::ClaudeIncompleteReport;
 use claude_incomplete::ClaudeIncompleteTracker;
@@ -59,6 +60,7 @@ pub use hourly::HourlyCostPoint;
 pub use read_receipt::CodexScanReadReceipt;
 pub use stats::CostScanStats;
 pub use today::TodayUsage;
+pub use token_activity::{TOKEN_ACTIVITY_DAYS, TokenActivityDay, daily_token_activity};
 
 /// Completeness of the pricing coverage in a [`CostSummary`] (upstream 0.48.0 F18).
 ///
@@ -1397,12 +1399,14 @@ pub fn get_daily_cost_and_incomplete_history(provider: &str, days: u32) -> Daily
     (daily, incomplete)
 }
 
+/// Daily costs, local-hour costs, and whether the Claude walk was complete.
+pub type ClaudeDailyAndHourlyCosts = (Vec<(String, Option<f64>)>, Vec<HourlyCostPoint>, bool);
+
 /// Claude daily costs plus local-hour costs from one de-duplicated log walk.
 /// The hourly series is empty unless the walk read every file completely, so
-/// a partial scan never draws an hour lower than it was.
-pub fn get_claude_daily_and_hourly_cost_history(
-    days: u32,
-) -> (Vec<(String, Option<f64>)>, Vec<HourlyCostPoint>) {
+/// a partial scan never draws an hour lower than it was. The flag reports
+/// whether the walk was complete.
+pub fn get_claude_daily_and_hourly_cost_history(days: u32) -> ClaudeDailyAndHourlyCosts {
     let mut hourly = HourlyCostAccumulator::default();
     let (daily, _, complete) = daily_cost_history("claude", days, Some(&mut hourly));
     let hourly = if complete {
@@ -1410,7 +1414,7 @@ pub fn get_claude_daily_and_hourly_cost_history(
     } else {
         Vec::new()
     };
-    (daily, hourly)
+    (daily, hourly, complete)
 }
 
 /// Daily costs, per-day incomplete counts, and whether the Claude walk read
