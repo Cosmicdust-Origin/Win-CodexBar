@@ -406,7 +406,7 @@ mod tests {
         let before = JsonlScanner::load_cache(ProviderId::Codex, Some(&shared));
         assert!(before.scan_since_key.is_some());
 
-        let keys = window_keys(Utc::now().date_naive(), TOKEN_ACTIVITY_DAYS);
+        let keys = window_keys(cost_bucket_zone().date(Utc::now()), TOKEN_ACTIVITY_DAYS);
         let activity = codex_activity_scanner(TOKEN_ACTIVITY_DAYS, Some(&shared))
             .with_sessions_dirs(vec![sessions]);
         let days = codex_token_activity(activity, &keys);
