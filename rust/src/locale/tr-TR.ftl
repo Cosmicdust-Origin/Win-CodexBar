@@ -1600,6 +1600,10 @@ ProviderCodexBatterySaver = OpenAI web pil tasarrufu
 ProviderCodexBatterySaverHelp = Pil ve ağ kullanımını azaltmak için arka plandaki chatgpt.com yenilemelerini sınırlar. Pano ekstraları siz elle yenileyene kadar eski kalabilir.
 ProviderOptionNotUsedOnWindows = Henüz Windows'ta kullanılmıyor; seçim, desteklendiğinde kullanılmak üzere kaydedilir.
 ClaudeSwapExecutablePathHelp = cswap yürütülebilir dosyasının yolu (github.com/realiti4/claude-swap).
+# Claude cloud credits
+ProviderLabelCloudCredits = Bulut kredileri
+ProviderTextExpired = Süresi doldu
+ProviderTextOfRemaining = { "{}" } / { "{}" } kaldı
 AntigravityProfileHomesLabel = Ek Gemini profil klasörleri
 AntigravityProfileHomesHelp = Başka bir Gemini CLI profilini (.gemini klasörü) içeren klasörler. Bu klasörlerdeki Antigravity yerel belirteç geçmişi, bu bilgisayarın varsayılan profiliyle birleştirilir. Birden çok klasöre kopyalanan bir konuşma yalnızca bir kez sayılır.
 AntigravityProfileHomesAdd = Klasör ekle

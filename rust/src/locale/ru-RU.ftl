@@ -1600,6 +1600,10 @@ ProviderCodexBatterySaver = Экономия заряда для веб-OpenAI
 ProviderCodexBatterySaverHelp = Ограничивает фоновые обновления chatgpt.com, чтобы снизить расход батареи и трафика. Дополнения панели могут устаревать, пока вы не обновите их вручную.
 ProviderOptionNotUsedOnWindows = Пока не используется в Windows; выбор сохраняется на будущее.
 ClaudeSwapExecutablePathHelp = Путь к исполняемому файлу cswap (github.com/realiti4/claude-swap).
+# Claude cloud credits
+ProviderLabelCloudCredits = Облачные кредиты
+ProviderTextExpired = Истёк
+ProviderTextOfRemaining = Осталось { "{}" } из { "{}" }
 AntigravityProfileHomesLabel = Дополнительные папки профилей Gemini
 AntigravityProfileHomesHelp = Папки, в которых лежит другой профиль Gemini CLI (папка .gemini). История токенов Antigravity из этих папок добавляется к профилю по умолчанию на этом ПК. Разговор, скопированный в несколько папок, учитывается один раз.
 AntigravityProfileHomesAdd = Добавить папку

@@ -1600,6 +1600,10 @@ ProviderCodexBatterySaver = OpenAI 網頁省電
 ProviderCodexBatterySaverHelp = 限制 chatgpt.com 背景重新整理，以減少電池和網路用量。儀表板附加資訊可能在手動重新整理前維持舊資料。
 ProviderOptionNotUsedOnWindows = Windows 上尚未使用；此選擇會儲存，待支援後生效。
 ClaudeSwapExecutablePathHelp = cswap 執行檔的路徑 (github.com/realiti4/claude-swap)。
+# Claude cloud credits
+ProviderLabelCloudCredits = 雲端額度
+ProviderTextExpired = 已過期
+ProviderTextOfRemaining = 剩餘 { "{}" } / { "{}" }
 AntigravityProfileHomesLabel = 額外的 Gemini 設定檔資料夾
 AntigravityProfileHomesHelp = 包含另一個 Gemini CLI 設定檔（.gemini 資料夾）的資料夾。這些資料夾中的 Antigravity 本機權杖紀錄會與本機預設設定檔合併。複製到多個資料夾的對話只計算一次。
 AntigravityProfileHomesAdd = 新增資料夾
