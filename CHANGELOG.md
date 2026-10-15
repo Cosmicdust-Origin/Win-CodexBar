@@ -9,6 +9,7 @@
 
 ## [Windows] Unreleased
 
+- Kimi (China): use the current Kimi Desktop session from its Local Storage (`%APPDATA%\kimi-desktop`) for web usage and monthly membership enrichment, and check that session again before each request, so a signed-out, replaced, or expired Desktop token is never sent or recovered from an older record (upstream #4416, #3536).
 - Add **Parallel** prepaid balance: reads the account balance and any pending debit from the platform.parallel.ai console using your browser session or a pasted Cookie header. A signed-out console moves on to the next browser session and reports an expired session when none remain (upstream #4479, #4508).
 - Add **fal** account credit balance: reads the credit balance and account name from fal's billing API with your API key (`FAL_KEY` or Settings) and explains when the key lacks the billing read permission (upstream #4438).
 - Add **FLORA** workspace balance: reads the workspace's available balance, your member limit, and this month's spend with your API key and workspace ID (`FLORA_API_KEY` / `FLORA_WORKSPACE_ID` or Settings), and explains when spend is unavailable or the key lacks billing permission (upstream #4439).
