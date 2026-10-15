@@ -36,6 +36,8 @@ import doubao from "./icons/ProviderIcon-doubao.svg?raw";
 import elevenlabs from "./icons/ProviderIcon-elevenlabs.svg?raw";
 import exa from "./icons/ProviderIcon-exa.svg?raw";
 import factory from "./icons/ProviderIcon-factory.svg?raw";
+import fal from "./icons/ProviderIcon-fal.svg?raw";
+import flora from "./icons/ProviderIcon-flora.svg?raw";
 import gemini from "./icons/ProviderIcon-gemini.svg?raw";
 import grok from "./icons/ProviderIcon-grok.svg?raw";
 import groq from "./icons/ProviderIcon-groq.svg?raw";
@@ -67,6 +69,7 @@ import ollama from "./icons/ProviderIcon-ollama.svg?raw";
 import opencode from "./icons/ProviderIcon-opencode.svg?raw";
 import opencodego from "./icons/ProviderIcon-opencodego.svg?raw";
 import openrouter from "./icons/ProviderIcon-openrouter.svg?raw";
+import parallel from "./icons/ProviderIcon-parallel.svg?raw";
 import perplexity from "./icons/ProviderIcon-perplexity.svg?raw";
 import qoder from "./icons/ProviderIcon-qoder.svg?raw";
 import raycast from "./icons/ProviderIcon-raycast.svg?raw";
@@ -146,6 +149,8 @@ const RAW: Record<string, string> = {
   elevenlabs: tint(elevenlabs),
   exa: tint(exa),
   factory: tint(factory),
+  fal: tint(fal),
+  flora: tint(flora),
   gemini: tint(gemini),
   grok: tint(grok),
   groq: tint(groq),
@@ -177,6 +182,7 @@ const RAW: Record<string, string> = {
   opencode: tint(opencode),
   opencodego: tint(opencodego),
   openrouter: tint(openrouter),
+  parallel: tint(parallel),
   perplexity: tint(perplexity),
   qoder: tint(qoder),
   raycast: tint(raycast),
@@ -232,6 +238,8 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   deepseek:    { id: "deepseek",    brandColor: "#4d6bfe", fallbackLetter: "D", svgPath: RAW.deepseek },
   elevenlabs:  { id: "elevenlabs",  brandColor: "#111827", fallbackLetter: "E", svgPath: RAW.elevenlabs },
   factory:     { id: "factory",     brandColor: "#ff6b35", fallbackLetter: "◎", svgPath: RAW.factory },
+  fal:         { id: "fal",         brandColor: "#7C3AED", fallbackLetter: "F", svgPath: RAW.fal },
+  flora:       { id: "flora",       brandColor: "#111111", fallbackLetter: "F", svgPath: RAW.flora },
   gemini:      { id: "gemini",      brandColor: "#ab87ea", fallbackLetter: "✦", svgPath: RAW.gemini },
   grok:        { id: "grok",        brandColor: "#10a37f", fallbackLetter: "G", svgPath: RAW.grok },
   groq:        { id: "groq",        brandColor: "#f56844", fallbackLetter: "G", svgPath: RAW.groq },
@@ -261,6 +269,7 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   opencode:    { id: "opencode",    brandColor: "#3b82f6", fallbackLetter: "○", svgPath: RAW.opencode },
   opencodego:  { id: "opencodego",  brandColor: "#3b82f6", fallbackLetter: "○", svgPath: RAW.opencodego },
   openrouter:  { id: "openrouter",  brandColor: "#6467f2", fallbackLetter: "R", svgPath: RAW.openrouter },
+  parallel:    { id: "parallel",    brandColor: "#1D1C1A", fallbackLetter: "P", svgPath: RAW.parallel },
   perplexity:  { id: "perplexity",  brandColor: "#20b2aa", fallbackLetter: "P", svgPath: RAW.perplexity },
   vertexai:    { id: "vertexai",    brandColor: "#4285f4", fallbackLetter: "△", svgPath: RAW.vertexai },
   warp:        { id: "warp",        brandColor: "#938bb4", fallbackLetter: "W", svgPath: RAW.warp },

@@ -348,6 +348,17 @@ pub fn get_api_key_providers() -> Vec<ProviderConfigInfo> {
             dashboard_url: Some("https://console.aws.amazon.com/bedrock"),
         },
         ProviderConfigInfo {
+            id: ProviderId::CommandCode,
+            name: "Command Code",
+            requires_api_key: false,
+            api_key_env_var: Some("COMMAND_CODE_API_KEY"),
+            api_key_help: Some(
+                "Used by Auto when set and by the API usage source. Without a key, Auto uses browser cookies. Set it here or in COMMAND_CODE_API_KEY.",
+            ),
+            config_file_path: None,
+            dashboard_url: Some("https://commandcode.ai/studio"),
+        },
+        ProviderConfigInfo {
             id: ProviderId::Codebuff,
             name: "Codebuff",
             requires_api_key: true,
@@ -843,6 +854,28 @@ pub fn get_api_key_providers() -> Vec<ProviderConfigInfo> {
             ),
             config_file_path: None,
             dashboard_url: Some("https://app.aerostack.dev/settings/billing"),
+        },
+        ProviderConfigInfo {
+            id: ProviderId::Fal,
+            name: "fal",
+            requires_api_key: true,
+            api_key_env_var: Some("FAL_KEY"),
+            api_key_help: Some(
+                "Key with billing read access (BILLING or READONLY preset). Or set FAL_KEY.",
+            ),
+            config_file_path: None,
+            dashboard_url: Some("https://fal.ai/dashboard/keys"),
+        },
+        ProviderConfigInfo {
+            id: ProviderId::Flora,
+            name: "FLORA",
+            requires_api_key: true,
+            api_key_env_var: Some("FLORA_API_KEY"),
+            api_key_help: Some("Needs billing permission on the workspace. Or set FLORA_API_KEY."),
+            config_file_path: None,
+            dashboard_url: Some(
+                "https://app.flora.ai/projects?openSettings=true&initialTab=apiKeys",
+            ),
         },
         ProviderConfigInfo {
             id: ProviderId::Cosmic,
