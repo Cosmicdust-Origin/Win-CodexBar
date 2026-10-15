@@ -311,10 +311,17 @@ pub(crate) fn build_fetch_context(
             "off" if provider_uses_oauth_without_cookies(id, usage_source) => {
                 (SourceMode::OAuth, None, false)
             }
-            "off"
-                if (has_kimi_code_api_key || has_opencodego_api_key)
-                    && usage_source == SourceMode::Auto =>
-            {
+            // OpenCode Go discovers browser sessions inside the provider; the
+            // missing-cookie flag tells it that Off forbids that discovery.
+            "off" if id == ProviderId::OpenCodeGo => {
+                let source_mode = if has_opencodego_api_key && usage_source == SourceMode::Auto {
+                    SourceMode::Auto
+                } else {
+                    SourceMode::Cli
+                };
+                (source_mode, None, true)
+            }
+            "off" if has_kimi_code_api_key && usage_source == SourceMode::Auto => {
                 (SourceMode::Auto, None, false)
             }
             // Droid/Factory: cookie-off must never scrape browser cookies. Map to
