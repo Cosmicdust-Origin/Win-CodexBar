@@ -160,7 +160,7 @@ fn workspace_id(configured: Option<&str>) -> Result<String, ProviderError> {
     Ok(raw.to_string())
 }
 
-fn is_workspace_id(value: &str) -> bool {
+pub(crate) fn is_workspace_id(value: &str) -> bool {
     value
         .strip_prefix("ws_")
         .is_some_and(|id| !id.is_empty() && id.bytes().all(|byte| byte.is_ascii_alphanumeric()))

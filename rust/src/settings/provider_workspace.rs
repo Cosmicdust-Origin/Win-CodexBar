@@ -71,11 +71,11 @@ pub fn validate_provider_workspace_value(
         ProviderId::LLMProxy => validate_llmproxy_base_url(trimmed),
         ProviderId::LLMMan => crate::providers::llmman::validated_llmman_base_url(trimmed)
             .map_err(|err| err.to_string()),
-        ProviderId::Flora => validate_id(trimmed, "FLORA workspace ID", |value| {
-            value.strip_prefix("ws_").is_some_and(|id| {
-                !id.is_empty() && id.bytes().all(|byte| byte.is_ascii_alphanumeric())
-            })
-        }),
+        ProviderId::Flora => validate_id(
+            trimmed,
+            "FLORA workspace ID",
+            crate::providers::flora::is_workspace_id,
+        ),
         ProviderId::Exa => {
             if trimmed.is_empty() || trimmed == "." || trimmed == ".." {
                 return Err(
