@@ -896,6 +896,9 @@ export interface SubscriptionMetadataSnapshot {
   startsAt: string | null;
   expiresAt: string | null;
   renewsAt: string | null;
+  /** Calendar-only dates are UTC midnight; format them in UTC. */
+  renewsAtIsDateOnly?: boolean;
+  expiresAtIsDateOnly?: boolean;
 }
 
 export interface ProviderInventoryItem {
@@ -925,6 +928,8 @@ export interface ProviderUsageItem {
   id: string;
   title: string;
   available: boolean;
+  /** Also suppressed while Cost summary display is Hidden. */
+  requiresCostSummary?: boolean;
 }
 /** Backend-classified provider availability state (camelCase serde on the bridge). */
 export type ProviderStateKind =
@@ -1389,6 +1394,8 @@ export interface ProviderDetail {
   inventory?: ProviderInventoryItem[];
   /** Provider-specific display rows; never used as quota math or persistence. */
   displayDetails?: ProviderDisplayDetail[];
+  /** Plan renewal / expiry dates for the usage preview. */
+  subscription?: SubscriptionMetadataSnapshot | null;
 
   cost: CostSnapshotBridge | null;
   pace: PaceSnapshot | null;

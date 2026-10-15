@@ -1650,3 +1650,8 @@ AntigravityProfileHomesAdd = 添加文件夹
 AntigravityProfileHomesRemove = 移除
 AntigravityProfileHomesEmpty = 尚未添加额外的配置文件文件夹。
 AntigravityProfileHomesPickFailed = 无法打开文件夹选择器。
+# Claude optional usage rows and plan dates
+UsageItemPlanRenewalExpiry = 套餐续订 / 到期
+UsageItemHiddenByCostSummary = 费用摘要显示方式设为“隐藏”时不显示。
+PlanRenewsOn = 续订：{ "{}" }
+PlanExpiresOn = 套餐到期：{ "{}" }

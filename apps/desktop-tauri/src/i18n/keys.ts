@@ -1687,6 +1687,10 @@ export const ALL_LOCALE_KEYS = [
   "AntigravityProfileHomesRemove",
   "AntigravityProfileHomesEmpty",
   "AntigravityProfileHomesPickFailed",
+  "UsageItemPlanRenewalExpiry",
+  "UsageItemHiddenByCostSummary",
+  "PlanRenewsOn",
+  "PlanExpiresOn",
 ] as const;
 
 export type LocaleKey = (typeof ALL_LOCALE_KEYS)[number];

@@ -1650,3 +1650,8 @@ AntigravityProfileHomesAdd = Klasör ekle
 AntigravityProfileHomesRemove = Kaldır
 AntigravityProfileHomesEmpty = Eklenmiş ek profil klasörü yok.
 AntigravityProfileHomesPickFailed = Klasör seçici açılamadı.
+# Claude optional usage rows and plan dates
+UsageItemPlanRenewalExpiry = Plan yenileme / bitiş
+UsageItemHiddenByCostSummary = Maliyet özeti görünümü Gizli olarak ayarlıyken gizlenir.
+PlanRenewsOn = Yenilenme: { "{}" }
+PlanExpiresOn = Plan bitişi: { "{}" }

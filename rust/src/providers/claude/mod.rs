@@ -13,6 +13,7 @@ mod reset_credits;
 pub mod reset_observations;
 mod scoped_weekly;
 mod spend_window;
+mod subscription_details;
 mod trust_dialog;
 mod web_api;
 

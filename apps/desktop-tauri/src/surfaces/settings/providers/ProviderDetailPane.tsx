@@ -416,6 +416,7 @@ export function ProviderDetailPane({
         disabled={settingsDisabled}
         t={t}
         onChange={onSettingsChange}
+        costSummaryHidden={settings.costSummaryDisplayStyle === "hidden"}
       />
 
       {hasFetchError && (

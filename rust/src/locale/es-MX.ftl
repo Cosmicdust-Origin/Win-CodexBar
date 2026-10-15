@@ -1649,3 +1649,8 @@ AntigravityProfileHomesAdd = Agregar carpeta
 AntigravityProfileHomesRemove = Quitar
 AntigravityProfileHomesEmpty = No hay carpetas de perfil adicionales.
 AntigravityProfileHomesPickFailed = No se pudo abrir el selector de carpetas.
+# Claude optional usage rows and plan dates
+UsageItemPlanRenewalExpiry = Renovación / vencimiento del plan
+UsageItemHiddenByCostSummary = Oculto mientras el estilo de resumen de costos está en Oculto.
+PlanRenewsOn = Se renueva: { "{}" }
+PlanExpiresOn = El plan vence: { "{}" }

@@ -1652,3 +1652,8 @@ AntigravityProfileHomesAdd = Add folder
 AntigravityProfileHomesRemove = Remove
 AntigravityProfileHomesEmpty = No additional profile folders added.
 AntigravityProfileHomesPickFailed = Could not open the folder picker.
+# Claude optional usage rows and plan dates
+UsageItemPlanRenewalExpiry = Plan renewal / expiry
+UsageItemHiddenByCostSummary = Hidden while Cost summary display is set to Hidden.
+PlanRenewsOn = Renews: { "{}" }
+PlanExpiresOn = Plan expires: { "{}" }
