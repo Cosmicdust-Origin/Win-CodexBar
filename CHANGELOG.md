@@ -9,6 +9,9 @@
 
 ## [Windows] Unreleased
 
+- Add **Parallel** prepaid balance: reads the account balance and any pending debit from the platform.parallel.ai console using your browser session or a pasted Cookie header. A signed-out console moves on to the next browser session and reports an expired session when none remain (upstream #4479, #4508).
+- Add **fal** account credit balance: reads the credit balance and account name from fal's billing API with your API key (`FAL_KEY` or Settings) and explains when the key lacks the billing read permission (upstream #4438).
+- Add **FLORA** workspace balance: reads the workspace's available balance, your member limit, and this month's spend with your API key and workspace ID (`FLORA_API_KEY` / `FLORA_WORKSPACE_ID` or Settings), and explains when spend is unavailable or the key lacks billing permission (upstream #4439).
 - Command Code: add an **API key** usage source (Settings > Providers > Command Code, or `COMMAND_CODE_API_KEY`). Auto uses the key before browser cookies, the **API** source reads billing with the key only, and a rejected key reports an expired key instead of falling back to cookies. The Browser cookies source is unchanged (upstream #4462).
 - JetBrains AI: read current quota from newer `JbaiQuota` and Junie `quota_update` records in `idea.log`, keeping same-IDE freshness and the XML fallback (upstream #4457).
 - Raycast: automatic cookie import walks every supported browser in the shared order and uses the first accepted session, instead of reading Chrome alone (upstream #4443, 0aef66c73).

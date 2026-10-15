@@ -457,7 +457,10 @@ impl TokenAccountSupport {
             | ProviderId::Tavily
             | ProviderId::Exa
             | ProviderId::Cosmic
-            | ProviderId::Aerostack => None,
+            | ProviderId::Aerostack
+            | ProviderId::Parallel
+            | ProviderId::Fal
+            | ProviderId::Flora => None,
         }
     }
 
