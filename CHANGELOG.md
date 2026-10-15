@@ -9,6 +9,7 @@
 
 ## [Windows] Unreleased
 
+- Codex CLI: add opt-in `cost --identified-only` request subtotals across local and SSH (`--remote`) histories, deduplicating strong request identities and keeping partial results without estimating a combined price, plus `--group-by project` reports that show the partial-history notice even when no projects are listed (upstream #4447, #4472).
 - JetBrains AI: read current quota from newer `JbaiQuota` and Junie `quota_update` records in `idea.log`, keeping same-IDE freshness and the XML fallback (upstream #4457).
 - Raycast: automatic cookie import walks every supported browser in the shared order and uses the first accepted session, instead of reading Chrome alone (upstream #4443, 0aef66c73).
 - Price Codex **codex-auto-review** requests made from a ChatGPT account at $0 from 2026-10-06 07:00 UTC onward: tokens stay in totals, the model is no longer listed as unpriced, and an explicit custom price for the model still applies (upstream #4452, #4453).

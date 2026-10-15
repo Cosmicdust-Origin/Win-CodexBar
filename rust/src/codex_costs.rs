@@ -4,10 +4,14 @@
 //! local-scan aggregation and pricing logic.
 
 mod host_costs;
+mod identified_requests;
 mod quota_windows;
 mod summary_contract;
 
 pub(crate) use host_costs::{CodexHostCostsArgs, HostOutputFormat, run_codex_host_costs};
+pub(crate) use identified_requests::{
+    IdentifiedUsageArgs, MAX_IDENTIFIED_OUTPUT_BYTES, run_codex_identified_usage,
+};
 pub use quota_windows::{CodexQuotaWindow, codex_quota_windows_from_cache};
 pub(crate) use summary_contract::{
     CodexCostSummary, CodexHostCostReport, CodexHostCostWindow, CodexHostOutcome,
