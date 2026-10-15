@@ -43,6 +43,7 @@ mod codex;
 mod read_receipt;
 mod stats;
 mod today;
+mod token_activity;
 mod window;
 pub use claude_incomplete::ClaudeIncompleteReport;
 use claude_incomplete::ClaudeIncompleteTracker;
@@ -56,6 +57,7 @@ use claude_usage::{
 pub use read_receipt::CodexScanReadReceipt;
 pub use stats::CostScanStats;
 pub use today::TodayUsage;
+pub use token_activity::{TOKEN_ACTIVITY_DAYS, TokenActivityDay, daily_token_activity};
 
 /// Completeness of the pricing coverage in a [`CostSummary`] (upstream 0.48.0 F18).
 ///

@@ -552,6 +552,21 @@ export interface UsageSpendSummary {
   dashboardTimezone: string;
   /** False when "Track costs" is off: nothing was scanned and the summary is empty. */
   costTrackingEnabled?: boolean;
+  /** The last year of per-day tokens per local-log row, independent of the period. */
+  tokenActivity?: TokenActivitySource[];
+}
+
+export interface TokenActivityDay {
+  day: string;
+  /** null is unknown: never scanned, or scanned and still not totalled. */
+  totalTokens: number | null;
+  isScanned: boolean;
+}
+
+export interface TokenActivitySource {
+  providerId: string;
+  /** Oldest day first; the last entry is today in the cost bucket zone. */
+  days: TokenActivityDay[];
 }
 
 export type CostProvenance = "listPriceEstimate" | "vendorMetered" | "mixed" | "unknown";
