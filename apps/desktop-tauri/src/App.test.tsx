@@ -96,6 +96,7 @@ function settings(overrides: Partial<SettingsSnapshot> = {}): SettingsSnapshot {
     quotaWarningMarkersVisible: true,
     workdayTickStyle: "subtle",
     menuBarColorPace: false,
+    menuBarPaceReservePositive: false,
     providersSortedAlphabetically: false,
     showAsUsed: true,
     showAllTokenAccountsInMenu: false,

@@ -211,6 +211,12 @@ pub struct Settings {
     #[serde(default)]
     pub menu_bar_color_pace: bool,
 
+    /// Show reserve as `+` and deficit as `-` in signed pace text (upstream
+    /// `menuBarPaceReservePositive`). Display only: the stored pace delta stays
+    /// usage-ahead, so pace colours and stages keep their meaning.
+    #[serde(default)]
+    pub menu_bar_pace_reserve_positive: bool,
+
     /// Settings sidebar lists providers alphabetically (enabled first)
     /// instead of in `provider_order`. Display only; never rewrites the order.
     #[serde(default)]
@@ -700,6 +706,7 @@ impl Default for Settings {
             highlight_menu_cards_on_hover: true,
             workday_tick_style: WorkdayTickStyle::Subtle,
             menu_bar_color_pace: false,
+            menu_bar_pace_reserve_positive: false,
             providers_sorted_alphabetically: false,
             show_as_used: false,
             enable_animations: true,   // Animations enabled by default

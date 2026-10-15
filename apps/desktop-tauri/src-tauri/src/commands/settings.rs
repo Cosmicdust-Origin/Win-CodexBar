@@ -44,6 +44,7 @@ pub struct SettingsUpdate {
     pub highlight_menu_cards_on_hover: Option<bool>,
     pub workday_tick_style: Option<codexbar::settings::WorkdayTickStyle>,
     pub menu_bar_color_pace: Option<bool>,
+    pub menu_bar_pace_reserve_positive: Option<bool>,
     pub providers_sorted_alphabetically: Option<bool>,
     pub show_as_used: Option<bool>,
     pub show_all_token_accounts_in_menu: Option<bool>,
@@ -393,6 +394,9 @@ impl SettingsUpdate {
         }
         if let Some(v) = self.menu_bar_color_pace {
             settings.menu_bar_color_pace = v;
+        }
+        if let Some(v) = self.menu_bar_pace_reserve_positive {
+            settings.menu_bar_pace_reserve_positive = v;
         }
         if let Some(v) = self.providers_sorted_alphabetically {
             settings.providers_sorted_alphabetically = v;
@@ -1134,6 +1138,24 @@ mod tests {
         }
         .apply_display_settings(&mut settings);
         assert!(!settings.menu_bar_color_pace);
+    }
+
+    #[test]
+    fn apply_display_settings_updates_pace_sign() {
+        let mut settings = Settings::default();
+        assert!(!settings.menu_bar_pace_reserve_positive);
+
+        let update: SettingsUpdate =
+            serde_json::from_str(r#"{"menuBarPaceReservePositive":true}"#).unwrap();
+        update.apply_display_settings(&mut settings);
+        assert!(settings.menu_bar_pace_reserve_positive);
+
+        SettingsUpdate {
+            menu_bar_pace_reserve_positive: Some(false),
+            ..Default::default()
+        }
+        .apply_display_settings(&mut settings);
+        assert!(!settings.menu_bar_pace_reserve_positive);
     }
 
     #[test]

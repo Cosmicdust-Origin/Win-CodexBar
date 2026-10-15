@@ -236,6 +236,24 @@ fn tray_pace_color_defaults_off_and_round_trips() {
 }
 
 #[test]
+fn pace_reserve_positive_defaults_off_and_round_trips() {
+    let defaulted: Settings = serde_json::from_str(r#"{ "enabled_providers": [] }"#)
+        .expect("missing pace sign defaults to ahead-of-pace positive");
+    assert!(!defaulted.menu_bar_pace_reserve_positive);
+    assert!(!Settings::default().menu_bar_pace_reserve_positive);
+
+    let enabled = Settings {
+        menu_bar_pace_reserve_positive: true,
+        ..Settings::default()
+    };
+    let json = serde_json::to_string(&enabled).expect("serialize pace sign");
+    assert!(json.contains(r#""menu_bar_pace_reserve_positive":true"#));
+
+    let loaded: Settings = serde_json::from_str(&json).expect("deserialize pace sign");
+    assert!(loaded.menu_bar_pace_reserve_positive);
+}
+
+#[test]
 fn providers_sorted_alphabetically_defaults_off_and_round_trips() {
     assert!(!Settings::default().providers_sorted_alphabetically);
 
