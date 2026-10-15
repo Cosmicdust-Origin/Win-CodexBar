@@ -37,25 +37,22 @@ export function brandArtworkFor(providerId: string): BrandArtwork | null {
   return BRAND_ARTWORK.get(getProviderIcon(providerId).id) ?? null;
 }
 
+const ICON_SCALES = new Map<string, { brand: number; monochrome: number }>([
+  ["cursor", { brand: 1.25, monochrome: 1.25 }],
+  ["codex", { brand: 1.17, monochrome: 1.24 }],
+  ["antigravity", { brand: 1.38, monochrome: 1.14 }],
+  ["bedrock", { brand: 0.84, monochrome: 1 }],
+  ["muse", { brand: 1.08, monochrome: 1 }],
+  ["vertexai", { brand: 1.08, monochrome: 1 }],
+]);
+
 /**
  * Upstream `SpendProviderIcon.artworkScale`: each bundled mark's transparent
  * padding is normalized inside the shared 20 point slot. Brand and monochrome
  * artwork have separate compensations; `isBrand` is false for template fallbacks.
  */
 export function spendIconScale(providerId: string, isBrand: boolean): number {
-  switch (getProviderIcon(providerId).id) {
-    case "cursor":
-      return 1.25;
-    case "codex":
-      return isBrand ? 1.17 : 1.24;
-    case "antigravity":
-      return isBrand ? 1.38 : 1.14;
-    case "bedrock":
-      return isBrand ? 0.84 : 1;
-    case "muse":
-    case "vertexai":
-      return isBrand ? 1.08 : 1;
-    default:
-      return 1;
-  }
+  const scale = ICON_SCALES.get(getProviderIcon(providerId).id);
+  if (!scale) return 1;
+  return isBrand ? scale.brand : scale.monochrome;
 }
