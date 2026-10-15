@@ -8,6 +8,7 @@ use codexbar::spend_contract::{
     SpendContract, build_contract_from_period_summary, build_local_spend_contract,
     build_local_spend_contract_for_period, build_local_spend_contract_from_summary,
 };
+use codexbar::spend_trend::SpendTrend;
 use serde::Serialize;
 use tauri::State;
 
@@ -86,6 +87,10 @@ pub struct UsageSpendSummary {
     /// False when "Track costs" is off: nothing was scanned and the summary
     /// is empty, so the pane shows "Cost tracking is off".
     pub cost_tracking_enabled: bool,
+    /// Per-source spend series for the trend explorer; absent while
+    /// "Track costs" is off.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trend: Option<SpendTrend>,
 }
 
 #[derive(Debug, Clone)]
@@ -774,6 +779,13 @@ fn build_usage_spend_summary(
     }
 
     let contract = codex_period_contract;
+    let claude_trend = rows.iter().any(|row| row.provider_id == "claude").then(|| {
+        let (daily, hourly) = codexbar::cost_scanner::get_claude_daily_and_hourly_cost_history(
+            period.sidecar_days(now),
+        );
+        (claude_period_summary.known_zero, daily, hourly)
+    });
+    let trend = build_spend_trend(&rows, &contract, claude_trend, period, now);
     let reporting_day = last_included_reporting_day(&contract);
     let dashboard_timezone = codexbar::core::local_timezone_name();
     UsageSpendSummary {
@@ -783,6 +795,7 @@ fn build_usage_spend_summary(
         reporting_day,
         dashboard_timezone,
         cost_tracking_enabled: true,
+        trend: Some(trend),
     }
 }
 
@@ -798,7 +811,79 @@ fn cost_tracking_off_summary(period: CostReportingPeriod) -> UsageSpendSummary {
             .to_string(),
         dashboard_timezone: codexbar::core::local_timezone_name(),
         cost_tracking_enabled: false,
+        trend: None,
     }
+}
+
+type DailyCosts = Vec<(String, Option<f64>)>;
+type HourlyCosts = Vec<codexbar::cost_scanner::HourlyCostPoint>;
+/// Claude's window known-zero flag with its daily and hourly cost series.
+type ClaudeTrendSeries = (bool, DailyCosts, HourlyCosts);
+
+/// Recorded daily (and, where the source keeps timestamps, hourly) spend per
+/// source over the selected window. Local-log providers use their own scans;
+/// every other USD row contributes its provider-reported daily costs.
+fn build_spend_trend(
+    rows: &[UsageSpendRow],
+    codex: &SpendContract,
+    claude: Option<ClaudeTrendSeries>,
+    period: CostReportingPeriod,
+    now: chrono::DateTime<Utc>,
+) -> SpendTrend {
+    use codexbar::spend_trend::{SpendTrendBuilder, SpendTrendSource};
+    let mut series: Vec<(SpendTrendSource, DailyCosts, HourlyCosts)> = Vec::new();
+    for row in rows {
+        let source = |known_zero: bool| SpendTrendSource {
+            id: row.provider_id.clone(),
+            provider_id: row.provider_id.clone(),
+            display_name: row.display_name.clone(),
+            known_zero,
+        };
+        match row.provider_id.as_str() {
+            "codex" => series.push((
+                source(codex.known_zero),
+                codex
+                    .daily
+                    .iter()
+                    .map(|point| (point.day.clone(), point.cost_usd))
+                    .collect(),
+                Vec::new(),
+            )),
+            "claude" => {
+                if let Some((known_zero, daily, hourly)) = claude.clone() {
+                    series.push((source(known_zero), daily, hourly));
+                }
+            }
+            _ if row.included_in_overview
+                && row.currency.eq_ignore_ascii_case("USD")
+                && !row.daily.is_empty() =>
+            {
+                series.push((
+                    source(false),
+                    row.daily
+                        .iter()
+                        .map(|point| (point.day.clone(), Some(point.amount)))
+                        .collect(),
+                    Vec::new(),
+                ));
+            }
+            _ => {}
+        }
+    }
+    // All available history opens at the first recorded spend, not at 1970.
+    let earliest = series
+        .iter()
+        .flat_map(|(_, daily, _)| daily.iter())
+        .filter(|(_, cost)| cost.is_some_and(|cost| cost > 0.0))
+        .filter_map(|(day, _)| chrono::NaiveDate::parse_from_str(day, "%Y-%m-%d").ok())
+        .min();
+    let zone = codexbar::cost_reporting_period::cost_bucket_zone();
+    let bounds = period.bounds(now, zone, earliest.or(Some(zone.date(now))));
+    let mut builder = SpendTrendBuilder::new(bounds, zone);
+    for (source, daily, hourly) in series {
+        builder.add_source(source, daily, &hourly);
+    }
+    builder.finish()
 }
 
 /// Reuse the fixed scan when it already covers the selected period.
@@ -1070,7 +1155,99 @@ mod cache_key_tests {
             reporting_day: "2026-10-01".to_string(),
             dashboard_timezone: "UTC".to_string(),
             cost_tracking_enabled: true,
+            trend: None,
         }
+    }
+
+    fn trend_row(provider_id: &str, currency: &str, daily: &[(&str, f64)]) -> UsageSpendRow {
+        UsageSpendRow {
+            provider_id: provider_id.to_string(),
+            display_name: provider_id.to_uppercase(),
+            seven_day: None,
+            thirty_day: None,
+            seven_day_estimate: None,
+            thirty_day_estimate: None,
+            seven_day_tokens: None,
+            thirty_day_tokens: None,
+            seven_day_tokens_lower_bound: false,
+            thirty_day_tokens_lower_bound: false,
+            period_cost: None,
+            period_tokens: None,
+            currency: currency.to_string(),
+            source: "fixture".to_string(),
+            included_in_overview: provider_id != "pi",
+            daily: daily
+                .iter()
+                .map(|(day, amount)| UsageSpendDailyPoint {
+                    day: (*day).to_string(),
+                    amount: *amount,
+                })
+                .collect(),
+            refreshing: false,
+            stale_updated_at: None,
+        }
+    }
+
+    #[test]
+    fn spend_trend_publishes_each_usd_source_once_inside_the_window() {
+        let now = chrono::Utc::now();
+        let zone = codexbar::cost_reporting_period::cost_bucket_zone();
+        let today = zone.date(now);
+        let key = |offset: i64| {
+            (today - chrono::Duration::days(offset))
+                .format("%Y-%m-%d")
+                .to_string()
+        };
+        let mut codex = empty_summary().contract;
+        codex.known_zero = true;
+        codex.daily = vec![codexbar::spend_contract::SpendDailyPoint {
+            day: key(1),
+            cost_usd: Some(2.0),
+            total_tokens: Some(10),
+        }];
+        let (old, recent) = (key(40), key(2));
+        let rows = vec![
+            trend_row("codex", "USD", &[(recent.as_str(), 99.0)]),
+            trend_row("claude", "USD", &[]),
+            trend_row(
+                "openrouter",
+                "USD",
+                &[(old.as_str(), 5.0), (recent.as_str(), 3.0)],
+            ),
+            trend_row("mistral", "EUR", &[(recent.as_str(), 4.0)]),
+            trend_row("pi", "USD", &[(recent.as_str(), 1.0)]),
+        ];
+        let claude = Some((false, vec![(key(0), Some(1.5))], Vec::new()));
+        let trend = build_spend_trend(&rows, &codex, claude, CostReportingPeriod::Rolling(30), now);
+
+        let ids: Vec<_> = trend.sources.iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(ids, ["claude", "codex", "openrouter"]);
+        assert!(
+            trend
+                .sources
+                .iter()
+                .find(|s| s.id == "codex")
+                .unwrap()
+                .known_zero
+        );
+        // Codex comes from local logs, never the snapshot's daily series.
+        let codex_days: Vec<_> = trend
+            .daily
+            .iter()
+            .filter(|p| p.source_id == "codex")
+            .map(|p| (p.day.clone(), p.cost_usd))
+            .collect();
+        assert_eq!(codex_days, vec![(key(1), Some(2.0))]);
+        // The 40-day-old point falls outside a 30-day window.
+        assert!(
+            trend
+                .daily
+                .iter()
+                .filter(|p| p.source_id == "openrouter")
+                .all(|p| p.day == recent)
+        );
+        assert_eq!(trend.start_day, key(29));
+        assert_eq!(trend.end_day, key(0));
     }
 
     #[test]
