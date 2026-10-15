@@ -166,6 +166,7 @@ describe("provider icon registry", () => {
       "elevenlabs",
       "linkup",
       "manus",
+      "parallel",
       "replicate",
       "synthetic",
       "typesafe",

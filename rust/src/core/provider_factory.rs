@@ -16,6 +16,7 @@ use crate::providers::LangdockProvider;
 use crate::providers::LinkupProvider;
 use crate::providers::LithosAIProvider;
 use crate::providers::MuseAIProvider;
+use crate::providers::ParallelProvider;
 use crate::providers::SyntheticProvider;
 use crate::providers::TavilyProvider;
 use crate::providers::WorkBuddyProvider;
@@ -151,6 +152,7 @@ pub fn instantiate(id: ProviderId) -> Box<dyn Provider> {
         ProviderId::Vercel => Box::new(VercelProvider::new()),
         ProviderId::Cosmic => Box::new(CosmicProvider::new()),
         ProviderId::Aerostack => Box::new(AerostackProvider::new()),
+        ProviderId::Parallel => Box::new(ParallelProvider::new()),
     }
 }
 
@@ -265,7 +267,8 @@ pub fn pace_capability(id: ProviderId) -> ProviderPaceCapability {
         | ProviderId::Raycast
         | ProviderId::Vercel
         | ProviderId::Cosmic
-        | ProviderId::Aerostack => ProviderPaceCapability::UNSUPPORTED,
+        | ProviderId::Aerostack
+        | ProviderId::Parallel => ProviderPaceCapability::UNSUPPORTED,
     }
 }
 
@@ -380,7 +383,8 @@ pub fn limit_reset_policy(id: ProviderId) -> ProviderLimitResetPolicy {
         | ProviderId::Raycast
         | ProviderId::Vercel
         | ProviderId::Cosmic
-        | ProviderId::Aerostack => ProviderLimitResetPolicy::DEFAULT,
+        | ProviderId::Aerostack
+        | ProviderId::Parallel => ProviderLimitResetPolicy::DEFAULT,
     }
 }
 #[cfg(test)]

@@ -1236,7 +1236,8 @@ impl Settings {
                 | ProviderId::MuseAI
                 | ProviderId::WorkBuddy
                 | ProviderId::TinyApi
-                | ProviderId::Xapi => "auto",
+                | ProviderId::Xapi
+                | ProviderId::Parallel => "auto",
                 _ => DEFAULT_COOKIE_SOURCE,
             })
     }

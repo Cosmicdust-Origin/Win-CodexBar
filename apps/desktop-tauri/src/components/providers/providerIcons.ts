@@ -67,6 +67,7 @@ import ollama from "./icons/ProviderIcon-ollama.svg?raw";
 import opencode from "./icons/ProviderIcon-opencode.svg?raw";
 import opencodego from "./icons/ProviderIcon-opencodego.svg?raw";
 import openrouter from "./icons/ProviderIcon-openrouter.svg?raw";
+import parallel from "./icons/ProviderIcon-parallel.svg?raw";
 import perplexity from "./icons/ProviderIcon-perplexity.svg?raw";
 import qoder from "./icons/ProviderIcon-qoder.svg?raw";
 import raycast from "./icons/ProviderIcon-raycast.svg?raw";
@@ -177,6 +178,7 @@ const RAW: Record<string, string> = {
   opencode: tint(opencode),
   opencodego: tint(opencodego),
   openrouter: tint(openrouter),
+  parallel: tint(parallel),
   perplexity: tint(perplexity),
   qoder: tint(qoder),
   raycast: tint(raycast),
@@ -261,6 +263,7 @@ export const PROVIDER_ICON_REGISTRY: Record<string, ProviderIcon> = {
   opencode:    { id: "opencode",    brandColor: "#3b82f6", fallbackLetter: "○", svgPath: RAW.opencode },
   opencodego:  { id: "opencodego",  brandColor: "#3b82f6", fallbackLetter: "○", svgPath: RAW.opencodego },
   openrouter:  { id: "openrouter",  brandColor: "#6467f2", fallbackLetter: "R", svgPath: RAW.openrouter },
+  parallel:    { id: "parallel",    brandColor: "#1D1C1A", fallbackLetter: "P", svgPath: RAW.parallel },
   perplexity:  { id: "perplexity",  brandColor: "#20b2aa", fallbackLetter: "P", svgPath: RAW.perplexity },
   vertexai:    { id: "vertexai",    brandColor: "#4285f4", fallbackLetter: "△", svgPath: RAW.vertexai },
   warp:        { id: "warp",        brandColor: "#938bb4", fallbackLetter: "W", svgPath: RAW.warp },

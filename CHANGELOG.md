@@ -9,6 +9,7 @@
 
 ## [Windows] Unreleased
 
+- Add **Parallel** prepaid balance: reads the account balance and any pending debit from the platform.parallel.ai console using your browser session or a pasted Cookie header. A signed-out console moves on to the next browser session and reports an expired session when none remain (upstream #4479, #4508).
 - Ollama: cookie mode reads the current **Usage credits** wallet on the settings page and shows its credit balance, as API-key mode already does, without inventing a quota percentage or changing older usage meters (upstream #4370).
 - Session depleted and restored alerts start fresh after you switch accounts: the first reading for the new account sets its baseline without an alert, and switching back does not announce a restore that happened while another account was active (upstream #4138).
 - Show a Windows path (`~\.local\bin\cswap.exe`) as the placeholder for the Claude account switcher (cswap) executable in Settings instead of a Unix path (upstream v0.74.0).

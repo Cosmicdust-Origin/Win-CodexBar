@@ -482,6 +482,38 @@ are tried in browser order, stale sessions are skipped, and a missing session
 after all attempts triggers "sign in to console.x.com". Errors never echo
 response bodies.
 
+### Parallel
+
+Parallel is disabled by default and reads the prepaid account balance from the
+Parallel platform console. Sign in to platform.parallel.ai in your browser, and
+CodexBar will use that session's cookies.
+
+- **Automatic:** A previously imported Cookie header is used on its own.
+  Otherwise CodexBar tries each detected browser (Chrome, Edge, Brave, Firefox)
+  holding a platform.parallel.ai session. If a session is signed out, it moves
+  to the next browser. No session means sign in to platform.parallel.ai.
+- **Manual:** Paste the Cookie header from a platform.parallel.ai request.
+  Manual mode does not fall back to browser sessions.
+- **Off:** Cookies are disabled.
+
+The provider makes one read-only request:
+
+```text
+POST https://platform.parallel.ai/api/rpc/billing/payments/refresh-balance
+Cookie: <session cookies>
+Origin: https://platform.parallel.ai
+```
+
+- The **Balance** row shows the account balance in USD (cents divided by 100).
+- **Pending debit** appears only when the account reports a non-zero pending debit.
+- The balance is informational: it has no quota percentage and no cost.
+- The provider reports identity as "Browser session".
+- A signed-out response (401, 403, a redirect, or an HTML page) moves to the next
+  session; when every session is signed out, CodexBar reports an expired session.
+- Malformed responses fail parsing without echoing the response body.
+- Parallel's upstream plugin reads only Chrome. This port uses the shared browser
+  order and the explicit browser selection in Preferences.
+
 ### Aerostack
 
 Aerostack is disabled by default. In Settings → Providers → Aerostack, enter an

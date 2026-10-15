@@ -257,6 +257,7 @@ fn cookie_source_provider(provider_id: &str) -> Option<codexbar::core::ProviderI
         "langdock" => ProviderId::Langdock,
         "tinyapi" => ProviderId::TinyApi,
         "xapi" => ProviderId::Xapi,
+        "parallel" => ProviderId::Parallel,
         _ => return None,
     })
 }
@@ -916,6 +917,13 @@ pub fn cookie_source_options_for(provider_id: &str, lang: Language) -> Vec<Cooki
         // X API cookie source: automatic browser import,
         // a pasted header, or off.
         "xapi" => vec![
+            cookie_option(lang, "auto", None),
+            cookie_option(lang, "manual", None),
+            cookie_option(lang, "off", None),
+        ],
+        // Upstream's Parallel picker (Chrome only there); this port offers the
+        // shared browser order: automatic browser import, a pasted header, or off.
+        "parallel" => vec![
             cookie_option(lang, "auto", None),
             cookie_option(lang, "manual", None),
             cookie_option(lang, "off", None),

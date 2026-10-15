@@ -119,6 +119,7 @@ pub enum ProviderId {
     Exa,
     Cosmic,
     Aerostack,
+    Parallel,
 }
 
 impl ProviderId {
@@ -230,6 +231,7 @@ impl ProviderId {
             ProviderId::Exa,
             ProviderId::Cosmic,
             ProviderId::Aerostack,
+            ProviderId::Parallel,
         ]
     }
 
@@ -341,6 +343,7 @@ impl ProviderId {
             ProviderId::Exa => "exa",
             ProviderId::Cosmic => "cosmic",
             ProviderId::Aerostack => "aerostack",
+            ProviderId::Parallel => "parallel",
         }
     }
 
@@ -454,6 +457,7 @@ impl ProviderId {
             ProviderId::Exa => "Exa",
             ProviderId::Cosmic => "Cosmic AI",
             ProviderId::Aerostack => "Aerostack",
+            ProviderId::Parallel => "Parallel",
         }
     }
 
@@ -572,6 +576,7 @@ impl ProviderId {
             ProviderId::Exa => None,
             ProviderId::Cosmic => None,
             ProviderId::Aerostack => None,
+            ProviderId::Parallel => Some("platform.parallel.ai"),
         }
     }
 
@@ -723,6 +728,7 @@ impl ProviderId {
             "exa" => Some(ProviderId::Exa),
             "cosmic" | "cosmic ai" => Some(ProviderId::Cosmic),
             "aerostack" => Some(ProviderId::Aerostack),
+            "parallel" | "parallel.ai" => Some(ProviderId::Parallel),
             _ => None,
         }
     }
@@ -1450,6 +1456,7 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::Exa => "#0143D9",
         ProviderId::Cosmic => "#6366F1",
         ProviderId::Aerostack => "#6366F1",
+        ProviderId::Parallel => "#1D1C1A",
     }
 }
 
@@ -1464,7 +1471,7 @@ mod tests {
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 105);
+        assert_eq!(all.len(), 106);
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Pi));
@@ -1549,6 +1556,7 @@ mod tests {
         assert!(all.contains(&ProviderId::Tavily));
         assert!(all.contains(&ProviderId::Exa));
         assert!(all.contains(&ProviderId::Aerostack));
+        assert!(all.contains(&ProviderId::Parallel));
     }
 
     #[test]
