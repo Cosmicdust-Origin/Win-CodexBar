@@ -1567,6 +1567,7 @@ fn claude_snapshot_with_sections(source_label: &str) -> ProviderUsageSnapshot {
         pace_authoritative: true,
         account_identity: None,
         last_good_owner: None,
+        throughput: None,
     };
     let mut snapshot = ProviderUsageSnapshot::from_fetch_result(
         ProviderId::Claude,
