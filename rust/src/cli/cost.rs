@@ -9,7 +9,8 @@ use super::cost_period::{
 };
 use super::usage::{OutputFormat, ProviderSelection};
 use crate::codex_costs::{
-    CodexHostCostReport, CodexHostCostsArgs, CodexHostOutcome, run_codex_host_costs,
+    CodexHostCostReport, CodexHostCostsArgs, CodexHostOutcome, IdentifiedUsageArgs,
+    run_codex_host_costs, run_codex_identified_usage,
 };
 use crate::codex_workspaces::short_session_id;
 use crate::core::{CostScanOptions, ProviderId};
@@ -61,17 +62,25 @@ pub struct CostArgs {
     #[arg(long = "provider-native-only")]
     pub provider_native_only: bool,
 
-    /// Group text output by Codex local conversation/session.
-    #[arg(long = "group-by", value_parser = ["session"])]
+    /// Group Codex text output by local project or conversation/session.
+    #[arg(long = "group-by", value_parser = ["project", "session"])]
     pub group_by: Option<String>,
 
-    /// Also report native Codex costs from one SSH host as a separate report.
+    /// Read one SSH host; separate summaries unless --identified-only is selected.
     #[arg(long)]
     pub remote: Option<String>,
 
     /// Emit the versioned native Codex summary contract as JSON.
     #[arg(long = "summary-only")]
     pub summary_only: bool,
+
+    /// Native Codex identified-request subtotal JSON; prices unavailable.
+    #[arg(long = "identified-only")]
+    pub identified_only: bool,
+
+    /// Identified subtotal window end, inclusive Unix milliseconds (UTC).
+    #[arg(long = "identified-end", value_name = "UNIX_MS")]
+    pub identified_end: Option<i64>,
 
     /// Antigravity only: when a recorded model has no known public price, wait
     /// for one bounded models.dev pricing refresh and rescan. Without it the
@@ -83,17 +92,23 @@ pub struct CostArgs {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CostGroupBy {
     None,
+    Project,
     Session,
 }
 
 impl CostGroupBy {
     fn from_arg(raw: Option<&str>) -> Self {
         match raw {
+            Some("project") => Self::Project,
             Some("session") => Self::Session,
             _ => Self::None,
         }
     }
 }
+
+/// Shown by the default and project Codex reports when the local cost scan
+/// has not fully covered the window.
+const PARTIAL_HISTORY_NOTICE: &str = "  Coverage: partial (history catch-up in progress)";
 
 /// Run the cost command
 pub async fn run(args: CostArgs) -> anyhow::Result<()> {
@@ -106,6 +121,27 @@ pub async fn run(args: CostArgs) -> anyhow::Result<()> {
     let providers = ProviderSelection::from_arg(args.provider.as_deref())?;
     let group_by = CostGroupBy::from_arg(args.group_by.as_deref());
     let use_color = !args.no_color && is_terminal();
+
+    // The identified window is explicit UTC milliseconds; saved periods and
+    // time zones never apply, so dispatch before resolving the period.
+    if args.identified_only || args.identified_end.is_some() {
+        return run_codex_identified_usage(&IdentifiedUsageArgs {
+            identified_only: args.identified_only,
+            provider_is_codex_only: args
+                .provider
+                .as_deref()
+                .is_some_and(|provider| provider.trim().eq_ignore_ascii_case("codex")),
+            json: format == OutputFormat::Json,
+            days: args.days,
+            end_unix_ms: args.identified_end,
+            remote: args.remote.clone(),
+            period_set: args.period.is_some(),
+            group_by_set: args.group_by.is_some(),
+            summary_only: args.summary_only,
+            pretty: args.pretty,
+        })
+        .await;
+    }
 
     let settings = Settings::load();
     let host_summary = args.remote.is_some() || args.summary_only;
@@ -230,7 +266,13 @@ pub async fn run(args: CostArgs) -> anyhow::Result<()> {
 
     match format {
         OutputFormat::Text => {
-            print_text_output(&results, use_color, period, group_by);
+            print_text_output(
+                &results,
+                use_color,
+                period,
+                group_by,
+                settings.hide_personal_info,
+            );
         }
         OutputFormat::Json => {
             // Upstream 0.60.4 refreshes OpenCodex prices before the JSON
@@ -316,6 +358,7 @@ fn print_text_output(
     use_color: bool,
     period: CostReportingPeriod,
     group_by: CostGroupBy,
+    hide_personal_info: bool,
 ) {
     let label = period.label();
     for (i, result) in results.iter().enumerate() {
@@ -330,7 +373,11 @@ fn print_text_output(
             println!("{title}");
         }
 
-        if let Some(history) = result.token_history.as_ref() {
+        if group_by == CostGroupBy::Project && result.provider == "codex" {
+            print_codex_project_output(result, period, hide_personal_info);
+        } else if group_by == CostGroupBy::Project {
+            println!("  Project grouping is only available for Codex local projects");
+        } else if let Some(history) = result.token_history.as_ref() {
             print_local_token_history(history);
         } else if group_by == CostGroupBy::Session && result.provider == "codex" {
             print_codex_session_output(result, period);
@@ -415,7 +462,7 @@ fn print_text_output(
 
             // A16 (upstream 0.48.0): coverage status for Codex.
             if result.provider == "codex" && !result.summary.history_coverage_established {
-                println!("  Coverage: partial (history catch-up in progress)");
+                println!("{PARTIAL_HISTORY_NOTICE}");
             }
         }
 
@@ -523,6 +570,68 @@ fn print_codex_session_output(result: &CostResult, period: CostReportingPeriod) 
         println!("  Coverage: partial (cost history catch-up in progress)");
     }
     println!("  Not a subscription bill or plan value · local usage × public API prices");
+}
+
+fn print_codex_project_output(
+    result: &CostResult,
+    period: CostReportingPeriod,
+    hide_personal_info: bool,
+) {
+    let index = crate::codex_workspaces::CodexWorkspacesIndex::new(rolling_window_days(period));
+    let snapshot = index.load_snapshot(false, |_| {}).map(|mut snapshot| {
+        if hide_personal_info {
+            snapshot.redact_for_privacy();
+        }
+        snapshot
+    });
+    for line in render_codex_project_lines(result.summary.history_coverage_established, &snapshot) {
+        println!("{line}");
+    }
+}
+
+/// Project report lines (upstream #4472): incomplete history carries the same
+/// partial-history notice as the default report, even with no project rows.
+fn render_codex_project_lines<E: std::fmt::Display>(
+    cost_history_established: bool,
+    snapshot: &Result<crate::codex_workspaces::CodexLocalProjectUsageSnapshot, E>,
+) -> Vec<String> {
+    let mut lines = Vec::new();
+    let catalog_partial = snapshot
+        .as_ref()
+        .is_ok_and(|snapshot| snapshot.source_status.is_partial());
+    if !cost_history_established || catalog_partial {
+        lines.push(PARTIAL_HISTORY_NOTICE.to_string());
+    }
+    let snapshot = match snapshot {
+        Ok(snapshot) => snapshot,
+        Err(err) => {
+            lines.push(format!("  Project history unavailable: {err}"));
+            return lines;
+        }
+    };
+    lines.push(format!("  Projects (last {} days):", snapshot.history_days));
+    if snapshot.projects.is_empty() {
+        lines.push("  —".to_string());
+    }
+    for project in &snapshot.projects {
+        let cost = if project.cost_estimate.unknown_tokens > 0 {
+            format!("~${:.2} partial", project.cost_estimate.known_usd)
+        } else {
+            format!("${:.2}", project.cost_estimate.known_usd)
+        };
+        lines.push(format!(
+            "  {}: {cost} · {} tokens",
+            project.display_name,
+            format_number(project.totals.total_tokens)
+        ));
+        if let Some(path) = project.path.as_deref() {
+            lines.push(format!("    {path}"));
+        }
+    }
+    lines.push(
+        "  Not a subscription bill or plan value · local usage × public API prices".to_string(),
+    );
+    lines
 }
 
 /// Print JSON output
@@ -986,6 +1095,107 @@ mod tests {
     fn group_by_defaults_none_and_accepts_session() {
         assert_eq!(CostGroupBy::from_arg(None), CostGroupBy::None);
         assert_eq!(CostGroupBy::from_arg(Some("session")), CostGroupBy::Session);
+        assert_eq!(CostGroupBy::from_arg(Some("project")), CostGroupBy::Project);
+        assert_eq!(
+            parse_args(&["--group-by", "project"]).group_by.as_deref(),
+            Some("project")
+        );
+    }
+
+    #[test]
+    fn identified_flags_parse_with_remote() {
+        let args = parse_args(&[
+            "--provider",
+            "codex",
+            "--format",
+            "json",
+            "--identified-only",
+            "--identified-end",
+            "1700000000000",
+            "--remote",
+            "build-host",
+        ]);
+        assert!(args.identified_only);
+        assert_eq!(args.identified_end, Some(1_700_000_000_000));
+        assert_eq!(args.remote.as_deref(), Some("build-host"));
+        assert!(!parse_args(&[]).identified_only);
+    }
+
+    fn project_snapshot(
+        projects: Vec<crate::codex_workspaces::ProjectUsage>,
+    ) -> crate::codex_workspaces::CodexLocalProjectUsageSnapshot {
+        crate::codex_workspaces::CodexLocalProjectUsageSnapshot {
+            updated_at: chrono::DateTime::from_timestamp(1_700_000_000, 0).unwrap(),
+            history_days: 30,
+            scope_signature: String::new(),
+            indexed_file_count: 0,
+            skipped_file_count: 0,
+            total: Default::default(),
+            sessions: Vec::new(),
+            projects,
+            daily: Vec::new(),
+            source_status: crate::codex_workspaces::SourceStatus::Complete,
+        }
+    }
+
+    #[test]
+    fn project_report_marks_partial_history_even_when_empty() {
+        let empty: Result<_, String> = Ok(project_snapshot(Vec::new()));
+        let partial = render_codex_project_lines(false, &empty);
+        assert_eq!(partial[0], PARTIAL_HISTORY_NOTICE);
+        assert!(partial.contains(&"  Projects (last 30 days):".to_string()));
+        assert!(partial.contains(&"  —".to_string()));
+
+        let complete = render_codex_project_lines(true, &empty);
+        assert!(!complete.iter().any(|line| line == PARTIAL_HISTORY_NOTICE));
+        assert!(complete.contains(&"  —".to_string()));
+
+        let unavailable: Result<crate::codex_workspaces::CodexLocalProjectUsageSnapshot, _> =
+            Err("locked".to_string());
+        let lines = render_codex_project_lines(false, &unavailable);
+        assert_eq!(lines[0], PARTIAL_HISTORY_NOTICE);
+        assert_eq!(lines[1], "  Project history unavailable: locked");
+
+        let mut locked_catalog = project_snapshot(Vec::new());
+        locked_catalog.source_status = crate::codex_workspaces::SourceStatus::CatalogLocked;
+        let lines = render_codex_project_lines(true, &Ok::<_, String>(locked_catalog));
+        assert_eq!(lines[0], PARTIAL_HISTORY_NOTICE);
+        assert_eq!(
+            lines
+                .iter()
+                .filter(|line| *line == PARTIAL_HISTORY_NOTICE)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn project_report_lists_projects_with_partial_costs() {
+        use crate::codex_workspaces::{CostEstimate, ProjectUsage, UsageTotals};
+        let project = |name: &str, path: Option<&str>, unknown_tokens: u64| ProjectUsage {
+            id: name.to_string(),
+            display_name: name.to_string(),
+            path: path.map(str::to_string),
+            totals: UsageTotals::from_parts(1_000, 0, 234),
+            cost_estimate: CostEstimate {
+                known_usd: 1.5,
+                unknown_tokens,
+            },
+            session_count: 1,
+            latest_activity: None,
+            top_model: None,
+            top_sessions: Vec::new(),
+            is_projectless: false,
+        };
+        let snapshot: Result<_, String> = Ok(project_snapshot(vec![
+            project("alpha", Some("C:\\src\\alpha"), 0),
+            project("beta", None, 10),
+        ]));
+        let lines = render_codex_project_lines(true, &snapshot);
+        assert!(lines.contains(&"  alpha: $1.50 · 1,234 tokens".to_string()));
+        assert!(lines.contains(&"    C:\\src\\alpha".to_string()));
+        assert!(lines.contains(&"  beta: ~$1.50 partial · 1,234 tokens".to_string()));
+        assert!(!lines.iter().any(|line| line == "  —"));
     }
 
     #[test]
