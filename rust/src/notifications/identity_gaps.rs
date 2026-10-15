@@ -79,6 +79,18 @@ pub(super) struct IdentityGapState {
     sequence: u64,
 }
 
+/// Owner identity used for session baseline resets. Upstream keeps one unresolved Claude
+/// owner (`claude-account:unknown`) for OAuth and CLI samples, so an OAuth-to-CLI source
+/// fallback alone is not an owner change. Threshold lanes stay scoped per source.
+pub(super) fn session_owner_of(provider: ProviderId, account: &str) -> &str {
+    if provider == ProviderId::Claude
+        && matches!(account, "claude:oauth:unknown" | "claude:cli:unknown")
+    {
+        return "claude:unknown";
+    }
+    account
+}
+
 impl NotificationManager {
     /// Resolve which account key a lane sample should be deduped under.
     ///
@@ -233,6 +245,17 @@ impl NotificationManager {
                 .map(|(p, _, w, t)| (p, to.to_string(), w, t)),
         );
         if window == "session" {
+            // The copied baseline continues the same episode, so `to` inherits session
+            // ownership and the next sample is not treated as an owner change.
+            let from_owner = session_owner_of(provider, from);
+            if self
+                .session_owner
+                .get(&provider)
+                .is_some_and(|owner| owner == from_owner)
+            {
+                self.session_owner
+                    .insert(provider, session_owner_of(provider, to).to_string());
+            }
             match self
                 .previous_session_percent
                 .get(&(provider, from.to_string()))

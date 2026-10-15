@@ -284,3 +284,71 @@ fn session_depleted_state_follows_the_merged_account() {
         .count();
     assert_eq!(depleted, 1, "depleted toast must not repeat after merge");
 }
+
+#[test]
+fn session_baseline_bridges_an_identity_gap_into_the_merged_account() {
+    let settings = settings();
+    let mut manager = NotificationManager::new();
+    let base = Utc.timestamp_opt(1_900_000_000, 0).unwrap();
+    let reset = Some(base + chrono::Duration::hours(1));
+
+    // The unresolved sample is a normal (non-depleted) baseline.
+    let unresolved = manager.resolve_warning_account(
+        ProviderId::Claude,
+        &scope_for(None),
+        "session",
+        50.0,
+        reset,
+        &settings,
+    );
+    manager.check_session_lane(ProviderId::Claude, &unresolved, 50.0, false, &settings);
+    // Once the identity resolves, the bridged baseline must still produce the depletion edge.
+    let account = manager.resolve_warning_account(
+        ProviderId::Claude,
+        &scope_for(Some(ACCOUNT_A)),
+        "session",
+        100.0,
+        reset,
+        &settings,
+    );
+    manager.check_session_lane(ProviderId::Claude, &account, 100.0, false, &settings);
+
+    let depleted = manager
+        .toasts
+        .borrow()
+        .iter()
+        .filter(|toast| {
+            toast.starts_with(&NotificationType::SessionDepleted.title(Language::English))
+        })
+        .count();
+    assert_eq!(
+        depleted, 1,
+        "bridged baseline must still announce depletion"
+    );
+}
+
+#[test]
+fn claude_unresolved_source_fallback_keeps_the_session_owner() {
+    let settings = settings();
+    let mut manager = NotificationManager::new();
+
+    manager.check_session_transition(ProviderId::Claude, "claude:oauth:unknown", 50.0, &settings);
+    manager.check_session_transition(ProviderId::Claude, "claude:oauth:unknown", 100.0, &settings);
+    // One CLI fallback sample keeps the same unresolved Claude owner (upstream
+    // `claude-account:unknown`), so OAuth's pending depletion is not dropped.
+    manager.check_session_transition(ProviderId::Claude, "claude:cli:unknown", 40.0, &settings);
+    manager.check_session_transition(ProviderId::Claude, "claude:oauth:unknown", 0.0, &settings);
+
+    let restored = manager
+        .toasts
+        .borrow()
+        .iter()
+        .filter(|toast| {
+            toast.starts_with(&NotificationType::SessionRestored.title(Language::English))
+        })
+        .count();
+    assert_eq!(
+        restored, 1,
+        "source fallback must not reset the session owner"
+    );
+}

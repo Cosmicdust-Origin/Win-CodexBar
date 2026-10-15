@@ -145,6 +145,9 @@ pub struct NotificationManager {
     sent_notifications: std::collections::HashSet<ThresholdKey>,
     /// Track previous session percent for depleted/restored transitions (per account)
     previous_session_percent: std::collections::HashMap<SessionTransitionKey, f64>,
+    /// Account that produced the last session transition sample per provider. A change
+    /// (including missing identity `""` versus a named account) starts a fresh baseline.
+    session_owner: std::collections::HashMap<ProviderId, String>,
     predictive_warning_keys: std::collections::HashSet<PredictiveWarningKey>,
     deepseek_pricing_period: Option<String>,
     identity_gaps: identity_gaps::IdentityGapState,
@@ -164,6 +167,7 @@ impl NotificationManager {
         Self {
             sent_notifications: std::collections::HashSet::new(),
             previous_session_percent: std::collections::HashMap::new(),
+            session_owner: std::collections::HashMap::new(),
             predictive_warning_keys: std::collections::HashSet::new(),
             deepseek_pricing_period: None,
             identity_gaps: identity_gaps::IdentityGapState::default(),
@@ -424,6 +428,21 @@ impl NotificationManager {
         const DEPLETED_THRESHOLD: f64 = 99.99; // Consider depleted at 99.99%+
 
         let transition_key: SessionTransitionKey = (provider, account.to_string());
+        // Upstream `ownerChanged`: a different account (or missing identity versus a named
+        // one) re-baselines and drops every session edge for this provider. Recovery seen
+        // while another account owned the lane must not surface as a restore on return.
+        let owner = identity_gaps::session_owner_of(provider, account);
+        let owner_changed = self
+            .session_owner
+            .insert(provider, owner.to_string())
+            .is_some_and(|previous| previous != owner);
+        if owner_changed {
+            self.reset_session_transition_state(provider);
+            self.previous_session_percent
+                .insert(transition_key, current_percent);
+            return;
+        }
+
         let previous_percent = self
             .previous_session_percent
             .get(&transition_key)
@@ -471,6 +490,17 @@ impl NotificationManager {
         // Update the tracked previous percent for this account
         self.previous_session_percent
             .insert(transition_key, current_percent);
+    }
+
+    /// Forget every session edge for `provider` (all accounts): the baseline, pending
+    /// depleted flags, and deferred restored confirmations. Threshold toasts are kept.
+    fn reset_session_transition_state(&mut self, provider: ProviderId) {
+        self.previous_session_percent
+            .retain(|(p, _), _| *p != provider);
+        self.sent_notifications.retain(|(p, _, w, t)| {
+            *p != provider || w != "session" || *t != NotificationType::SessionDepleted
+        });
+        self.deferred_restored.retain(|(p, _)| *p != provider);
     }
 
     fn post_session_restored(&self, provider: ProviderId, settings: &Settings) {
@@ -1346,9 +1376,83 @@ mod tests {
         assert!(!manager.sent_notifications.contains(&depleted_a));
         assert!(!manager.sent_notifications.contains(&depleted_b));
 
-        // Account B can still fire depleted independently.
+        // Account B can still fire depleted once it is the active owner again.
+        manager.check_session_transition(ProviderId::Claude, "account-b", 40.0, &settings);
         manager.check_session_transition(ProviderId::Claude, "account-b", 100.0, &settings);
         assert!(manager.sent_notifications.contains(&depleted_b));
+    }
+
+    fn toast_count(manager: &NotificationManager, notification: NotificationType) -> usize {
+        let prefix = notification.title(crate::settings::Language::English);
+        manager
+            .toasts
+            .borrow()
+            .iter()
+            .filter(|toast| toast.starts_with(&prefix))
+            .count()
+    }
+
+    #[test]
+    fn session_owner_change_starts_a_fresh_baseline() {
+        let mut manager = NotificationManager::new();
+        let settings = Settings::default();
+
+        manager.check_session_transition(ProviderId::Claude, "account-a", 50.0, &settings);
+        // Switching to an account already depleted is a new baseline, not a depleted edge.
+        manager.check_session_transition(ProviderId::Claude, "account-b", 100.0, &settings);
+        assert_eq!(
+            toast_count(&manager, NotificationType::SessionDepleted),
+            0,
+            "owner change must not fire depleted"
+        );
+
+        // The new owner's later samples produce normal edges again.
+        manager.check_session_transition(ProviderId::Claude, "account-b", 40.0, &settings);
+        manager.check_session_transition(ProviderId::Claude, "account-b", 100.0, &settings);
+        assert_eq!(toast_count(&manager, NotificationType::SessionDepleted), 1);
+    }
+
+    #[test]
+    fn session_switching_back_does_not_restore_a_stale_depletion() {
+        let mut manager = NotificationManager::new();
+        let settings = Settings::default();
+        let depleted_a = (
+            ProviderId::Claude,
+            "account-a".to_string(),
+            "session".to_string(),
+            NotificationType::SessionDepleted,
+        );
+
+        manager.check_session_transition(ProviderId::Claude, "account-a", 50.0, &settings);
+        manager.check_session_transition(ProviderId::Claude, "account-a", 100.0, &settings);
+        assert_eq!(toast_count(&manager, NotificationType::SessionDepleted), 1);
+
+        // A -> B -> A: the recovery happened while B was the owner, so A's
+        // return must rebaseline instead of announcing a restore.
+        manager.check_session_transition(ProviderId::Claude, "account-b", 40.0, &settings);
+        manager.check_session_transition(ProviderId::Claude, "account-a", 20.0, &settings);
+        assert_eq!(toast_count(&manager, NotificationType::SessionRestored), 0);
+        assert!(!manager.sent_notifications.contains(&depleted_a));
+    }
+
+    #[test]
+    fn session_missing_identity_is_its_own_owner() {
+        let mut manager = NotificationManager::new();
+        let settings = Settings::default();
+
+        // Missing identity ("") repeats like a nil discriminator: same owner, normal edges.
+        manager.check_session_transition(ProviderId::Claude, "", 50.0, &settings);
+        manager.check_session_transition(ProviderId::Claude, "", 100.0, &settings);
+        assert_eq!(toast_count(&manager, NotificationType::SessionDepleted), 1);
+
+        // Missing -> named and named -> missing are owner changes (nil != value).
+        manager.check_session_transition(ProviderId::Claude, "account-a", 40.0, &settings);
+        manager.check_session_transition(ProviderId::Claude, "", 0.0, &settings);
+        assert_eq!(
+            toast_count(&manager, NotificationType::SessionRestored),
+            0,
+            "missing identity must not restore a depletion from before the switch"
+        );
     }
 
     #[test]
