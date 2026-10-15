@@ -1070,7 +1070,7 @@ mod tests {
             source_status: SourceStatus::Complete,
         };
         snap.redact_for_privacy();
-        assert_eq!(snap.projects[0].display_name, "Workspace");
+        assert_eq!(snap.projects[0].display_name, "Workspace #1");
         assert!(snap.projects[0].path.is_none());
         assert_eq!(snap.projects[0].top_sessions[0].display_title, "Session s1");
         assert!(snap.projects[0].top_sessions[0].cwd.is_none());

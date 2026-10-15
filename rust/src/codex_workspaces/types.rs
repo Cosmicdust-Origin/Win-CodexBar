@@ -222,6 +222,7 @@ impl CodexLocalProjectUsageSnapshot {
             session.cwd = None;
         }
         let mut chat_number = 0usize;
+        let mut workspace_number = 0usize;
         for project in &mut self.projects {
             if project.id == crate::codex_workspaces::CHATS_PROJECT_ID {
                 project.display_name = crate::codex_workspaces::CHATS_DISPLAY_NAME.to_string();
@@ -230,7 +231,9 @@ impl CodexLocalProjectUsageSnapshot {
                 chat_number += 1;
                 project.display_name = format!("Chat {chat_number}");
             } else {
-                project.display_name = "Workspace".to_string();
+                // Distinct numbers keep same-named projects apart once their paths are hidden.
+                workspace_number += 1;
+                project.display_name = format!("Workspace #{workspace_number}");
             }
             project.path = None;
             for session in &mut project.top_sessions {
