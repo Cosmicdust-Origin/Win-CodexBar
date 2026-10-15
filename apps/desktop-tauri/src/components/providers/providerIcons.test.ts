@@ -109,6 +109,14 @@ describe("provider icon registry", () => {
     expect(svg).not.toContain('fill="#000"');
   });
 
+  it("ships the official Devin hexagon mark as a currentColor template", () => {
+    const entry = PROVIDER_ICON_REGISTRY.devin;
+    expect(entry.svgPath).toContain('viewBox="0 0 128 128"');
+    expect(entry.svgPath).toContain('fill="currentColor"');
+    expect(entry.svgPath).not.toContain("<rect");
+    expect(entry.brandColor.toLowerCase()).toBe("#317cff");
+  });
+
   it("does not expose the retired Crof provider", () => {
     expect(PROVIDER_ICON_REGISTRY).not.toHaveProperty("crof");
   });
