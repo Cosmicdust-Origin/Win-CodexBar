@@ -1654,3 +1654,8 @@ AntigravityProfileHomesAdd = Adicionar pasta
 AntigravityProfileHomesRemove = Remover
 AntigravityProfileHomesEmpty = Nenhuma pasta de perfil adicional.
 AntigravityProfileHomesPickFailed = Não foi possível abrir o seletor de pastas.
+# Claude optional usage rows and plan dates
+UsageItemPlanRenewalExpiry = Renovação / expiração do plano
+UsageItemHiddenByCostSummary = Oculto enquanto a exibição do resumo de custos estiver em Oculto.
+PlanRenewsOn = Renova: { "{}" }
+PlanExpiresOn = O plano expira: { "{}" }

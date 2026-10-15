@@ -1983,6 +1983,12 @@ locale_keys! {
     AntigravityProfileHomesRemove,
     AntigravityProfileHomesEmpty,
     AntigravityProfileHomesPickFailed,
+
+    // Claude optional usage rows and plan dates (upstream 0.75.0 #4484, #4324)
+    UsageItemPlanRenewalExpiry,
+    UsageItemHiddenByCostSummary,
+    PlanRenewsOn,
+    PlanExpiresOn,
 }
 
 #[cfg(test)]

@@ -9,6 +9,7 @@
 
 ## [Windows] Unreleased
 
+- **Claude**: show the plan renewal or expiry date from claude.ai billing under the quota rows when your cookie session supplies it, and make saved limit-reset credits, Extra usage (including a prepaid balance), and plan dates independently selectable under Visible usage items. Existing settings keep all three visible; Admin API spend is unaffected (upstream #4324, #4484).
 - Devin: use Devin's official transparent hexagon mark for the provider icon in Settings and the CLI dashboard, instead of the settings-gear badge and the letter fallback (upstream #4458).
 - Kimi (China): use the current Kimi Desktop session from its Local Storage (`%APPDATA%\kimi-desktop`) for web usage and monthly membership enrichment, and check that session again before each request, so a signed-out, replaced, or expired Desktop token is never sent or recovered from an older record (upstream #4416, #3536).
 - Codex CLI: add opt-in `cost --identified-only` request subtotals across local and SSH (`--remote`) histories, deduplicating strong request identities and keeping partial results without estimating a combined price, plus `--group-by project` reports that show the partial-history notice even when no projects are listed (upstream #4447, #4472).

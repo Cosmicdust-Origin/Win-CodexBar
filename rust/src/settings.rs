@@ -27,6 +27,15 @@ pub const CODEX_SPARK_USAGE_ITEM_IDS: [&str; 2] = [
     "metric:extra-codex-spark-weekly",
 ];
 pub const CLAUDE_DAILY_ROUTINES_USAGE_ITEM_ID: &str = "metric:extra-claude-routines";
+/// Namespace for non-metric card sections with their own visibility choice
+/// (upstream 0.75.0 #4484). The raw IDs match upstream's.
+pub const USAGE_ITEM_SECTION_PREFIX: &str = "section:";
+/// Claude saved limit-reset credits (the `reset-credits` inventory row).
+pub const CLAUDE_RESET_CREDITS_USAGE_ITEM_ID: &str = "section:claude-reset-credits";
+/// Claude Extra usage / prepaid balance block. Admin API spend is excluded.
+pub const CLAUDE_EXTRA_USAGE_USAGE_ITEM_ID: &str = "section:claude-extra-usage";
+/// Plan renewal / expiry dates shown beside the quota rows.
+pub const SUBSCRIPTION_USAGE_ITEM_ID: &str = "section:subscription";
 
 mod api_keys;
 mod config_path;
@@ -660,7 +669,8 @@ fn normalize_hidden_usage_item_ids(ids: Vec<String>) -> Vec<String> {
                 && id.len() <= 128
                 && !id.chars().any(char::is_control)
                 && (id.starts_with(USAGE_ITEM_METRIC_PREFIX)
-                    || id.starts_with(USAGE_ITEM_DETAIL_SECTION_PREFIX))
+                    || id.starts_with(USAGE_ITEM_DETAIL_SECTION_PREFIX)
+                    || id.starts_with(USAGE_ITEM_SECTION_PREFIX))
         })
         .filter(|id| seen.insert(id.clone()))
         .collect::<Vec<_>>();

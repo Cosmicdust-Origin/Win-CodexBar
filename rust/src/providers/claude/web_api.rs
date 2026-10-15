@@ -13,6 +13,7 @@ use super::CLOUDFLARE_CHALLENGE_MESSAGE;
 use super::cloud_credits;
 use super::reset_credits;
 use super::spend_window;
+use super::subscription_details;
 
 const CLOUDFLARE_BODY_PREFIX_BYTES: usize = 64 * 1024;
 
@@ -295,6 +296,16 @@ struct AccountOrganization {
 }
 
 impl AccountResponse {
+    fn is_member_of(&self, org_id: &str) -> bool {
+        self.memberships.iter().any(|membership| {
+            membership
+                .organization
+                .as_ref()
+                .and_then(|organization| organization.uuid.as_deref())
+                .is_some_and(|uuid| uuid.trim() == org_id)
+        })
+    }
+
     fn first_membership_org_id(&self) -> Option<String> {
         self.memberships.iter().find_map(|membership| {
             membership
@@ -419,14 +430,26 @@ impl ClaudeWebApiFetcher {
         // cookie source is explicitly off.
         let settings = crate::settings::Settings::load();
         let cookie_source = settings.claude_cookie_source();
-        if !cookie_source.eq_ignore_ascii_case("off")
-            && let Some(balance) = self.get_prepaid_credits(&org_id, &headers).await
+        let cookie_source_on = !cookie_source.eq_ignore_ascii_case("off");
+        if cookie_source_on && let Some(balance) = self.get_prepaid_credits(&org_id, &headers).await
         {
             cost = Some(apply_prepaid_balance(balance, cost));
         }
 
         if let Some(cost) = cost {
             result = result.with_cost(cost);
+        }
+
+        // Best-effort plan renewal / expiration dates, only for an organization
+        // the authenticated account is a member of.
+        if cookie_source_on
+            && account
+                .as_ref()
+                .is_some_and(|account| account.is_member_of(&org_id))
+            && let Some(metadata) = self.get_subscription_details(&org_id, &headers).await
+            && !metadata.is_empty()
+        {
+            result.usage = result.usage.with_subscription(Some(metadata));
         }
 
         Ok(result)
@@ -644,6 +667,31 @@ impl ClaudeWebApiFetcher {
 
         let body = response.text().await.ok()?;
         parse_prepaid_balance(&body)
+    }
+
+    /// Best-effort subscription dates with a two-second budget. Non-fatal.
+    async fn get_subscription_details(
+        &self,
+        org_id: &str,
+        headers: &reqwest::header::HeaderMap,
+    ) -> Option<crate::core::SubscriptionMetadata> {
+        let url = format!(
+            "{}/organizations/{}/subscription_details",
+            self.base_url, org_id
+        );
+        let response = self
+            .client
+            .get(&url)
+            .headers(headers.clone())
+            .timeout(std::time::Duration::from_secs(2))
+            .send()
+            .await
+            .ok()?;
+        if response.status() != StatusCode::OK {
+            return None;
+        }
+        let body = response.text().await.ok()?;
+        subscription_details::parse(&body)
     }
 
     /// Get account info
@@ -1535,3 +1583,7 @@ mod cloudflare_tests;
 #[cfg(test)]
 #[path = "reset_opt_in_tests.rs"]
 mod reset_opt_in_tests;
+
+#[cfg(test)]
+#[path = "subscription_details_wire_tests.rs"]
+mod subscription_details_wire_tests;

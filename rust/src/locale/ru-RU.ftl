@@ -1650,3 +1650,8 @@ AntigravityProfileHomesAdd = Добавить папку
 AntigravityProfileHomesRemove = Удалить
 AntigravityProfileHomesEmpty = Дополнительные папки профилей не добавлены.
 AntigravityProfileHomesPickFailed = Не удалось открыть выбор папки.
+# Claude optional usage rows and plan dates
+UsageItemPlanRenewalExpiry = Продление / окончание тарифа
+UsageItemHiddenByCostSummary = Скрыто, пока стиль отображения стоимости — «Скрытый».
+PlanRenewsOn = Продление: { "{}" }
+PlanExpiresOn = Тариф истекает: { "{}" }

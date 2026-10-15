@@ -22,6 +22,13 @@ pub struct SubscriptionMetadata {
     pub expires_at: Option<DateTime<Utc>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub renews_at: Option<DateTime<Utc>>,
+    /// The provider sent a calendar date (`YYYY-MM-DD`) for `renews_at`,
+    /// stored as UTC midnight; display it in UTC so it stays on that day.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub renews_at_is_date_only: bool,
+    /// Calendar-date precision for `expires_at`, as for `renews_at`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub expires_at_is_date_only: bool,
 }
 
 impl SubscriptionMetadata {
@@ -34,7 +41,17 @@ impl SubscriptionMetadata {
             starts_at,
             expires_at,
             renews_at,
+            renews_at_is_date_only: false,
+            expires_at_is_date_only: false,
         }
+    }
+
+    /// Mark which of the dates carry calendar-day precision only.
+    #[must_use]
+    pub const fn with_date_only(mut self, renews_at: bool, expires_at: bool) -> Self {
+        self.renews_at_is_date_only = renews_at;
+        self.expires_at_is_date_only = expires_at;
+        self
     }
 
     pub const fn is_empty(&self) -> bool {

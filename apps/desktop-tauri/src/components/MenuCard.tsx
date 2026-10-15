@@ -10,7 +10,11 @@ import { useLocale } from "../hooks/useLocale";
 import { providerSupportsChartData } from "../lib/providerCharts";
 import { providerAllowsPace } from "../lib/providerPace";
 import { hideOpenAiApiProjectId } from "../lib/openAiApiIdentity";
-import { isUsageItemVisible } from "../lib/usageItemVisibility";
+import {
+  claudePlanDateNote,
+  isUsageItemVisible,
+  projectClaudeSections,
+} from "../lib/usageItemVisibility";
 import { localizeWindowLabel } from "../lib/windowLabels";
 import { inlineDashboardModel } from "../lib/inlineDashboard";
 import { useMonthlyLimitBlockNow } from "../hooks/useMonthlyLimitBlockNow";
@@ -136,7 +140,7 @@ function cardMetrics(
  * forecasts, burndown and pricing details live in Settings > Providers.
  */
 export default function MenuCard({
-  provider,
+  provider: reportedProvider,
   display,
   isRefreshing = false,
   accentColor,
@@ -157,6 +161,7 @@ export default function MenuCard({
     costTrackingEnabled = true,
   } = display;
   const { t, language } = useLocale();
+  const provider = projectClaudeSections(reportedProvider.providerId, reportedProvider);
   const [chartData, setChartData] = useState<ProviderChartData | null>(null);
 
   // Another provider or account must not show the previous card's chart.
@@ -210,6 +215,7 @@ export default function MenuCard({
     metrics,
     costSummaryDisplayStyle,
     compactOverview,
+    claudePlanDateNote(provider.providerId, provider.subscription, t),
   );
   const dashboard =
     !compactOverview && presence.localUsage
@@ -281,6 +287,7 @@ export default function MenuCard({
               ))}
             </section>
           )}
+          {presence.planDateNote && <p className="card-notes">{presence.planDateNote}</p>}
           {showDetailSections && (
             <DetailSections
               details={provider.displayDetails ?? []}
@@ -293,7 +300,10 @@ export default function MenuCard({
           {dashboard && <InlineDashboard model={dashboard} />}
           {showCost && provider.cost && (
             <>
-              {(presence.hasMetrics || showDetailSections || dashboard) && (
+              {(presence.hasMetrics ||
+                presence.planDateNote ||
+                showDetailSections ||
+                dashboard) && (
                 <div className="menu-card__separator" />
               )}
               <ExtraUsageBlock

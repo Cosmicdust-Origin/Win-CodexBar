@@ -1652,3 +1652,8 @@ CosmicProjectIdHelp = Required. Usage covers this project only. Or set COSMIC_PR
 ProviderLabelCloudCredits = Хмарні кредити
 ProviderTextExpired = Термін минув
 ProviderTextOfRemaining = Залишилося { "{}" } із { "{}" }
+# Claude optional usage rows and plan dates
+UsageItemPlanRenewalExpiry = Поновлення / завершення тарифу
+UsageItemHiddenByCostSummary = Приховано, поки показ вартості встановлено на «Приховано».
+PlanRenewsOn = Поновлення: { "{}" }
+PlanExpiresOn = Тариф спливає: { "{}" }

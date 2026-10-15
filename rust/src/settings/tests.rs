@@ -1840,6 +1840,76 @@ fn legacy_visibility_setters_preserve_other_explicit_hidden_items() {
     );
 }
 
+/// Windows never had upstream's global optional-usage gate, so Claude reset
+/// credits, Extra usage and plan dates were all visible before the
+/// independent choices existed. Upgrading must keep them visible and leave
+/// existing choices untouched.
+#[test]
+fn upgrade_keeps_claude_optional_rows_visible_and_preserves_existing_choices() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("settings.json");
+    std::fs::write(
+        &path,
+        r#"{ "enabled_providers": ["claude"],
+             "provider_configs": { "claude": { "hidden_usage_item_ids": ["metric:secondary"] } } }"#,
+    )
+    .unwrap();
+
+    let mut loaded = Settings::load_from_path(Some(&path));
+    loaded.migrate_legacy_usage_item_flags();
+
+    assert_eq!(
+        loaded.hidden_usage_item_ids(ProviderId::Claude),
+        vec!["metric:secondary".to_string()]
+    );
+    for id in [
+        CLAUDE_RESET_CREDITS_USAGE_ITEM_ID,
+        CLAUDE_EXTRA_USAGE_USAGE_ITEM_ID,
+        SUBSCRIPTION_USAGE_ITEM_ID,
+    ] {
+        assert!(
+            !loaded
+                .hidden_usage_item_ids(ProviderId::Claude)
+                .contains(&id.to_string())
+        );
+    }
+
+    let fresh = Settings::load_from_path(Some(&dir.path().join("missing.json")));
+    assert!(fresh.hidden_usage_item_ids(ProviderId::Claude).is_empty());
+}
+
+#[test]
+fn claude_section_choices_round_trip_independently_through_persistence() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("settings.json");
+    let mut settings = Settings::default();
+    settings.set_hidden_usage_item_ids(
+        ProviderId::Claude,
+        vec![
+            SUBSCRIPTION_USAGE_ITEM_ID.to_string(),
+            CLAUDE_RESET_CREDITS_USAGE_ITEM_ID.to_string(),
+            "section:unknown-section".to_string(),
+            "bogus:claude-extra-usage".to_string(),
+        ],
+    );
+    settings.save_to_path(&path).unwrap();
+
+    let loaded = Settings::load_from_path(Some(&path));
+    assert_eq!(
+        loaded.hidden_usage_item_ids(ProviderId::Claude),
+        vec![
+            CLAUDE_RESET_CREDITS_USAGE_ITEM_ID.to_string(),
+            SUBSCRIPTION_USAGE_ITEM_ID.to_string(),
+            "section:unknown-section".to_string(),
+        ]
+    );
+    assert!(
+        !loaded
+            .hidden_usage_item_ids(ProviderId::Claude)
+            .contains(&CLAUDE_EXTRA_USAGE_USAGE_ITEM_ID.to_string())
+    );
+}
+
 /// Cookie-denial settings must survive the same path-based persistence used by
 /// `Settings::save` and `Settings::load`, including the secure-file wrapper
 /// shared by desktop and CLI settings.
