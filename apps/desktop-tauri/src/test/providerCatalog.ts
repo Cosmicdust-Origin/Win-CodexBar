@@ -102,4 +102,7 @@ export const TEST_PROVIDER_CATALOG: Array<[string, string]> = [
   ["museai", "Muse (muse.ai)"],
   ["workbuddy", "WorkBuddy"],
   ["xapi", "X API"],
+  ["parallel", "Parallel"],
+  ["fal", "fal"],
+  ["flora", "FLORA"],
 ];

@@ -269,6 +269,21 @@ pub(crate) fn build_fetch_context(
                 (SourceMode::Web, stored_cookie.clone(), false)
             }
             _ if active_token_env.is_some() => (SourceMode::OAuth, None, false),
+            // Providers that pick their own API-key or cookie lane (Command
+            // Code) keep Auto and API for every cookie source, so a configured
+            // key is used without touching a browser. `off` marks the cookie
+            // lane unavailable; `manual`/`auto` pass a stored header through.
+            _ if provider.owns_credential_lane_routing()
+                && matches!(usage_source, SourceMode::Auto | SourceMode::OAuth) =>
+            {
+                let cookie_off = cookie_source == "off";
+                let cookie_header = if cookie_off {
+                    None
+                } else {
+                    active_token_cookie.clone().or(stored_cookie)
+                };
+                (usage_source, cookie_header, cookie_off)
+            }
             // Opt-in web providers keep their default credential lane
             // unless the usage source is explicitly Web; a stored or
             // browser cookie must not turn Auto into Web.

@@ -105,6 +105,7 @@ const WORKSPACE_EXTRA_IDS: Record<string, true> = {
   gitkraken: true,
   exa: true,
   cosmic: true,
+  flora: true,
 };
 
 function extraConfig(providerId: string, t: Props["t"]) {
@@ -199,6 +200,13 @@ function extraConfig(providerId: string, t: Props["t"]) {
         label: t("CosmicProjectIdLabel"),
         placeholder: t("CosmicProjectIdPlaceholder"),
         help: t("CosmicProjectIdHelp"),
+      };
+    case "flora":
+      return {
+        title: "FLORA workspace",
+        label: "Workspace ID",
+        placeholder: "ws_…",
+        help: "Required. The ws_… ID of the workspace the key can bill. Or set FLORA_WORKSPACE_ID.",
       };
     default:
       return null;

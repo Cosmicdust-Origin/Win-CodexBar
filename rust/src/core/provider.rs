@@ -119,6 +119,9 @@ pub enum ProviderId {
     Exa,
     Cosmic,
     Aerostack,
+    Parallel,
+    Fal,
+    Flora,
 }
 
 impl ProviderId {
@@ -230,6 +233,9 @@ impl ProviderId {
             ProviderId::Exa,
             ProviderId::Cosmic,
             ProviderId::Aerostack,
+            ProviderId::Parallel,
+            ProviderId::Fal,
+            ProviderId::Flora,
         ]
     }
 
@@ -341,6 +347,9 @@ impl ProviderId {
             ProviderId::Exa => "exa",
             ProviderId::Cosmic => "cosmic",
             ProviderId::Aerostack => "aerostack",
+            ProviderId::Parallel => "parallel",
+            ProviderId::Fal => "fal",
+            ProviderId::Flora => "flora",
         }
     }
 
@@ -454,6 +463,9 @@ impl ProviderId {
             ProviderId::Exa => "Exa",
             ProviderId::Cosmic => "Cosmic AI",
             ProviderId::Aerostack => "Aerostack",
+            ProviderId::Parallel => "Parallel",
+            ProviderId::Fal => "fal",
+            ProviderId::Flora => "FLORA",
         }
     }
 
@@ -572,6 +584,9 @@ impl ProviderId {
             ProviderId::Exa => None,
             ProviderId::Cosmic => None,
             ProviderId::Aerostack => None,
+            ProviderId::Parallel => Some("platform.parallel.ai"),
+            ProviderId::Fal => None,
+            ProviderId::Flora => None,
         }
     }
 
@@ -723,6 +738,9 @@ impl ProviderId {
             "exa" => Some(ProviderId::Exa),
             "cosmic" | "cosmic ai" => Some(ProviderId::Cosmic),
             "aerostack" => Some(ProviderId::Aerostack),
+            "parallel" | "parallel.ai" => Some(ProviderId::Parallel),
+            "fal" => Some(ProviderId::Fal),
+            "flora" => Some(ProviderId::Flora),
             _ => None,
         }
     }
@@ -1172,6 +1190,18 @@ pub trait Provider: Send + Sync {
         false
     }
 
+    /// Whether the provider picks between its API-key and cookie lanes itself.
+    ///
+    /// When true, the shell keeps the usage source for Auto and API (OAuth)
+    /// under every cookie source instead of remapping it to Web or Cli. It
+    /// forwards a stored or token-account cookie header when the cookie source
+    /// is not `off`; `off` sets [`FetchContext::manual_cookie_missing`]. The
+    /// shell never reads a browser for this provider, which does that only on
+    /// its own cookie lane.
+    fn owns_credential_lane_routing(&self) -> bool {
+        false
+    }
+
     /// Whether the web lane is used only when the usage source is explicitly
     /// `web`. A cookie domain otherwise lets the shell turn Auto into Web
     /// (manual cookie present or browser import), which would replace a
@@ -1450,6 +1480,9 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::Exa => "#0143D9",
         ProviderId::Cosmic => "#6366F1",
         ProviderId::Aerostack => "#6366F1",
+        ProviderId::Parallel => "#1D1C1A",
+        ProviderId::Fal => "#7C3AED",
+        ProviderId::Flora => "#111111",
     }
 }
 
@@ -1464,7 +1497,7 @@ mod tests {
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 105);
+        assert_eq!(all.len(), 108);
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Pi));
@@ -1549,6 +1582,9 @@ mod tests {
         assert!(all.contains(&ProviderId::Tavily));
         assert!(all.contains(&ProviderId::Exa));
         assert!(all.contains(&ProviderId::Aerostack));
+        assert!(all.contains(&ProviderId::Parallel));
+        assert!(all.contains(&ProviderId::Fal));
+        assert!(all.contains(&ProviderId::Flora));
     }
 
     #[test]
