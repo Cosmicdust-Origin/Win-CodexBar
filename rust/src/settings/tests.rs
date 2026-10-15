@@ -2067,6 +2067,23 @@ fn quota_warning_markers_default_on_and_round_trip() {
 }
 
 #[test]
+fn highlight_menu_cards_on_hover_defaults_on_and_round_trips() {
+    assert!(Settings::default().highlight_menu_cards_on_hover);
+    let legacy: Settings =
+        serde_json::from_str(r#"{ "enabled_providers": [] }"#).expect("legacy file");
+    assert!(legacy.highlight_menu_cards_on_hover);
+
+    let off = Settings {
+        highlight_menu_cards_on_hover: false,
+        ..Settings::default()
+    };
+    let json = serde_json::to_string(&off).expect("serialize hover highlight");
+    assert!(json.contains(r#""highlight_menu_cards_on_hover":false"#));
+    let loaded: Settings = serde_json::from_str(&json).expect("deserialize hover highlight");
+    assert!(!loaded.highlight_menu_cards_on_hover);
+}
+
+#[test]
 fn workday_tick_style_defaults_subtle_and_round_trips() {
     assert_eq!(
         Settings::default().workday_tick_style,

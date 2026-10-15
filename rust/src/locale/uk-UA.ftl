@@ -635,6 +635,7 @@ WindowRestore = Відновити
 WindowClose = Закрити
 ShowAsUsedLabel = Показувати використане
 ShowAsUsedHelper = Показувати на смугах використаний обсяг, а не залишок.
+HighlightMenuCardsOnHoverLabel = Підсвічувати картки меню при наведенні
 OverviewLayoutLabel = Вигляд огляду
 OverviewLayoutHelper = Виберіть, скільки інформації показує «Огляд».
 OverviewLayoutDetailed = Докладно

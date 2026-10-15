@@ -605,6 +605,7 @@ ShowAsUsedLabel = 消費済みで表示
 ShowAsUsedHelper = 使用量バーを残量ではなく消費済みで表示。
 ShowAllTokenAccountsLabel = すべてのトークンアカウントを表示
 ShowAllTokenAccountsHelper = プロバイダーメニューでトークンアカウントを折りたたまず全表示。
+HighlightMenuCardsOnHoverLabel = ホバー時にメニューカードをハイライト
 OverviewLayoutLabel = Overview レイアウト
 OverviewLayoutHelper = Overview に表示する情報量を選択します。
 OverviewLayoutDetailed = 詳細

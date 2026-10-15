@@ -41,6 +41,7 @@ pub struct SettingsUpdate {
     pub menu_bar_icon_style: Option<codexbar::settings::MenuBarIconStyle>,
     pub merged_overview_selected_providers: Option<Vec<String>>,
     pub quota_warning_markers_visible: Option<bool>,
+    pub highlight_menu_cards_on_hover: Option<bool>,
     pub workday_tick_style: Option<codexbar::settings::WorkdayTickStyle>,
     pub menu_bar_color_pace: Option<bool>,
     pub providers_sorted_alphabetically: Option<bool>,
@@ -383,6 +384,9 @@ impl SettingsUpdate {
         }
         if let Some(v) = self.quota_warning_markers_visible {
             settings.quota_warning_markers_visible = v;
+        }
+        if let Some(v) = self.highlight_menu_cards_on_hover {
+            settings.highlight_menu_cards_on_hover = v;
         }
         if let Some(v) = self.workday_tick_style {
             settings.workday_tick_style = v;
@@ -1160,6 +1164,7 @@ mod tests {
         let mut settings = Settings::default();
         let update: SettingsUpdate = serde_json::from_str(
             r#"{"quotaWarningMarkersVisible":false,"workdayTickStyle":"high_contrast",
+                "highlightMenuCardsOnHover":false,
                 "mergedOverviewSelectedProviders":["claude","Codex","claude","gemini","cursor","copilot","zai","kimi"],
                 "weeklyProgressWorkDays":7}"#,
         )
@@ -1168,6 +1173,7 @@ mod tests {
             .apply_display_settings(&mut settings)
             .apply_advanced_settings(&mut settings);
         assert!(!settings.quota_warning_markers_visible);
+        assert!(!settings.highlight_menu_cards_on_hover);
         assert_eq!(
             settings.workday_tick_style,
             codexbar::settings::WorkdayTickStyle::HighContrast
@@ -1211,6 +1217,7 @@ mod tests {
         assert_eq!(json["menuBarIconStyle"], "percent");
         assert_eq!(json["workdayTickStyle"], "high_contrast");
         assert_eq!(json["quotaWarningMarkersVisible"], true);
+        assert_eq!(json["highlightMenuCardsOnHover"], true);
         assert_eq!(
             json["mergedOverviewSelectedProviders"],
             serde_json::json!([])

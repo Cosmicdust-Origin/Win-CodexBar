@@ -658,6 +658,7 @@ ShowAsUsedLabel = Mostrar como usado
 ShowAsUsedHelper = Mostrar barras de uso como consumido en lugar de restante.
 ShowAllTokenAccountsLabel = Mostrar todas las cuentas de token
 ShowAllTokenAccountsHelper = Listar todas las cuentas de token en los menús de proveedores en lugar de colapsarlas.
+HighlightMenuCardsOnHoverLabel = Resaltar las tarjetas del menú al pasar el cursor
 OverviewLayoutLabel = Diseño de Overview
 OverviewLayoutHelper = Elige cuánta información muestra Overview.
 OverviewLayoutDetailed = Detallado

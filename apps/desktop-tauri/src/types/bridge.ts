@@ -246,6 +246,8 @@ export interface SettingsSnapshot {
   /** Overview cards, at most 6; empty means the first 6 enabled providers. */
   mergedOverviewSelectedProviders: string[];
   quotaWarningMarkersVisible: boolean;
+  /** Pointer hover highlights the tray panel Refresh row. Absent on older shells: on. */
+  highlightMenuCardsOnHover?: boolean;
   workdayTickStyle: WorkdayTickStyle;
   menuBarColorPace: boolean;
   /** Settings sidebar lists providers alphabetically, enabled first. Display only. */
@@ -403,6 +405,7 @@ export interface SettingsUpdate {
   menuBarIconStyle?: MenuBarIconStyle;
   mergedOverviewSelectedProviders?: string[];
   quotaWarningMarkersVisible?: boolean;
+  highlightMenuCardsOnHover?: boolean;
   workdayTickStyle?: WorkdayTickStyle;
   menuBarColorPace?: boolean;
   providersSortedAlphabetically?: boolean;
