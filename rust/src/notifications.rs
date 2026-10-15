@@ -136,8 +136,27 @@ type ThresholdKey = (
     NotificationType,
 );
 
-/// Session-transition tracking key: provider + account identity.
-type SessionTransitionKey = (ProviderId, String /* account */);
+/// Session-transition tracking key: provider + session owner (see
+/// `identity_gaps::session_owner_of`). Threshold keys stay per account.
+type SessionTransitionKey = (ProviderId, String /* session owner */);
+
+/// Session-transition key for a sample's account, normalized to its session owner.
+fn session_transition_key(provider: ProviderId, account: &str) -> SessionTransitionKey {
+    (
+        provider,
+        identity_gaps::session_owner_of(provider, account).to_string(),
+    )
+}
+
+/// Depleted marker for a session owner. Shares `sent_notifications` with threshold keys.
+fn session_depleted_key(provider: ProviderId, owner: &str) -> ThresholdKey {
+    (
+        provider,
+        owner.to_string(),
+        "session".to_string(),
+        NotificationType::SessionDepleted,
+    )
+}
 
 /// Notification manager
 pub struct NotificationManager {
@@ -421,25 +440,22 @@ impl NotificationManager {
         current_percent: f64,
         settings: &Settings,
     ) {
-        if !settings.session_quota_notifications_enabled {
-            return;
-        }
-
         const DEPLETED_THRESHOLD: f64 = 99.99; // Consider depleted at 99.99%+
 
-        let transition_key: SessionTransitionKey = (provider, account.to_string());
         // Upstream `ownerChanged`: a different account (or missing identity versus a named
         // one) re-baselines and drops every session edge for this provider. Recovery seen
         // while another account owned the lane must not surface as a restore on return.
-        let owner = identity_gaps::session_owner_of(provider, account);
-        let owner_changed = self
-            .session_owner
-            .insert(provider, owner.to_string())
-            .is_some_and(|previous| previous != owner);
+        // Owner tracking runs even while session alerts are off, so a switch made while
+        // they are off cannot leave a depletion for the next owner to restore.
+        let transition_key = session_transition_key(provider, account);
+        let owner_changed = self.observe_session_owner(provider, account);
         if owner_changed {
             self.reset_session_transition_state(provider);
             self.previous_session_percent
                 .insert(transition_key, current_percent);
+            return;
+        }
+        if !settings.session_quota_notifications_enabled {
             return;
         }
 
@@ -459,22 +475,13 @@ impl NotificationManager {
             );
             self.show_toast(&title, &body);
             Self::play_notification_sound(NotificationSoundEvent::SessionDepleted, settings);
-            self.sent_notifications.insert((
-                provider,
-                account.to_string(),
-                "session".to_string(),
-                NotificationType::SessionDepleted,
-            ));
+            self.sent_notifications
+                .insert(session_depleted_key(provider, &transition_key.1));
         }
         // Check for restored transition: was depleted, now is not
         else if previous_percent >= DEPLETED_THRESHOLD && current_percent < DEPLETED_THRESHOLD {
             // Only notify restored if we previously sent a depleted notification
-            let depleted_key = (
-                provider,
-                account.to_string(),
-                "session".to_string(),
-                NotificationType::SessionDepleted,
-            );
+            let depleted_key = session_depleted_key(provider, &transition_key.1);
             if self.sent_notifications.contains(&depleted_key) {
                 if settings.limit_reset_notifications_enabled {
                     // The reset detector decides whether this restored toast or a
@@ -487,9 +494,18 @@ impl NotificationManager {
             }
         }
 
-        // Update the tracked previous percent for this account
+        // Update the tracked previous percent for this session owner
         self.previous_session_percent
             .insert(transition_key, current_percent);
+    }
+
+    /// Record the session owner for `account` and report whether it differs from the
+    /// previous sample's owner for this provider.
+    fn observe_session_owner(&mut self, provider: ProviderId, account: &str) -> bool {
+        let owner = identity_gaps::session_owner_of(provider, account);
+        self.session_owner
+            .insert(provider, owner.to_string())
+            .is_some_and(|previous| previous != owner)
     }
 
     /// Forget every session edge for `provider` (all accounts): the baseline, pending
@@ -1433,6 +1449,35 @@ mod tests {
         manager.check_session_transition(ProviderId::Claude, "account-a", 20.0, &settings);
         assert_eq!(toast_count(&manager, NotificationType::SessionRestored), 0);
         assert!(!manager.sent_notifications.contains(&depleted_a));
+    }
+
+    #[test]
+    fn session_owner_switch_while_alerts_are_off_still_rebaselines() {
+        let mut manager = NotificationManager::new();
+        let on = Settings::default();
+        let off = Settings {
+            session_quota_notifications_enabled: false,
+            ..Settings::default()
+        };
+
+        manager.check_session_transition(ProviderId::Claude, "account-a", 50.0, &on);
+        manager.check_session_transition(ProviderId::Claude, "account-a", 100.0, &on);
+        assert_eq!(toast_count(&manager, NotificationType::SessionDepleted), 1);
+
+        // Owner B arrives while alerts are off: silent, but it still re-baselines.
+        manager.check_session_transition(ProviderId::Claude, "account-b", 100.0, &off);
+        assert_eq!(toast_count(&manager, NotificationType::SessionDepleted), 1);
+
+        // A returns with alerts on at 20%. A's recovery happened while B owned the
+        // lane, so A's stale depletion must not surface as a restore.
+        manager.check_session_transition(ProviderId::Claude, "account-a", 20.0, &on);
+        assert_eq!(toast_count(&manager, NotificationType::SessionRestored), 0);
+        assert!(!manager.sent_notifications.contains(&(
+            ProviderId::Claude,
+            "account-a".to_string(),
+            "session".to_string(),
+            NotificationType::SessionDepleted,
+        )));
     }
 
     #[test]

@@ -20,7 +20,7 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use super::{NotificationManager, SessionTransitionKey};
+use super::{NotificationManager, SessionTransitionKey, session_transition_key};
 use crate::core::{ProviderId, WeeklyResetRule};
 use crate::locale::{self, LocaleKey};
 use crate::settings::Settings;
@@ -601,10 +601,8 @@ impl NotificationManager {
     /// session lane for the same snapshot, then finish the refresh batch with
     /// [`NotificationManager::finish_limit_reset_batch`].
     pub fn observe_limit_reset(&mut self, sample: LimitResetSample<'_>, settings: &Settings) {
-        let restored_key: SessionTransitionKey = (
-            sample.provider,
-            sample.session_transition_account.to_string(),
-        );
+        let restored_key =
+            session_transition_key(sample.provider, sample.session_transition_account);
         let restored = self.deferred_restored.remove(&restored_key);
         let account = sample
             .account
