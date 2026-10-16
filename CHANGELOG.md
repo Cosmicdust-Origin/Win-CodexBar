@@ -9,6 +9,7 @@
 
 ## [Windows] Unreleased
 
+- **Claude**: in Auto mode, a Claude CLI probe timeout now falls back to the retained CLI usage from the last 15 minutes, as other CLI failures already did, instead of failing the refresh outright. Without a retained result the timeout is reported as before.
 - Settings providers: show the FLORA Workspace ID and Fireworks account slug fields, which were defined but never displayed, so they no longer need the `FLORA_WORKSPACE_ID` / `FIREWORKS_ACCOUNT_SLUG` environment variables.
 - Localization: align the Raycast auto-import and cookie-disabled strings in ru-RU, uk-UA, tr-TR and zh-CN with each locale's existing cookie and installed-browser terminology.
 - OpenAI API: each Admin refresh also reads the last hour of 1-minute usage from the Admin Usage API (input plus output tokens, cached input included, Batch API traffic kept out of limit headroom) and carries a Tokens/min grid with a reporting frontier, so buckets that arrive late show as pending instead of zero. The backend can also load 15-minute, 1-hour or 6-hour windows, read per-project rate-limit caps, and measure headroom against manual per-model organization limits stored in settings. The per-refresh request can be turned off, and a failure never affects the daily usage. The menu bar token comes in a later release (upstream #4495).

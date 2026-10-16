@@ -1036,7 +1036,7 @@ impl ClaudeProvider {
         if let Some(result) =
             record_auto_source(&mut failures, "Web", self.fetch_via_web(ctx).await)?
         {
-            return Ok(result);
+            return Ok(live_auto_success(result));
         }
 
         // Upstream 0.50.1 #2516: track whether OAuth failed with a revocation.
@@ -1046,7 +1046,7 @@ impl ClaudeProvider {
             .err()
             .is_some_and(oauth_failure_uses_cli_cache);
         if let Some(result) = record_auto_source(&mut failures, "OAuth", oauth_result)? {
-            return Ok(result);
+            return Ok(live_auto_success(result));
         }
 
         // When OAuth was revoked (not just expired) or is rate limited, reuse a
@@ -1059,9 +1059,12 @@ impl ClaudeProvider {
             return Ok(cached);
         }
 
-        if let Some(mut result) =
-            record_auto_source(&mut failures, "CLI", self.fetch_via_cli(ctx, started).await)?
-        {
+        let cli_result = self.fetch_via_cli(ctx, started).await;
+        if let Some(cached) = stale_cli_result_on_probe_timeout(&cli_result) {
+            tracing::debug!("Claude CLI probe timed out; returning stale cached CLI result");
+            return Ok(cached);
+        }
+        if let Some(mut result) = record_auto_source(&mut failures, "CLI", cli_result)? {
             // Without consent for reading Claude Code credentials, label the
             // CLI fallback as reduced fidelity.
             if !claude_code_consent() {
@@ -1335,6 +1338,27 @@ fn record_auto_source(
             failures.push((source, error));
             Ok(None)
         }
+    }
+}
+
+/// A live OAuth or Web answer is newer than any retained CLI result. Dropping
+/// the retained result keeps a later CLI timeout from serving usage older than
+/// what the user has already seen.
+fn live_auto_success(result: ProviderFetchResult) -> ProviderFetchResult {
+    clear_cli_result_cache();
+    result
+}
+
+/// `record_auto_source` propagates transport failures immediately, so a CLI
+/// probe timeout would never reach the auto path's stale-cache fallback. The
+/// CLI probe has no network leg, so a transport-class error here is a probe
+/// timeout; prefer the retained CLI result when one is still within the TTL.
+fn stale_cli_result_on_probe_timeout(
+    result: &Result<ProviderFetchResult, ProviderError>,
+) -> Option<ProviderFetchResult> {
+    match result {
+        Err(error) if error.is_transport_failure() => cached_cli_result(),
+        _ => None,
     }
 }
 
@@ -2894,6 +2918,114 @@ Usage:                 0 input, 0 output, 0 cache read
         let stale = cached_cli_result().expect("retained CLI result survives failed probes");
         assert!((stale.usage.primary.used_percent - 42.0).abs() < 0.01);
         assert!(!stale.has_successful_claude_cli_quota);
+        clear_cli_result_cache();
+    }
+
+    #[tokio::test]
+    async fn cli_probe_timeout_returns_stale_cached_cli_result() {
+        let _guard = CLI_CACHE_TEST_LOCK.lock().await;
+        let mut live = ProviderFetchResult::new(UsageSnapshot::new(RateWindow::new(42.0)), "cli");
+        live.has_successful_claude_cli_quota = true;
+        cache_cli_result(live);
+
+        let (probe, _) = run_scripted_cli_probe(
+            Instant::now(),
+            vec![Err(ProviderError::Timeout), Err(ProviderError::Timeout)],
+        )
+        .await;
+        let cli_result: Result<ProviderFetchResult, ProviderError> =
+            probe.map(|_| unreachable!("every scripted probe times out"));
+
+        let stale = stale_cli_result_on_probe_timeout(&cli_result)
+            .expect("timeout with a retained CLI result falls back to it");
+        assert!((stale.usage.primary.used_percent - 42.0).abs() < 0.01);
+        assert_eq!(stale.source_label, "cli");
+        assert!(!stale.has_successful_claude_cli_quota);
+        clear_cli_result_cache();
+    }
+
+    #[test]
+    fn live_oauth_or_web_success_drops_retained_cli_result() {
+        let _guard = CLI_CACHE_TEST_LOCK.blocking_lock();
+        let timeout: Result<ProviderFetchResult, ProviderError> = Err(ProviderError::Timeout);
+
+        for source in ["OAuth", "Web"] {
+            cache_cli_result(ProviderFetchResult::new(
+                UsageSnapshot::new(RateWindow::new(42.0)),
+                "cli",
+            ));
+            let live = ProviderFetchResult::new(UsageSnapshot::new(RateWindow::new(10.0)), "oauth");
+            let mut failures = Vec::new();
+            let recorded = record_auto_source(&mut failures, source, Ok(live))
+                .expect("live success is not a failure")
+                .expect("live success yields a result");
+            let returned = live_auto_success(recorded);
+
+            assert!((returned.usage.primary.used_percent - 10.0).abs() < 0.01);
+            assert!(cached_cli_result().is_none(), "{source}");
+            assert!(
+                stale_cli_result_on_probe_timeout(&timeout).is_none(),
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn revoked_oauth_failure_keeps_retained_cli_result() {
+        let _guard = CLI_CACHE_TEST_LOCK.blocking_lock();
+        cache_cli_result(ProviderFetchResult::new(
+            UsageSnapshot::new(RateWindow::new(42.0)),
+            "cli",
+        ));
+
+        let revoked = ProviderError::OAuthRevoked("token revoked".to_string());
+        assert!(oauth_failure_uses_cli_cache(&revoked));
+        let mut failures = Vec::new();
+        let outcome = record_auto_source(&mut failures, "OAuth", Err(revoked));
+        assert!(matches!(outcome, Ok(None)));
+        assert!(cached_cli_result().is_some());
+        clear_cli_result_cache();
+    }
+
+    #[tokio::test]
+    async fn cli_probe_timeout_without_cache_still_propagates() {
+        let _guard = CLI_CACHE_TEST_LOCK.lock().await;
+        clear_cli_result_cache();
+
+        let (probe, _) = run_scripted_cli_probe(
+            Instant::now(),
+            vec![Err(ProviderError::Timeout), Err(ProviderError::Timeout)],
+        )
+        .await;
+        let cli_result: Result<ProviderFetchResult, ProviderError> =
+            probe.map(|_| unreachable!("every scripted probe times out"));
+
+        assert!(stale_cli_result_on_probe_timeout(&cli_result).is_none());
+        let mut failures = Vec::new();
+        let outcome = record_auto_source(&mut failures, "CLI", cli_result);
+        assert!(matches!(outcome, Err(ProviderError::Timeout)));
+        assert!(failures.is_empty());
+    }
+
+    #[tokio::test]
+    async fn cli_auth_failure_skips_timeout_fallback_and_is_recorded() {
+        let _guard = CLI_CACHE_TEST_LOCK.lock().await;
+        cache_cli_result(ProviderFetchResult::new(
+            UsageSnapshot::new(RateWindow::new(42.0)),
+            "cli",
+        ));
+
+        let (probe, _) =
+            run_scripted_cli_probe(Instant::now(), vec![Err(ProviderError::AuthRequired)]).await;
+        let cli_result: Result<ProviderFetchResult, ProviderError> =
+            probe.map(|_| unreachable!("the scripted probe fails"));
+
+        assert!(stale_cli_result_on_probe_timeout(&cli_result).is_none());
+        let mut failures = Vec::new();
+        let outcome = record_auto_source(&mut failures, "CLI", cli_result);
+        assert!(matches!(outcome, Ok(None)));
+        assert_eq!(failures.len(), 1);
+        assert!(matches!(failures[0], ("CLI", ProviderError::AuthRequired)));
         clear_cli_result_cache();
     }
 
