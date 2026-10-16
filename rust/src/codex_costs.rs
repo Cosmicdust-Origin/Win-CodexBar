@@ -3,11 +3,15 @@
 //! The SSH wire contract lives in [`summary_contract`]; this module owns the
 //! local-scan aggregation and pricing logic.
 
+mod cost_cli;
 mod host_costs;
 pub(crate) mod identified_requests;
 mod quota_windows;
 mod summary_contract;
 
+pub(crate) use cost_cli::CODEX_COST_CLI;
+#[cfg(test)]
+pub(crate) use cost_cli::CodexCostCli;
 pub(crate) use host_costs::{CodexHostCostsArgs, HostOutputFormat, run_codex_host_costs};
 pub(crate) use identified_requests::{
     IdentifiedUsageArgs, MAX_IDENTIFIED_OUTPUT_BYTES, run_codex_identified_usage,

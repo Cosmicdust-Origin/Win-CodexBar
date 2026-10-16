@@ -5,7 +5,9 @@
 //! only requires editing `ProviderId`, the matching `providers/` module, and
 //! this one match arm.
 
-use super::{Provider, ProviderId, ProviderLimitResetPolicy, ProviderPaceCapability};
+use super::{
+    CostCliExtension, Provider, ProviderId, ProviderLimitResetPolicy, ProviderPaceCapability,
+};
 use crate::providers::AerostackProvider;
 use crate::providers::AtlasCloudProvider;
 use crate::providers::ClawRouterProvider;
@@ -395,6 +397,130 @@ pub fn limit_reset_policy(id: ProviderId) -> ProviderLimitResetPolicy {
         | ProviderId::Flora => ProviderLimitResetPolicy::DEFAULT,
     }
 }
+
+/// `codexbar cost` extension declared by a provider's module. Exhaustive over
+/// [`ProviderId`]: a new variant is a compile error until it is listed here,
+/// and providers without extra cost modes map to `None`.
+pub(crate) fn cost_cli_extension_for(id: ProviderId) -> Option<&'static dyn CostCliExtension> {
+    match id {
+        ProviderId::Codex => Some(&crate::codex_costs::CODEX_COST_CLI),
+        ProviderId::Claude
+        | ProviderId::TinyApi
+        | ProviderId::Xapi
+        | ProviderId::Langdock
+        | ProviderId::Exa
+        | ProviderId::Copilot
+        | ProviderId::Cursor
+        | ProviderId::Grok
+        | ProviderId::Kimi
+        | ProviderId::Zai
+        | ProviderId::Amp
+        | ProviderId::Alibaba
+        | ProviderId::AlibabaTokenPlan
+        | ProviderId::CommandCode
+        | ProviderId::Doubao
+        | ProviderId::MiMo
+        | ProviderId::StepFun
+        | ProviderId::Notion
+        | ProviderId::Ollama
+        | ProviderId::OpenCodeGo
+        | ProviderId::Pi
+        | ProviderId::Gemini
+        | ProviderId::Antigravity
+        | ProviderId::AtlasCloud
+        | ProviderId::Synthetic
+        | ProviderId::ClawRouter
+        | ProviderId::IBMBob
+        | ProviderId::Linkup
+        | ProviderId::LithosAI
+        | ProviderId::MuseAI
+        | ProviderId::WorkBuddy
+        | ProviderId::Tavily
+        | ProviderId::Factory
+        | ProviderId::Kiro
+        | ProviderId::VertexAI
+        | ProviderId::Augment
+        | ProviderId::MiniMax
+        | ProviderId::OpenCode
+        | ProviderId::KimiK2
+        | ProviderId::Warp
+        | ProviderId::AzureOpenAI
+        | ProviderId::T3Chat
+        | ProviderId::OpenRouter
+        | ProviderId::JetBrains
+        | ProviderId::NanoGPT
+        | ProviderId::Infini
+        | ProviderId::Perplexity
+        | ProviderId::Abacus
+        | ProviderId::Mistral
+        | ProviderId::Kilo
+        | ProviderId::Bedrock
+        | ProviderId::Codebuff
+        | ProviderId::CodeRabbit
+        | ProviderId::DeepSeek
+        | ProviderId::DeepInfra
+        | ProviderId::AiAnd
+        | ProviderId::Windsurf
+        | ProviderId::Manus
+        | ProviderId::Venice
+        | ProviderId::OpenAIApi
+        | ProviderId::ElevenLabs
+        | ProviderId::Deepgram
+        | ProviderId::Groq
+        | ProviderId::HuggingFace
+        | ProviderId::Helmcode
+        | ProviderId::V0
+        | ProviderId::TypeSafe
+        | ProviderId::LLMProxy
+        | ProviderId::Chutes
+        | ProviderId::LiteLLM
+        | ProviderId::Poe
+        | ProviderId::Devin
+        | ProviderId::Zed
+        | ProviderId::CrossModel
+        | ProviderId::Qoder
+        | ProviderId::CodeBuddy
+        | ProviderId::Sakana
+        | ProviderId::Sofya
+        | ProviderId::Sub2Api
+        | ProviderId::Wayfinder
+        | ProviderId::ZenMux
+        | ProviderId::ClinePass
+        | ProviderId::LongCat
+        | ProviderId::Neuralwatt
+        | ProviderId::ZoomMate
+        | ProviderId::QwenCloud
+        | ProviderId::Replicate
+        | ProviderId::SailResearch
+        | ProviderId::Xai
+        | ProviderId::Fireworks
+        | ProviderId::Meta
+        | ProviderId::Muse
+        | ProviderId::Nous
+        | ProviderId::Hyper
+        | ProviderId::GitKraken
+        | ProviderId::Bifrost
+        | ProviderId::Aixy
+        | ProviderId::LLMMan
+        | ProviderId::DevPass
+        | ProviderId::XKiro
+        | ProviderId::Raycast
+        | ProviderId::Vercel
+        | ProviderId::Cosmic
+        | ProviderId::Aerostack
+        | ProviderId::Parallel
+        | ProviderId::Fal
+        | ProviderId::Flora => None,
+    }
+}
+
+/// Every registered `codexbar cost` extension, in [`ProviderId::all`] order.
+pub(crate) fn cost_cli_extensions() -> impl Iterator<Item = &'static dyn CostCliExtension> {
+    ProviderId::all()
+        .iter()
+        .filter_map(|&id| cost_cli_extension_for(id))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -465,5 +591,17 @@ mod tests {
                 ..ProviderLimitResetPolicy::DEFAULT
             }
         );
+    }
+
+    #[test]
+    fn only_codex_registers_a_cost_cli_extension() {
+        for &id in ProviderId::all() {
+            assert_eq!(
+                cost_cli_extension_for(id).is_some(),
+                id == ProviderId::Codex,
+                "{id}"
+            );
+        }
+        assert_eq!(cost_cli_extensions().count(), 1);
     }
 }

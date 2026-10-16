@@ -7,6 +7,7 @@ mod claude_routed_pricing;
 pub(crate) mod codex_included_pricing;
 mod codex_routed_pricing;
 mod cost_cache_budget;
+mod cost_cli_extension;
 mod cost_pricing;
 pub mod curl_capture;
 mod display_detail;
@@ -42,6 +43,10 @@ pub use adaptive_refresh::*;
 pub use aws_signing::*;
 pub use blocking_quota::*;
 pub use cost_cache_budget::*;
+pub(crate) use cost_cli_extension::{
+    CostCliExtension, CostCliInvocation, CostCliMode, CostGroupedReportContext, CostGrouping,
+    format_count,
+};
 pub use cost_pricing::*;
 pub use curl_capture::*;
 pub use display_detail::*;
@@ -59,6 +64,7 @@ pub use openai_dashboard::*;
 pub use pace_capability::*;
 pub use provider::*;
 pub use provider_factory::instantiate as instantiate_provider;
+pub(crate) use provider_factory::{cost_cli_extension_for, cost_cli_extensions};
 pub use provider_state::*;
 pub use quota_burndown::{
     MAX_SERIES_SAMPLES, PersistedPlanEntry, PersistedPlanSeries, QuotaBurndownModel,
