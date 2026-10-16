@@ -150,6 +150,8 @@ describe("parseLimitDrafts", () => {
     expect(parseLimitDrafts([row("m".repeat(201), "1")])).toMatchObject({
       error: "OpenAiLimitErrorLine",
     });
+    // Counted in code points, like the shell: 200 astral characters still fit.
+    expect(parseLimitDrafts([row("😀".repeat(200), "1")])).toMatchObject({ ok: true });
   });
 
   it("accepts an empty list, which clears the stored limits", () => {

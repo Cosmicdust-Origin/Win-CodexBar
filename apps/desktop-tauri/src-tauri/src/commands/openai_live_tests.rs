@@ -90,6 +90,11 @@ fn validated_rows_reject_bad_input_instead_of_dropping_it() {
 
     let multiline = validated_model_rate_limits(&[row("gpt-\n5", 1, None)]).unwrap_err();
     assert!(multiline.contains("one line"));
+
+    let at_limit = "é".repeat(200);
+    assert!(validated_model_rate_limits(&[row(&at_limit, 1, None)]).is_ok());
+    let over_limit = "é".repeat(201);
+    assert!(validated_model_rate_limits(&[row(&over_limit, 1, None)]).is_err());
 }
 
 #[test]

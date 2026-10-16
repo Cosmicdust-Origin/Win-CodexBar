@@ -119,7 +119,8 @@ export function parseLimitDrafts(drafts: readonly LimitDraft[]): LimitDraftResul
     const draft = drafts[index];
     const model = draft.model.trim();
     if (model.length === 0) return { ok: false, error: "OpenAiLimitErrorModel", index };
-    if (model.length > MAX_MODEL_ID_LENGTH || hasControlCharacter(model)) {
+    // Code points, matching the shell's `chars().count()` check.
+    if ([...model].length > MAX_MODEL_ID_LENGTH || hasControlCharacter(model)) {
       return { ok: false, error: "OpenAiLimitErrorLine", index };
     }
     if (seen.has(model)) return { ok: false, error: "OpenAiLimitErrorDuplicate", index };

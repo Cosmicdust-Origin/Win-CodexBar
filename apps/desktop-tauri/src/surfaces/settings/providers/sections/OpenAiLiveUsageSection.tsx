@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Field, Toggle } from "../../../../components/FormControls";
 import { OpenAITokensPerMinuteChart } from "../../../../components/OpenAITokensPerMinuteChart";
 import type { LocaleKey } from "../../../../i18n/keys";
@@ -18,6 +18,7 @@ import type {
   ProviderThroughputSnapshot,
   SettingsUpdate,
 } from "../../../../types/bridge";
+import { PROVIDER_WORKSPACE_ID_SAVED_EVENT } from "./credentials/OpenAiExtras";
 import { OpenAiModelLimitsEditor } from "./OpenAiModelLimitsEditor";
 
 type T = (key: LocaleKey) => string;
@@ -50,6 +51,18 @@ const WINDOW_LABELS: Record<LiveWindowMinutes, LocaleKey> = {
  */
 export function OpenAiLiveUsageSection({ settings, disabled, t, onSettingsChange }: Props) {
   const limits = settings.openAiModelRateLimits ?? NO_LIMITS;
+  // Usage and org caps depend on the saved project scope; a new scope remounts the
+  // view so loaded data and any pending load from the old scope are discarded.
+  const [scopeVersion, setScopeVersion] = useState(0);
+  useEffect(() => {
+    const onSaved = (event: Event) => {
+      if ((event as CustomEvent<string>).detail === "openaiapi") {
+        setScopeVersion((version) => version + 1);
+      }
+    };
+    window.addEventListener(PROVIDER_WORKSPACE_ID_SAVED_EVENT, onSaved);
+    return () => window.removeEventListener(PROVIDER_WORKSPACE_ID_SAVED_EVENT, onSaved);
+  }, []);
   return (
     <>
       <Field
@@ -69,7 +82,7 @@ export function OpenAiLiveUsageSection({ settings, disabled, t, onSettingsChange
         t={t}
         onSave={(next) => onSettingsChange({ openAiModelRateLimits: next })}
       />
-      <LiveUsageView limits={limits} disabled={disabled} t={t} />
+      <LiveUsageView key={scopeVersion} limits={limits} disabled={disabled} t={t} />
     </>
   );
 }

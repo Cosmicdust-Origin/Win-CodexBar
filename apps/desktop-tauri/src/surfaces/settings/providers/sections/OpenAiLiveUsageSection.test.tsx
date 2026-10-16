@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocaleKey } from "../../../../i18n/keys";
 import type {
@@ -17,6 +17,7 @@ vi.mock("../../../../lib/tauri", async (importOriginal) => ({
   ...tauriMocks,
 }));
 
+import { PROVIDER_WORKSPACE_ID_SAVED_EVENT } from "./credentials/OpenAiExtras";
 import { OpenAiLiveUsageSection } from "./OpenAiLiveUsageSection";
 
 const t = (key: LocaleKey) => key as string;
@@ -99,5 +100,25 @@ describe("OpenAiLiveUsageSection", () => {
     fireEvent.click(screen.getByText("OpenAiOrgLimitsLoad"));
     await waitFor(() => expect(screen.getByText("gpt-5")).toBeTruthy());
     expect(tauriMocks.getOpenAiOrgRateLimits).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears loaded caps when an OpenAI project id is saved", async () => {
+    renderSection();
+    fireEvent.click(screen.getByText("OpenAiOrgLimitsLoad"));
+    await waitFor(() => expect(screen.getByText("gpt-5")).toBeTruthy());
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(PROVIDER_WORKSPACE_ID_SAVED_EVENT, { detail: "litellm" }),
+      );
+    });
+    expect(screen.getByText("gpt-5")).toBeTruthy();
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(PROVIDER_WORKSPACE_ID_SAVED_EVENT, { detail: "openaiapi" }),
+      );
+    });
+    expect(screen.queryByText("gpt-5")).toBeNull();
   });
 });

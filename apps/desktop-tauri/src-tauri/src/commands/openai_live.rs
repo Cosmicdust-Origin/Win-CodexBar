@@ -80,9 +80,9 @@ pub(crate) fn validated_model_rate_limits(
         if model.is_empty() {
             return Err("Each rate limit needs a model ID.".to_string());
         }
-        if model.len() > MAX_MODEL_ID_LEN || model.chars().any(char::is_control) {
+        if model.chars().count() > MAX_MODEL_ID_LEN || model.chars().any(char::is_control) {
             return Err(format!(
-                "Model IDs must be on one line and under {MAX_MODEL_ID_LEN} characters."
+                "Model IDs must be on one line and at most {MAX_MODEL_ID_LEN} characters."
             ));
         }
         if !seen.insert(model) {
