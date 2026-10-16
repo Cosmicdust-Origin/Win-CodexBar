@@ -98,6 +98,15 @@ export function draftsFromLimits(limits: readonly ModelRateLimitSnapshot[]): Lim
 
 const WHOLE_NUMBER = /^\d+$/;
 
+/** C0 controls and DEL; checked by code point so the pattern needs no control escapes. */
+function hasControlCharacter(value: string): boolean {
+  for (const char of value) {
+    const code = char.codePointAt(0) ?? 0;
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
+}
+
 /**
  * Validates every row before save. A bad row is reported with its index; the
  * caller keeps the editor state so nothing is dropped silently. A requests
@@ -110,7 +119,7 @@ export function parseLimitDrafts(drafts: readonly LimitDraft[]): LimitDraftResul
     const draft = drafts[index];
     const model = draft.model.trim();
     if (model.length === 0) return { ok: false, error: "OpenAiLimitErrorModel", index };
-    if (model.length > MAX_MODEL_ID_LENGTH || /[\u0000-\u001f\u007f]/.test(model)) {
+    if (model.length > MAX_MODEL_ID_LENGTH || hasControlCharacter(model)) {
       return { ok: false, error: "OpenAiLimitErrorLine", index };
     }
     if (seen.has(model)) return { ok: false, error: "OpenAiLimitErrorDuplicate", index };
