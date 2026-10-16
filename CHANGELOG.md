@@ -9,6 +9,7 @@
 
 ## [Windows] Unreleased
 
+- Tray: add a **Progress bars stacked** menu bar style that draws the session and weekly meters as two equal-height rows on the single tray icon, with the same windows and pace tint as **Meter bars**; older settings files keep their style (upstream #4436).
 - OpenAI API: each Admin refresh also reads the last hour of 1-minute usage from the Admin Usage API (input plus output tokens, cached input included, Batch API traffic kept out of limit headroom) and carries a Tokens/min grid with a reporting frontier, so buckets that arrive late show as pending instead of zero. The backend can also load 15-minute, 1-hour or 6-hour windows, read per-project rate-limit caps, and measure headroom against manual per-model organization limits stored in settings. The per-refresh request can be turned off, and a failure never affects the daily usage. The chart, menu bar token and Settings controls come in a later release (upstream #4495).
 - **Claude**: show the plan renewal or expiry date from claude.ai billing under the quota rows when your cookie session supplies it, and make saved limit-reset credits, Extra usage (including a prepaid balance), and plan dates independently selectable under Visible usage items. Existing settings keep all three visible; Admin API spend is unaffected (upstream #4324, #4484).
 - Devin: use Devin's official transparent hexagon mark for the provider icon in Settings and the CLI dashboard, instead of the settings-gear badge and the letter fallback (upstream #4458).
