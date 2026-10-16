@@ -786,6 +786,8 @@ export const ALL_LOCALE_KEYS = [
   "ShowPercentInTrayHelper",
   "ColorPaceInTray",
   "ColorPaceInTrayHelper",
+  "ColorByProviderInTray",
+  "ColorByProviderInTrayHelper",
   "PaceSignLabel",
   "PaceSignHelper",
   "PaceSignAheadPositive",

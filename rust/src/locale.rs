@@ -1056,6 +1056,8 @@ locale_keys! {
     ShowPercentInTrayHelper,
     ColorPaceInTray,
     ColorPaceInTrayHelper,
+    ColorByProviderInTray,
+    ColorByProviderInTrayHelper,
     PaceSignLabel,
     PaceSignHelper,
     PaceSignAheadPositive,

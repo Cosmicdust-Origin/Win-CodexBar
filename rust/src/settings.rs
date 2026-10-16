@@ -222,6 +222,11 @@ pub struct Settings {
     #[serde(default)]
     pub menu_bar_color_pace: bool,
 
+    /// Tint the Windows tray usage indicator with each shown provider's accent
+    /// color (upstream "Color by provider", #4321). Defaults off.
+    #[serde(default)]
+    pub menu_bar_color_by_provider: bool,
+
     /// Show reserve as `+` and deficit as `-` in signed pace text (upstream
     /// `menuBarPaceReservePositive`). Display only: the stored pace delta stays
     /// usage-ahead, so pace colours and stages keep their meaning.
@@ -750,6 +755,7 @@ impl Default for Settings {
             highlight_menu_cards_on_hover: true,
             workday_tick_style: WorkdayTickStyle::Subtle,
             menu_bar_color_pace: false,
+            menu_bar_color_by_provider: false,
             menu_bar_pace_reserve_positive: false,
             providers_sorted_alphabetically: false,
             providers_enabled_only: false,
