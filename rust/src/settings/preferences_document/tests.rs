@@ -1,7 +1,7 @@
 use super::*;
 use crate::settings::{
-    Language, ProviderConfig, ProviderQuotaWarnings, QuotaWarningWindow, ThemePreference,
-    TrayIconMode,
+    Language, MenuBarIconStyle, ProviderConfig, ProviderQuotaWarnings, QuotaWarningWindow,
+    ThemePreference, TrayIconMode,
 };
 use serde_json::json;
 use std::collections::BTreeMap;
@@ -180,6 +180,21 @@ fn round_trips_every_allowlisted_preference() {
     // Non-portable state on the receiving machine is untouched.
     assert!(target.start_at_login);
     assert_eq!(target.global_shortcut, "Ctrl+Alt+K");
+}
+
+#[test]
+fn menu_bar_icon_style_import_accepts_stacked_bars_and_rejects_junk() {
+    let document =
+        parse(json!({ "menu_bar_icon_style": "stackedBars" })).expect("stackedBars imports");
+    let mut target = Settings::default();
+    document.apply_to(&mut target).expect("apply");
+    assert_eq!(target.menu_bar_icon_style, MenuBarIconStyle::StackedBars);
+
+    let rejected = parse(json!({ "menu_bar_icon_style": "stacked_bars" }));
+    assert!(
+        rejected.is_err(),
+        "unknown style must be rejected on import"
+    );
 }
 
 #[test]

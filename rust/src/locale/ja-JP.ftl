@@ -1560,6 +1560,7 @@ MenuBarIconStyleLabel = メニューバーのスタイル
 MenuBarIconStyleHelper = トレイアイコンの描画方法。
 MenuBarIconStyleBars = メーターバー
 MenuBarIconStylePercent = アイコンとパーセント
+MenuBarIconStyleStackedBars = 進度バーのスタック
 CombinedIconSectionTitle = 統合アイコン
 CombinedIconStyleLabel = 統合アイコンのスタイル
 CombinedIconStyleSwitcher = 切り替え

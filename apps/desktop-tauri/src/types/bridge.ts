@@ -79,7 +79,7 @@ export type OverviewLayout = "detailed" | "compact";
 /** How cost is rendered on provider MenuCards (#2976). */
 export type CostSummaryDisplayStyle = "compact" | "detailed" | "hidden";
 /** Settings > Menu Bar > Menu bar style (`menu_bar_icon_style`). */
-export type MenuBarIconStyle = "bars" | "percent";
+export type MenuBarIconStyle = "bars" | "percent" | "stackedBars";
 /** Settings > Menu > Workday tick appearance (`workday_tick_style`). */
 export type WorkdayTickStyle = "hidden" | "subtle" | "high_contrast";
 export type FloatBarOrientation = "horizontal" | "vertical";

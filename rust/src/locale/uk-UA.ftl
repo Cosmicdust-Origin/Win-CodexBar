@@ -1558,6 +1558,7 @@ MenuBarIconStyleLabel = Стиль значка
 MenuBarIconStyleHelper = Як відображається значок у треї.
 MenuBarIconStyleBars = Шкали
 MenuBarIconStylePercent = Значок і відсоток
+MenuBarIconStyleStackedBars = Індикатори прогресу штабелем
 CombinedIconSectionTitle = Спільний значок
 CombinedIconStyleLabel = Стиль спільного значка
 CombinedIconStyleSwitcher = Перемикач

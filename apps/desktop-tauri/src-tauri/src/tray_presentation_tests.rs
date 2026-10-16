@@ -1,5 +1,6 @@
 use super::*;
 use codexbar::core::{ProviderId, ProviderStateKind};
+use codexbar::tray::render_stacked_bars_icon_rgba_with_pace;
 
 fn fake_snapshot(id: &str, display_name: &str, used_percent: f64) -> ProviderUsageSnapshot {
     fake_snapshot_with(id, display_name, used_percent, None, None, None)
@@ -1001,6 +1002,118 @@ fn retired_minimal_display_mode_no_longer_forces_most_used_provider() {
     assert_eq!(plan.status_rows[0].snapshot.provider_id, "codex");
 }
 
+#[test]
+fn stacked_bars_style_plans_the_same_windows_as_bars_as_equal_rows() {
+    let snapshots = vec![fake_snapshot_with(
+        "codex",
+        "Codex",
+        30.0,
+        Some(65.0),
+        None,
+        None,
+    )];
+    let bars_settings = Settings {
+        menu_bar_icon_style: codexbar::settings::MenuBarIconStyle::Bars,
+        show_as_used: true,
+        ..Settings::default()
+    };
+    let stacked_settings = Settings {
+        menu_bar_icon_style: codexbar::settings::MenuBarIconStyle::StackedBars,
+        show_as_used: true,
+        ..Settings::default()
+    };
+
+    let TrayIconPlan::Bars {
+        primary_percent,
+        secondary_percent,
+        has_error,
+        provider_tint,
+    } = TrayPresentationPlan::resolve(&bars_settings, &snapshots, None).icon
+    else {
+        panic!("bars style should plan Bars");
+    };
+    let stacked = TrayPresentationPlan::resolve(&stacked_settings, &snapshots, None);
+    assert_eq!(
+        stacked.icon,
+        TrayIconPlan::StackedBars {
+            primary_percent,
+            secondary_percent,
+            has_error,
+            provider_tint,
+        }
+    );
+    assert_eq!(
+        stacked.render_icon(),
+        render_stacked_bars_icon_rgba_with_pace(
+            primary_percent,
+            secondary_percent,
+            has_error,
+            None
+        )
+    );
+    assert_ne!(
+        stacked.render_icon(),
+        TrayPresentationPlan::resolve(&bars_settings, &snapshots, None).render_icon()
+    );
+}
+
+#[test]
+fn stacked_bars_style_with_one_window_draws_the_bars_fallback() {
+    let snapshots = vec![fake_snapshot("codex", "Codex", 30.0)];
+    let bars_settings = Settings {
+        menu_bar_icon_style: codexbar::settings::MenuBarIconStyle::Bars,
+        show_as_used: true,
+        ..Settings::default()
+    };
+    let stacked_settings = Settings {
+        menu_bar_icon_style: codexbar::settings::MenuBarIconStyle::StackedBars,
+        ..bars_settings.clone()
+    };
+    let bars = TrayPresentationPlan::resolve(&bars_settings, &snapshots, None);
+    let stacked = TrayPresentationPlan::resolve(&stacked_settings, &snapshots, None);
+    assert!(matches!(
+        stacked.icon,
+        TrayIconPlan::StackedBars {
+            secondary_percent: None,
+            ..
+        }
+    ));
+    assert_eq!(stacked.render_icon(), bars.render_icon());
+}
+
+#[test]
+fn stacked_bars_style_keeps_the_pace_tint_on_both_rows() {
+    let settings = Settings {
+        menu_bar_icon_style: codexbar::settings::MenuBarIconStyle::StackedBars,
+        ..tint_settings()
+    };
+    let snapshots = vec![paced_snapshot(
+        "synthetic",
+        paced_window(70.0, Some(300), 150),
+    )];
+    let plan = TrayPresentationPlan::resolve_at(&settings, &snapshots, None, pace_now());
+    assert_eq!(plan.icon_pace, Some(TrayPaceColor::Ahead));
+
+    let TrayIconPlan::StackedBars {
+        primary_percent,
+        secondary_percent,
+        has_error,
+        provider_tint: None,
+    } = plan.icon
+    else {
+        panic!("stacked bars style should plan StackedBars");
+    };
+    assert_eq!(
+        plan.render_icon(),
+        render_stacked_bars_icon_rgba_with_pace(
+            primary_percent,
+            secondary_percent,
+            has_error,
+            Some(TrayPaceColor::Ahead),
+        )
+    );
+}
+
 const CODEX_BRAND: (u8, u8, u8) = (0x49, 0xA3, 0xB0);
 const CLAUDE_BRAND: (u8, u8, u8) = (0xCC, 0x7C, 0x5E);
 
@@ -1167,4 +1280,34 @@ fn parse_hex_rgb_accepts_only_six_digit_hex() {
     assert_eq!(parse_hex_rgb("#49A3"), None);
     assert_eq!(parse_hex_rgb("#GG0000"), None);
     assert_eq!(parse_hex_rgb(""), None);
+}
+
+#[test]
+fn color_by_provider_tints_both_stacked_bars_rows() {
+    let snapshots = vec![fake_snapshot_with(
+        "codex",
+        "Codex",
+        30.0,
+        Some(65.0),
+        None,
+        None,
+    )];
+    let settings = color_by_provider_settings(codexbar::settings::MenuBarIconStyle::StackedBars);
+    let plan = TrayPresentationPlan::resolve(&settings, &snapshots, None);
+    assert!(matches!(
+        plan.icon,
+        TrayIconPlan::StackedBars {
+            provider_tint: Some(CODEX_BRAND),
+            ..
+        }
+    ));
+    let (rgba, _, _) = plan.render_icon();
+    assert_eq!(
+        pixel_at(&rgba, 8, 8),
+        [CODEX_BRAND.0, CODEX_BRAND.1, CODEX_BRAND.2, 255]
+    );
+    assert_eq!(
+        pixel_at(&rgba, 8, 20),
+        [CODEX_BRAND.0, CODEX_BRAND.1, CODEX_BRAND.2, 255]
+    );
 }

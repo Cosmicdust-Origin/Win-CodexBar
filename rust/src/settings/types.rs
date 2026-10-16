@@ -629,6 +629,10 @@ pub enum MenuBarIconStyle {
     Bars,
     /// Provider icon plus the percent text.
     Percent,
+    /// Session and weekly meters drawn as two equal-height rows (upstream
+    /// "Progress bars stacked", #4436). Older builds read it as `Bars`.
+    #[serde(rename = "stackedBars")]
+    StackedBars,
 }
 
 impl MenuBarIconStyle {
@@ -637,6 +641,7 @@ impl MenuBarIconStyle {
         match value.trim().to_ascii_lowercase().as_str() {
             "bars" => Some(Self::Bars),
             "percent" => Some(Self::Percent),
+            "stackedbars" => Some(Self::StackedBars),
             _ => None,
         }
     }
@@ -645,6 +650,7 @@ impl MenuBarIconStyle {
         match self {
             Self::Bars => "bars",
             Self::Percent => "percent",
+            Self::StackedBars => "stackedBars",
         }
     }
 }

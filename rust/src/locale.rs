@@ -1928,6 +1928,7 @@ locale_keys! {
     MenuBarIconStyleHelper,
     MenuBarIconStyleBars,
     MenuBarIconStylePercent,
+    MenuBarIconStyleStackedBars,
     CombinedIconSectionTitle,
     CombinedIconStyleLabel,
     CombinedIconStyleSwitcher,

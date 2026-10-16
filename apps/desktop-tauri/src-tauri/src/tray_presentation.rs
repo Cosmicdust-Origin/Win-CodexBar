@@ -6,7 +6,7 @@ use codexbar::core::{IconLane, ProviderId, UsagePace};
 use codexbar::settings::{Language, MetricPreference, Settings, TrayIconMode};
 use codexbar::tray::{
     TrayPaceColor, render_bar_icon_rgba_tinted, render_percent_icon_rgba_tinted,
-    render_stacked_bar_icon_rgba_tinted,
+    render_stacked_bar_icon_rgba_tinted, render_stacked_bars_icon_rgba_tinted,
 };
 
 /// Opt-in provider accent for a tray meter (`menu_bar_color_by_provider`).
@@ -15,6 +15,13 @@ type ProviderRgb = (u8, u8, u8);
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum TrayIconPlan {
     Bars {
+        primary_percent: f64,
+        secondary_percent: Option<f64>,
+        has_error: bool,
+        provider_tint: Option<ProviderRgb>,
+    },
+    /// The same session and weekly windows as `Bars`, drawn as equal rows.
+    StackedBars {
         primary_percent: f64,
         secondary_percent: Option<f64>,
         has_error: bool,
@@ -183,7 +190,9 @@ impl<'a> TrayPresentationPlan<'a> {
 
         let icon_pace = match icon {
             TrayIconPlan::Stacked { .. } => None,
-            TrayIconPlan::Bars { .. } | TrayIconPlan::Percent { .. } => icon_pace,
+            TrayIconPlan::Bars { .. }
+            | TrayIconPlan::StackedBars { .. }
+            | TrayIconPlan::Percent { .. } => icon_pace,
         };
 
         Self {
@@ -214,6 +223,18 @@ impl<'a> TrayPresentationPlan<'a> {
                 has_error,
                 provider_tint,
             } => render_percent_icon_rgba_tinted(percent, has_error, self.icon_pace, provider_tint),
+            TrayIconPlan::StackedBars {
+                primary_percent,
+                secondary_percent,
+                has_error,
+                provider_tint,
+            } => render_stacked_bars_icon_rgba_tinted(
+                primary_percent,
+                secondary_percent,
+                has_error,
+                self.icon_pace,
+                provider_tint,
+            ),
             TrayIconPlan::Stacked {
                 top_percent,
                 bottom_percent,
@@ -253,19 +274,25 @@ fn resolve_single_provider_icon_plan(
     has_error: bool,
     provider_tint: Option<ProviderRgb>,
 ) -> TrayIconPlan {
-    if settings.menu_bar_icon_style == codexbar::settings::MenuBarIconStyle::Percent {
-        TrayIconPlan::Percent {
+    use codexbar::settings::MenuBarIconStyle;
+    match settings.menu_bar_icon_style {
+        MenuBarIconStyle::Percent => TrayIconPlan::Percent {
             percent: primary_percent,
             has_error,
             provider_tint,
-        }
-    } else {
-        TrayIconPlan::Bars {
+        },
+        MenuBarIconStyle::StackedBars => TrayIconPlan::StackedBars {
             primary_percent,
             secondary_percent,
             has_error,
             provider_tint,
-        }
+        },
+        MenuBarIconStyle::Bars => TrayIconPlan::Bars {
+            primary_percent,
+            secondary_percent,
+            has_error,
+            provider_tint,
+        },
     }
 }
 

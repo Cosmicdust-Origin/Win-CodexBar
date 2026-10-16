@@ -1560,6 +1560,7 @@ MenuBarIconStyleLabel = 選單欄樣式
 MenuBarIconStyleHelper = 系統匣圖示的繪製方式。
 MenuBarIconStyleBars = 計量條
 MenuBarIconStylePercent = 圖示與百分比
+MenuBarIconStyleStackedBars = 進度條堆疊
 CombinedIconSectionTitle = 合併圖示
 CombinedIconStyleLabel = 合併圖示樣式
 CombinedIconStyleSwitcher = 切換器

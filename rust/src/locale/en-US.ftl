@@ -1562,6 +1562,7 @@ MenuBarIconStyleLabel = Menu bar style
 MenuBarIconStyleHelper = How the tray icon is drawn.
 MenuBarIconStyleBars = Meter bars
 MenuBarIconStylePercent = Icon & percent
+MenuBarIconStyleStackedBars = Progress bars stacked
 CombinedIconSectionTitle = Combined icon
 CombinedIconStyleLabel = Combined icon style
 CombinedIconStyleSwitcher = Switcher
