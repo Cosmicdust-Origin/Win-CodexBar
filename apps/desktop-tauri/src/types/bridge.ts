@@ -694,6 +694,37 @@ export interface CodexWorkspacesDailyPoint {
   estimatedCostUsd: number | null;
 }
 
+/** Turns that share one model and reasoning effort (upstream #4304). */
+export interface CodexWorkspacesTurnPerformanceGroup {
+  model: string | null;
+  reasoningEffort: string | null;
+  sampleCount: number;
+  firstTokenSampleCount: number;
+  medianFirstTokenMilliseconds: number | null;
+  medianDurationMilliseconds: number;
+  outputTokensPerSecond: number;
+}
+
+export interface CodexWorkspacesTurnPerformanceDetails {
+  p95DurationMilliseconds: number | null;
+  p95FirstTokenMilliseconds: number | null;
+  outputRateLowerQuartile: number | null;
+  outputRateUpperQuartile: number | null;
+  cachedInputFraction: number | null;
+  cacheSampleCount: number;
+  groups: CodexWorkspacesTurnPerformanceGroup[];
+}
+
+/** Native Codex turn latency and throughput for one conversation. */
+export interface CodexWorkspacesTurnPerformance {
+  sampleCount: number;
+  outputTokensPerSecond: number;
+  medianDurationMilliseconds: number;
+  medianFirstTokenMilliseconds: number | null;
+  firstTokenSampleCount: number;
+  details: CodexWorkspacesTurnPerformanceDetails;
+}
+
 export interface CodexWorkspacesSessionUsage {
   id: string;
   projectId: string;
@@ -704,6 +735,7 @@ export interface CodexWorkspacesSessionUsage {
   totals: CodexWorkspacesUsageTotals;
   costEstimate: CodexWorkspacesCostEstimate;
   topModel: string | null;
+  turnPerformance: CodexWorkspacesTurnPerformance | null;
 }
 
 export interface CodexWorkspacesProjectUsage {
