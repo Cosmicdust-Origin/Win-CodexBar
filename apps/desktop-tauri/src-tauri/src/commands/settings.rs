@@ -89,9 +89,11 @@ pub struct SettingsUpdate {
     pub codex_local_session_cost_ledger_enabled: Option<bool>,
     pub codex_openai_web_battery_saver_enabled: Option<bool>,
     /// OpenAI API: fetch the last hour of Tokens/min on each refresh (upstream #4495).
+    #[serde(rename = "openAiLiveUsageEnabled")]
     pub openai_live_usage_enabled: Option<bool>,
     /// OpenAI API: manual per-model organization limits; replaces the stored list, and an
     /// empty list clears it.
+    #[serde(rename = "openAiModelRateLimits")]
     pub openai_model_rate_limits: Option<Vec<ModelRateLimitSnapshot>>,
     pub disable_keychain_access: Option<bool>,
     /// Map of provider CLI name → metric preference label.

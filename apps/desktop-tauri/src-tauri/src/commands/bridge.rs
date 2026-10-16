@@ -1062,8 +1062,10 @@ pub struct SettingsSnapshot {
     codex_local_session_cost_ledger_enabled: bool,
     codex_openai_web_battery_saver_enabled: bool,
     /// OpenAI API Live Usage (upstream #4495): fetch Tokens/min on each refresh.
+    #[serde(rename = "openAiLiveUsageEnabled")]
     openai_live_usage_enabled: bool,
     /// Manual per-model organization limits, read by the card's limit line and the editor.
+    #[serde(rename = "openAiModelRateLimits")]
     openai_model_rate_limits: Vec<ModelRateLimitSnapshot>,
     disable_keychain_access: bool,
     wayfinder_gateway_url: String,

@@ -134,6 +134,24 @@ fn saving_limits_and_the_live_switch_round_trips_through_settings() {
 }
 
 #[test]
+fn live_usage_fields_use_the_frontend_wire_names() {
+    let update: SettingsUpdate = serde_json::from_value(serde_json::json!({
+        "openAiLiveUsageEnabled": false,
+        "openAiModelRateLimits": [{ "model": "gpt-5", "tokensPerMinute": 1000 }],
+    }))
+    .unwrap();
+    assert_eq!(update.openai_live_usage_enabled, Some(false));
+    assert_eq!(
+        update.openai_model_rate_limits.as_ref().map(Vec::len),
+        Some(1)
+    );
+
+    let snapshot = serde_json::to_value(SettingsSnapshot::from(Settings::default())).unwrap();
+    assert_eq!(snapshot["openAiLiveUsageEnabled"], serde_json::json!(true));
+    assert!(snapshot["openAiModelRateLimits"].is_array());
+}
+
+#[test]
 fn live_usage_defaults_on_and_is_not_offered_for_other_providers() {
     let settings = Settings::default();
     assert!(settings.live_usage_enabled(ProviderId::OpenAIApi));
