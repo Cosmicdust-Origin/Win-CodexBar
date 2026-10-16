@@ -301,6 +301,62 @@ fn providers_sorted_alphabetically_defaults_off_and_round_trips() {
 }
 
 #[test]
+fn providers_enabled_only_defaults_off_and_round_trips() {
+    assert!(!Settings::default().providers_enabled_only);
+
+    let legacy: Settings = serde_json::from_str(r#"{ "enabled_providers": [] }"#)
+        .expect("legacy file without the sidebar enabled-only key");
+    assert!(!legacy.providers_enabled_only);
+
+    let filtered = Settings {
+        providers_enabled_only: true,
+        ..Settings::default()
+    };
+    let json = serde_json::to_string(&filtered).expect("serialize enabled-only filter");
+    assert!(json.contains(r#""providers_enabled_only":true"#));
+
+    let loaded: Settings = serde_json::from_str(&json).expect("deserialize enabled-only filter");
+    assert!(loaded.providers_enabled_only);
+}
+
+#[test]
+fn merge_visible_provider_order_keeps_hidden_slots_in_place() {
+    let full: Vec<String> = ["codex", "kimik2", "claude", "gemini"]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+    let visible: Vec<String> = ["gemini", "codex", "claude"]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+
+    // kimik2 is hidden from the sidebar; it keeps index 1.
+    assert_eq!(
+        merge_visible_provider_order(&full, &visible),
+        Some(
+            ["gemini", "kimik2", "codex", "claude"]
+                .into_iter()
+                .map(str::to_string)
+                .collect()
+        )
+    );
+}
+
+#[test]
+fn merge_visible_provider_order_rejects_unknown_or_repeated_ids() {
+    let full: Vec<String> = ["codex", "claude"]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+    let unknown: Vec<String> = ["codex", "nope"].into_iter().map(str::to_string).collect();
+    let repeated: Vec<String> = ["codex", "codex"].into_iter().map(str::to_string).collect();
+
+    assert_eq!(merge_visible_provider_order(&full, &unknown), None);
+    assert_eq!(merge_visible_provider_order(&full, &repeated), None);
+    assert_eq!(merge_visible_provider_order(&full, &[]), Some(full.clone()));
+}
+
+#[test]
 fn cost_reporting_period_defaults_to_thirty_days_and_round_trips() {
     let defaulted: Settings = serde_json::from_str(r#"{ "enabled_providers": [] }"#)
         .expect("missing cost_reporting_period defaults");

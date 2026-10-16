@@ -187,6 +187,8 @@ pub const EXCLUDED_KEYS: &[&str] = &[
     "weekly_progress_work_days",
     "alibaba_token_plan_region",
     "cost_summary_display_style",
+    // Settings sidebar view filter: local to this machine, as upstream keeps it.
+    "providers_enabled_only",
     // Kept out of the portable set, as upstream (0.70.0) keeps them.
     "menu_bar_color_pace",
     "menu_bar_pace_reserve_positive",

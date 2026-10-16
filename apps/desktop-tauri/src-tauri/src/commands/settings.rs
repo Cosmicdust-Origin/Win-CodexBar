@@ -47,6 +47,7 @@ pub struct SettingsUpdate {
     pub menu_bar_color_by_provider: Option<bool>,
     pub menu_bar_pace_reserve_positive: Option<bool>,
     pub providers_sorted_alphabetically: Option<bool>,
+    pub providers_enabled_only: Option<bool>,
     pub show_as_used: Option<bool>,
     pub show_all_token_accounts_in_menu: Option<bool>,
     pub enable_animations: Option<bool>,
@@ -405,6 +406,9 @@ impl SettingsUpdate {
         }
         if let Some(v) = self.providers_sorted_alphabetically {
             settings.providers_sorted_alphabetically = v;
+        }
+        if let Some(v) = self.providers_enabled_only {
+            settings.providers_enabled_only = v;
         }
         if let Some(v) = self.show_all_token_accounts_in_menu {
             settings.show_all_token_accounts_in_menu = v;

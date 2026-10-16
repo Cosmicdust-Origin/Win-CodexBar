@@ -93,6 +93,16 @@ export function reorderProviders(ids: string[]): Promise<ProviderSummary[]> {
   return invoke<ProviderSummary[]>("reorder_providers", { ids });
 }
 
+/** Settings sidebar reorder: `ids` is the full listed order; hidden providers keep their slots. */
+export function reorderVisibleProviders(ids: string[]): Promise<ProviderSummary[]> {
+  return invoke<ProviderSummary[]>("reorder_visible_providers", { ids });
+}
+
+/** Restore the built-in order for the providers the Settings sidebar lists. */
+export function restoreDefaultProviderOrder(): Promise<ProviderSummary[]> {
+  return invoke<ProviderSummary[]>("restore_default_provider_order");
+}
+
 export function getSettingsSnapshot(): Promise<SettingsSnapshot> {
   return invoke<SettingsSnapshot>("get_settings_snapshot");
 }

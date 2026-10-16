@@ -174,6 +174,8 @@ export interface ProviderCatalogEntry {
   id: string;
   displayName: string;
   cookieDomain: string | null;
+  /** CLI aliases the Settings search also matches. Absent on older shells. */
+  cliAliases?: string[];
 }
 
 /** Upstream `ProviderStatusIndicator` raw values; `none` is operational. */
@@ -256,6 +258,8 @@ export interface SettingsSnapshot {
   menuBarPaceReservePositive: boolean;
   /** Settings sidebar lists providers alphabetically, enabled first. Display only. */
   providersSortedAlphabetically: boolean;
+  /** Settings sidebar lists only enabled providers. Local, not portable. Absent on older shells: off. */
+  providersEnabledOnly?: boolean;
   showAsUsed: boolean;
   showAllTokenAccountsInMenu: boolean;
   enableAnimations: boolean;
@@ -415,6 +419,7 @@ export interface SettingsUpdate {
   menuBarColorByProvider?: boolean;
   menuBarPaceReservePositive?: boolean;
   providersSortedAlphabetically?: boolean;
+  providersEnabledOnly?: boolean;
   showAsUsed?: boolean;
   showAllTokenAccountsInMenu?: boolean;
   enableAnimations?: boolean;
