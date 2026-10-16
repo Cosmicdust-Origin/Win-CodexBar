@@ -1554,6 +1554,7 @@ MenuBarIconStyleLabel = Menü çubuğu stili
 MenuBarIconStyleHelper = Tepsi simgesinin nasıl çizileceği.
 MenuBarIconStyleBars = Ölçüm çubukları
 MenuBarIconStylePercent = Simge ve yüzde
+MenuBarIconStyleStackedBars = İstiflenmiş ilerleme çubukları
 CombinedIconSectionTitle = Birleşik simge
 CombinedIconStyleLabel = Birleşik simge stili
 CombinedIconStyleSwitcher = Değiştirici

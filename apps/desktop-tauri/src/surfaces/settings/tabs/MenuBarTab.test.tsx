@@ -99,6 +99,24 @@ describe("MenuBarTab Icon section", () => {
     expect(set).toHaveBeenCalledWith({ menuBarIconStyle: "percent" });
   });
 
+  it("offers Progress bars stacked after the other menu bar styles and saves it", () => {
+    const { set } = renderTab();
+    const options = Array.from(select("MenuBarIconStyleLabel").options).map((o) => [o.value, o.textContent]);
+    expect(options).toEqual([
+      ["bars", "MenuBarIconStyleBars"],
+      ["percent", "MenuBarIconStylePercent"],
+      ["stackedBars", "MenuBarIconStyleStackedBars"],
+    ]);
+    fireEvent.change(select("MenuBarIconStyleLabel"), { target: { value: "stackedBars" } });
+    expect(set).toHaveBeenCalledWith({ menuBarIconStyle: "stackedBars" });
+  });
+
+  it("shows a saved Progress bars stacked style", () => {
+    renderTab({ menuBarIconStyle: "stackedBars" });
+    expect(select("MenuBarIconStyleLabel").value).toBe("stackedBars");
+    expect(select("MenuBarIconStyleLabel").disabled).toBe(false);
+  });
+
   it("disables the Menu bar style while the icon is stacked", () => {
     renderTab({ trayIconMode: "stacked" });
     expect(select("MenuBarIconStyleLabel").disabled).toBe(true);

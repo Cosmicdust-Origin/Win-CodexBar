@@ -1554,6 +1554,7 @@ MenuBarIconStyleLabel = 菜单栏样式
 MenuBarIconStyleHelper = 托盘图标的绘制方式。
 MenuBarIconStyleBars = 计量条
 MenuBarIconStylePercent = 图标和百分比
+MenuBarIconStyleStackedBars = 进度条堆叠
 CombinedIconSectionTitle = 合并图标
 CombinedIconStyleLabel = 合并图标样式
 CombinedIconStyleSwitcher = 切换器
