@@ -1564,6 +1564,7 @@ MenuBarIconStyleLabel = Estilo da barra de menus
 MenuBarIconStyleHelper = Como o ícone da bandeja é desenhado.
 MenuBarIconStyleBars = Barras de medidor
 MenuBarIconStylePercent = Ícone e porcentagem
+MenuBarIconStyleStackedBars = Barras de progresso empilhadas
 CombinedIconSectionTitle = Ícone combinado
 CombinedIconStyleLabel = Estilo do ícone combinado
 CombinedIconStyleSwitcher = Alternador

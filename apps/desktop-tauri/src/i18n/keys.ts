@@ -1603,6 +1603,7 @@ export const ALL_LOCALE_KEYS = [
   "MenuBarIconStyleHelper",
   "MenuBarIconStyleBars",
   "MenuBarIconStylePercent",
+  "MenuBarIconStyleStackedBars",
   "CombinedIconSectionTitle",
   "CombinedIconStyleLabel",
   "CombinedIconStyleSwitcher",
