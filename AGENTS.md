@@ -167,6 +167,17 @@ Then follow post-install instructions (permissions / accessibility as prompted).
 
 **Do not** treat Vitest/jsdom or `cargo test` alone as sufficient for tray icon, DWM, WebView2 theme, float bar z-order, or settings chrome. **Do not** open issues/PRs against trycua/cua unless the user explicitly asks; use it as tooling.
 
+### Off-machine proof (Cloudflare)
+
+Every Cloudflare runtime (Workers, Containers, Sandbox, Browser Rendering) is Linux. None can run the Tauri shell, WebView2, the tray, or DWM. Off-machine evidence supplements the CUA loop above; it never replaces it for tray, theme, float-bar, or window-chrome changes.
+
+- **What it can prove:** React surface layout, copy / i18n, rendered data, provider siloing, DOM and accessibility tree, and console errors (Browser Rendering's headless Chromium against a static frontend build); tray icon pixels from `codexbar::tray::{render_bar_icon_rgba, render_percent_icon_rgba}` exported without a desktop.
+- **Frontend adapter:** mock the bridge with `mockIPC(handler, { shouldMockEvents: true })` and `mockWindows` from `@tauri-apps/api/mocks` (ships with `@tauri-apps/api`; no new dependency). The handler answers by command name from fixtures whose shape matches that command's return type in `types/bridge.ts`; usage-snapshot fixtures use the `CODEXBAR_SEED_USAGE_JSON` shape. Keep the mock out of the production bundle.
+- **Fixtures only:** never upload real settings, cookies, tokens, account emails, or provider responses.
+- **Labeling:** mark these screenshots in PRs as "Chromium (Linux), mocked IPC". Fonts, scrollbars, and DPI differ from WebView2.
+- **Windows-only checks away from the dev machine:** use a Windows host (CircleCI `windows` orb or a disposable Windows VM) running the same rebuild → proof mode → CDP + CUA loop. Cloudflare may front that host (`cloudflared` tunnel behind Cloudflare Access) and store its artifacts, but the proof itself comes from Windows.
+- **Account safety:** the Cloudflare account is shared with unrelated projects, and no Win-CodexBar resources exist on it yet. Read-only `list` / `get` calls are fine. Do not reuse, redeploy, or bind into another project's Workers, Browser Rendering bindings, or containers. Creating, deploying, or editing any Cloudflare resource needs explicit user approval in the current turn; never delete Cloudflare resources. Keep Cloudflare tokens out of the repo, logs, and PR text.
+
 
 ## Commit & PR Guidelines
 
