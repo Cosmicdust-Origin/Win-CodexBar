@@ -284,6 +284,8 @@ fn main() {
             commands::get_spend_contract,
             commands::get_codex_workspaces_snapshot,
             commands::reorder_providers,
+            commands::reorder_visible_providers,
+            commands::restore_default_provider_order,
             commands::set_provider_cookie_source,
             commands::set_provider_usage_source,
             commands::set_provider_auto_resume_after_quota_reset,

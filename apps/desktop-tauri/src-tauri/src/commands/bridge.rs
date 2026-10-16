@@ -949,6 +949,8 @@ pub struct ProviderCatalogEntry {
     pub(crate) id: String,
     pub(crate) display_name: String,
     pub(crate) cookie_domain: Option<String>,
+    /// CLI aliases the Settings search also matches (see `ProviderId::cli_aliases`).
+    pub(crate) cli_aliases: Vec<String>,
 }
 
 /// One provider's service status for the sidebar dot and the tray panel.
@@ -1020,8 +1022,10 @@ pub struct SettingsSnapshot {
     highlight_menu_cards_on_hover: bool,
     workday_tick_style: codexbar::settings::WorkdayTickStyle,
     menu_bar_color_pace: bool,
+    menu_bar_color_by_provider: bool,
     menu_bar_pace_reserve_positive: bool,
     providers_sorted_alphabetically: bool,
+    providers_enabled_only: bool,
     show_as_used: bool,
     show_all_token_accounts_in_menu: bool,
     enable_animations: bool,
@@ -1201,8 +1205,10 @@ impl From<Settings> for SettingsSnapshot {
             highlight_menu_cards_on_hover: settings.highlight_menu_cards_on_hover,
             workday_tick_style: settings.workday_tick_style,
             menu_bar_color_pace: settings.menu_bar_color_pace,
+            menu_bar_color_by_provider: settings.menu_bar_color_by_provider,
             menu_bar_pace_reserve_positive: settings.menu_bar_pace_reserve_positive,
             providers_sorted_alphabetically: settings.providers_sorted_alphabetically,
+            providers_enabled_only: settings.providers_enabled_only,
             show_as_used: settings.show_as_used,
             show_all_token_accounts_in_menu: settings.show_all_token_accounts_in_menu,
             enable_animations: settings.enable_animations,
@@ -1300,6 +1306,11 @@ pub(crate) fn provider_catalog_for(settings: &Settings) -> Vec<ProviderCatalogEn
             id: provider.cli_name().to_string(),
             display_name: provider.display_name().to_string(),
             cookie_domain: provider.cookie_domain().map(ToString::to_string),
+            cli_aliases: provider
+                .cli_aliases()
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
         })
         .collect()
 }
