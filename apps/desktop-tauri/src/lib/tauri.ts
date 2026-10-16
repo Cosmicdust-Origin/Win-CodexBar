@@ -49,6 +49,8 @@ import type {
   CodexSwitchResult,
   DeepSeekPricingStatus,
   CurrencyRatesSnapshot,
+  OrgRateLimitsSnapshot,
+  ProviderThroughputSnapshot,
 } from "../types/bridge";
 
 export const claudeAccountsList = () => invoke<ClaudeAccount[]>("get_claude_accounts_state");
@@ -456,6 +458,16 @@ export function setProviderOptionalDetails(
   enabled: boolean,
 ): Promise<void> {
   return invoke<void>("set_provider_optional_details", { providerId, enabled });
+}
+
+/** On-demand Tokens/min window for OpenAI API Live Usage; 15, 60 or 360 minutes. */
+export function getOpenAiLiveUsage(windowMinutes: 15 | 60 | 360): Promise<ProviderThroughputSnapshot> {
+  return invoke<ProviderThroughputSnapshot>("get_openai_live_usage", { windowMinutes });
+}
+
+/** Organization project caps; the caller skips this when a project scope is saved. */
+export function getOpenAiOrgRateLimits(): Promise<OrgRateLimitsSnapshot> {
+  return invoke<OrgRateLimitsSnapshot>("get_openai_org_rate_limits");
 }
 
 export function setProviderAutoResumeAfterQuotaReset(
