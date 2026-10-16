@@ -479,10 +479,28 @@ impl OllamaProvider {
         None
     }
 
-    /// Parse account email from the page
+    /// Parse the account email from the settings page header (`id="header-email"`).
+    ///
+    /// Only that element is read, matching upstream CodexBar: a page-wide scan would
+    /// pick up unrelated addresses (footer/support links). A missing header yields no email.
     fn parse_account_email(&self, html: &str) -> Option<String> {
-        let re = Regex::new(r#"[\w.+-]+@[\w-]+\.[\w.-]+"#).ok()?;
-        re.find(html).map(|m| m.as_str().to_string())
+        // Walk start tags attribute by attribute: a quoted value is consumed whole, so text
+        // such as `data-x=' id="header-email"'` or `data-id="header-email"` cannot match.
+        let tag_re = Regex::new(
+            r#"<[A-Za-z][A-Za-z0-9:-]*((?:\s+[^\s=>/"']+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>"']+))?)*)\s*/?>([^<]*)"#,
+        )
+        .ok()?;
+        let attr_re =
+            Regex::new(r#"([^\s=>/"']+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+)))?"#).ok()?;
+        let raw = tag_re.captures_iter(html).find_map(|tag| {
+            let is_header = attr_re.captures_iter(tag.get(1)?.as_str()).any(|attr| {
+                let value = attr.get(2).or(attr.get(3)).or(attr.get(4));
+                attr[1].eq_ignore_ascii_case("id")
+                    && value.is_some_and(|v| v.as_str() == "header-email")
+            });
+            is_header.then(|| tag.get(2).map_or("", |m| m.as_str()).trim())
+        })?;
+        raw.contains('@').then(|| raw.to_string())
     }
 }
 
@@ -1240,6 +1258,76 @@ mod tests {
         assert_eq!(result.usage.login_method.as_deref(), Some("pro"));
         assert_eq!(
             result.usage.account_email.as_deref(),
+            Some("user@example.com")
+        );
+    }
+
+    #[test]
+    fn account_email_comes_from_header_not_unrelated_page_addresses() {
+        // A footer/support address that precedes the header must not be picked.
+        let provider = OllamaProvider::new();
+        let html = format!(
+            r#"<footer><a href="mailto:support@ollama.com">support@ollama.com</a></footer>
+            <h2 id="header-email">user@example.com</h2>{CREDIT_WALLET_FIXTURE}"#
+        );
+        assert_eq!(
+            provider.parse_account_email(&html).as_deref(),
+            Some("user@example.com")
+        );
+    }
+
+    #[test]
+    fn account_email_is_absent_without_header_even_if_page_has_addresses() {
+        // No header-email element: no account email, and no page-wide fallback to the footer address.
+        let provider = OllamaProvider::new();
+        let html = format!(
+            r#"{CREDIT_WALLET_FIXTURE}<footer><a href="mailto:support@ollama.com">support@ollama.com</a></footer>"#
+        );
+        assert_eq!(provider.parse_account_email(&html), None);
+
+        let result = provider
+            .parse_usage_result(&html)
+            .expect("wallet page without a header still parses");
+        assert_eq!(result.usage.account_email, None);
+        assert_eq!(result.usage.login_method.as_deref(), Some("pro"));
+    }
+
+    #[test]
+    fn account_email_header_without_at_sign_is_ignored() {
+        let provider = OllamaProvider::new();
+        assert_eq!(
+            provider.parse_account_email(r#"<h2 id="header-email">  Signed in  </h2>"#),
+            None
+        );
+    }
+
+    #[test]
+    fn account_email_ignores_data_id_lookalike() {
+        let provider = OllamaProvider::new();
+        assert_eq!(
+            provider.parse_account_email(
+                r#"<span data-id="header-email">other@example.com</span><h2 id="header-email">user@example.com</h2>"#
+            )
+            .as_deref(),
+            Some("user@example.com")
+        );
+        assert_eq!(
+            provider
+                .parse_account_email(r#"<span data-id="header-email">other@example.com</span>"#),
+            None
+        );
+        assert_eq!(
+            provider.parse_account_email(
+                r#"<span data-x=' id="header-email"'>other@example.com</span>"#
+            ),
+            None
+        );
+        assert_eq!(
+            provider
+                .parse_account_email(
+                    r#"<span data-x=' id="header-email"'>other@example.com</span><h2 class="a" id='header-email'>user@example.com</h2>"#
+                )
+                .as_deref(),
             Some("user@example.com")
         );
     }
