@@ -97,6 +97,11 @@ export function OpenAiExtras({ providerId = "openaiapi", t }: Props) {
   return null;
 }
 
+/** Providers that show a workspace, organization or base-URL field next to their key. */
+export function hasWorkspaceExtra(providerId: string): boolean {
+  return WORKSPACE_EXTRA_IDS[providerId] === true;
+}
+
 const WORKSPACE_EXTRA_IDS: Record<string, true> = {
   openaiapi: true,
   litellm: true,
