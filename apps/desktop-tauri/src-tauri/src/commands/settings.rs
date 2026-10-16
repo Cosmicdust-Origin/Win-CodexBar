@@ -1179,6 +1179,17 @@ mod tests {
             codexbar::settings::MenuBarIconStyle::Bars
         );
         assert!(!settings.menu_bar_shows_percent);
+
+        // Progress bars stacked is not the percent style, so the legacy flag stays off.
+        let update: SettingsUpdate =
+            serde_json::from_str(r#"{"menuBarIconStyle":"stackedBars"}"#).unwrap();
+        assert!(update.refreshes_tray_presentation());
+        update.apply_display_settings(&mut settings);
+        assert_eq!(
+            settings.menu_bar_icon_style,
+            codexbar::settings::MenuBarIconStyle::StackedBars
+        );
+        assert!(!settings.menu_bar_shows_percent);
     }
 
     #[test]

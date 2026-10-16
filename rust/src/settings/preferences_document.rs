@@ -92,7 +92,9 @@ const ALLOWED_PREFERENCES: &[(&str, Validator)] = &[
     ("hide_personal_info", typed::<bool>),
     ("menu_bar_shows_highest_usage", typed::<bool>),
     ("menu_bar_shows_percent", typed::<bool>),
-    ("menu_bar_icon_style", |v| one_of(v, &["bars", "percent"])),
+    ("menu_bar_icon_style", |v| {
+        one_of(v, &["bars", "percent", "stackedBars"])
+    }),
     (
         "merged_overview_selected_providers",
         merged_overview_selection,

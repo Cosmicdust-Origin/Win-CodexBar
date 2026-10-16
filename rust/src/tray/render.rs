@@ -159,6 +159,28 @@ pub fn render_stacked_bar_icon_rgba(
     (image.into_raw(), TRAY_ICON_SIZE, TRAY_ICON_SIZE)
 }
 
+/// Render the session and weekly meters of one provider as two equal-height
+/// rows (upstream "Progress bars stacked", #4436), with the same optional pace
+/// tint as [`render_bar_icon_rgba_with_pace`].
+///
+/// With no weekly window the output is exactly the single thick bar from
+/// [`render_bar_icon_rgba_with_pace`], so a provider with one window looks the
+/// same under either bar style.
+pub fn render_stacked_bars_icon_rgba_with_pace(
+    session_percent: f64,
+    weekly_percent: Option<f64>,
+    has_error: bool,
+    pace_color: Option<TrayPaceColor>,
+) -> (Vec<u8>, u32, u32) {
+    let Some(weekly) = weekly_percent else {
+        return render_bar_icon_rgba_with_pace(session_percent, None, has_error, pace_color);
+    };
+    let mut image = new_icon_canvas(has_error);
+    draw_bar_row(&mut image, 6, 14, session_percent, has_error, pace_color);
+    draw_bar_row(&mut image, 18, 26, weekly, has_error, pace_color);
+    (image.into_raw(), TRAY_ICON_SIZE, TRAY_ICON_SIZE)
+}
+
 /// Render a compact numeric percent tray icon as raw RGBA bytes.
 pub fn render_percent_icon_rgba(percent: f64, has_error: bool) -> (Vec<u8>, u32, u32) {
     render_percent_icon_rgba_with_pace(percent, has_error, None)
@@ -416,5 +438,107 @@ mod tests {
 
         assert_eq!(pixel(&normal, 8, 12), pixel(&stacked, 8, 8));
         assert_eq!(pixel(&normal, 8, 12)[0], pixel(&normal, 8, 12)[1]);
+    }
+
+    fn pixel_at(rgba: &[u8], x: u32, y: u32) -> [u8; 4] {
+        let index = ((y * TRAY_ICON_SIZE + x) * 4) as usize;
+        [
+            rgba[index],
+            rgba[index + 1],
+            rgba[index + 2],
+            rgba[index + 3],
+        ]
+    }
+
+    /// Rows in `rows` whose pixel at column `x` is part of a bar (track or fill),
+    /// i.e. not the icon background gap.
+    fn painted_rows(rgba: &[u8], x: u32, rows: std::ops::Range<u32>) -> Vec<u32> {
+        rows.filter(|&y| pixel_at(rgba, x, y) != [60, 60, 70, 255])
+            .collect()
+    }
+
+    /// Horizontal extent `(first_x, end_x)` of usage-coloured pixels (neither the
+    /// track nor the background) across `rows`, or `None` when nothing is filled.
+    fn filled_span(rgba: &[u8], rows: std::ops::Range<u32>) -> Option<(u32, u32)> {
+        let mut span: Option<(u32, u32)> = None;
+        for y in rows {
+            for x in BAR_LEFT..BAR_RIGHT {
+                let px = pixel_at(rgba, x, y);
+                if px != [80, 80, 90, 255] && px != [60, 60, 70, 255] {
+                    span = Some(match span {
+                        None => (x, x + 1),
+                        Some((first, end)) => (first.min(x), end.max(x + 1)),
+                    });
+                }
+            }
+        }
+        span
+    }
+
+    #[test]
+    fn stacked_bars_draws_two_equal_height_rows() {
+        let (rgba, width, height) =
+            render_stacked_bars_icon_rgba_with_pace(100.0, Some(0.0), false, None);
+        assert_eq!((width, height), (TRAY_ICON_SIZE, TRAY_ICON_SIZE));
+
+        let (r, g, b) = UsageLevel::Critical.color();
+        // Session row is filled to the end; weekly row is empty track.
+        assert_eq!(pixel_at(&rgba, 8, 8), [r, g, b, 255]);
+        assert_eq!(pixel_at(&rgba, 8, 20), [80, 80, 90, 255]);
+        // Gap between the rows keeps the icon background.
+        assert_eq!(pixel_at(&rgba, 8, 15), [60, 60, 70, 255]);
+
+        // Both rows are painted over the same 8-pixel height, separated by a 4-pixel gap.
+        let top: Vec<u32> = (6..14).collect();
+        let bottom: Vec<u32> = (18..26).collect();
+        // Rows 2..30 are the inset canvas; the outer border is transparent.
+        assert_eq!(
+            painted_rows(&rgba, 20, 2..30),
+            [top.clone(), bottom.clone()].concat()
+        );
+        assert_eq!(top.len(), bottom.len());
+    }
+
+    #[test]
+    fn stacked_bars_fill_widths_follow_each_window() {
+        let (rgba, _, _) = render_stacked_bars_icon_rgba_with_pace(50.0, Some(100.0), false, None);
+        // Session at 50% fills half of the 24-px track (x 4..16); weekly fills all of it.
+        assert_eq!(filled_span(&rgba, 6..14), Some((BAR_LEFT, BAR_LEFT + 12)));
+        assert_eq!(filled_span(&rgba, 18..26), Some((BAR_LEFT, BAR_RIGHT)));
+        // Nothing fills the gap between the rows.
+        assert_eq!(filled_span(&rgba, 14..18), None);
+    }
+
+    #[test]
+    fn stacked_bars_without_weekly_matches_single_bars_fallback() {
+        let (stacked, _, _) = render_stacked_bars_icon_rgba_with_pace(42.0, None, false, None);
+        let (bars, _, _) = render_bar_icon_rgba_with_pace(42.0, None, false, None);
+        assert_eq!(stacked, bars);
+
+        let (stacked_err, _, _) = render_stacked_bars_icon_rgba_with_pace(42.0, None, true, None);
+        let (bars_err, _, _) = render_bar_icon_rgba_with_pace(42.0, None, true, None);
+        assert_eq!(stacked_err, bars_err);
+    }
+
+    #[test]
+    fn stacked_bars_applies_pace_tint_to_both_rows() {
+        let (rgba, _, _) = render_stacked_bars_icon_rgba_with_pace(
+            100.0,
+            Some(100.0),
+            false,
+            Some(TrayPaceColor::Behind),
+        );
+        assert_eq!(pixel_at(&rgba, 8, 8), [76, 175, 80, 255]);
+        assert_eq!(pixel_at(&rgba, 8, 20), [76, 175, 80, 255]);
+    }
+
+    #[test]
+    fn stacked_bars_error_state_desaturates_both_rows() {
+        let (rgba, _, _) = render_stacked_bars_icon_rgba_with_pace(100.0, Some(100.0), true, None);
+        for (x, y) in [(8, 8), (8, 20)] {
+            let px = pixel_at(&rgba, x, y);
+            assert_eq!(px[0], px[1]);
+            assert_eq!(px[1], px[2]);
+        }
     }
 }

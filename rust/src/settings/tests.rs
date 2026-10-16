@@ -2080,7 +2080,11 @@ fn stored_menu_bar_icon_style_wins_over_the_legacy_flag() {
 
 #[test]
 fn menu_bar_icon_style_round_trips() {
-    for style in [MenuBarIconStyle::Bars, MenuBarIconStyle::Percent] {
+    for style in [
+        MenuBarIconStyle::Bars,
+        MenuBarIconStyle::Percent,
+        MenuBarIconStyle::StackedBars,
+    ] {
         let settings = Settings {
             menu_bar_icon_style: style,
             // The legacy flag disagrees on purpose: the stored key must win.
@@ -2092,6 +2096,37 @@ fn menu_bar_icon_style_round_trips() {
         let loaded: Settings = serde_json::from_str(&json).expect("deserialize icon style");
         assert_eq!(loaded.menu_bar_icon_style, style);
     }
+}
+
+#[test]
+fn stacked_bars_icon_style_loads_from_a_settings_file() {
+    assert_eq!(
+        MenuBarIconStyle::StackedBars.as_str(),
+        "stackedBars",
+        "the id is the camelCase string the bridge and the file both use"
+    );
+    assert_eq!(
+        MenuBarIconStyle::parse("stackedBars"),
+        Some(MenuBarIconStyle::StackedBars)
+    );
+    assert_eq!(
+        MenuBarIconStyle::parse("STACKEDBARS"),
+        Some(MenuBarIconStyle::StackedBars)
+    );
+    assert_eq!(MenuBarIconStyle::parse("stacked_bars"), None);
+
+    let stored: Settings = serde_json::from_str(
+        r#"{ "enabled_providers": [], "menu_bar_shows_percent": false, "menu_bar_icon_style": "stackedBars" }"#,
+    )
+    .expect("stackedBars file loads");
+    assert_eq!(stored.menu_bar_icon_style, MenuBarIconStyle::StackedBars);
+
+    // Unknown ids keep the legacy fallback, so a bad value never breaks the file.
+    let unknown: Settings = serde_json::from_str(
+        r#"{ "enabled_providers": [], "menu_bar_shows_percent": false, "menu_bar_icon_style": "stacked_bars" }"#,
+    )
+    .expect("unknown style still loads");
+    assert_eq!(unknown.menu_bar_icon_style, MenuBarIconStyle::Bars);
 }
 
 #[test]

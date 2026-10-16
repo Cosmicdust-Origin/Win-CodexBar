@@ -6,12 +6,18 @@ use codexbar::core::{IconLane, ProviderId, UsagePace};
 use codexbar::settings::{Language, MetricPreference, Settings, TrayIconMode};
 use codexbar::tray::{
     TrayPaceColor, render_bar_icon_rgba_with_pace, render_percent_icon_rgba_with_pace,
-    render_stacked_bar_icon_rgba,
+    render_stacked_bar_icon_rgba, render_stacked_bars_icon_rgba_with_pace,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum TrayIconPlan {
     Bars {
+        primary_percent: f64,
+        secondary_percent: Option<f64>,
+        has_error: bool,
+    },
+    /// The same session and weekly windows as `Bars`, drawn as equal rows.
+    StackedBars {
         primary_percent: f64,
         secondary_percent: Option<f64>,
         has_error: bool,
@@ -157,7 +163,9 @@ impl<'a> TrayPresentationPlan<'a> {
 
         let icon_pace = match icon {
             TrayIconPlan::Stacked { .. } => None,
-            TrayIconPlan::Bars { .. } | TrayIconPlan::Percent { .. } => icon_pace,
+            TrayIconPlan::Bars { .. }
+            | TrayIconPlan::StackedBars { .. }
+            | TrayIconPlan::Percent { .. } => icon_pace,
         };
 
         Self {
@@ -184,6 +192,16 @@ impl<'a> TrayPresentationPlan<'a> {
             TrayIconPlan::Percent { percent, has_error } => {
                 render_percent_icon_rgba_with_pace(percent, has_error, self.icon_pace)
             }
+            TrayIconPlan::StackedBars {
+                primary_percent,
+                secondary_percent,
+                has_error,
+            } => render_stacked_bars_icon_rgba_with_pace(
+                primary_percent,
+                secondary_percent,
+                has_error,
+                self.icon_pace,
+            ),
             TrayIconPlan::Stacked {
                 top_percent,
                 bottom_percent,
@@ -214,17 +232,22 @@ fn resolve_single_provider_icon_plan(
     secondary_percent: Option<f64>,
     has_error: bool,
 ) -> TrayIconPlan {
-    if settings.menu_bar_icon_style == codexbar::settings::MenuBarIconStyle::Percent {
-        TrayIconPlan::Percent {
+    use codexbar::settings::MenuBarIconStyle;
+    match settings.menu_bar_icon_style {
+        MenuBarIconStyle::Percent => TrayIconPlan::Percent {
             percent: primary_percent,
             has_error,
-        }
-    } else {
-        TrayIconPlan::Bars {
+        },
+        MenuBarIconStyle::StackedBars => TrayIconPlan::StackedBars {
             primary_percent,
             secondary_percent,
             has_error,
-        }
+        },
+        MenuBarIconStyle::Bars => TrayIconPlan::Bars {
+            primary_percent,
+            secondary_percent,
+            has_error,
+        },
     }
 }
 
