@@ -1,3 +1,6 @@
+mod openai_live;
+#[cfg(test)]
+mod openai_live_tests;
 mod openai_usage;
 #[cfg(test)]
 mod openai_usage_tests;
@@ -7,6 +10,7 @@ mod status;
 mod throughput;
 #[cfg(test)]
 mod throughput_tests;
+pub(crate) use openai_live::{ModelRateLimitSnapshot, OrgRateLimitsSnapshot};
 pub(crate) use openai_usage::OpenAiApiUsageSnapshot;
 pub use quota_block::MonthlyLimitBlockSnapshot;
 pub(crate) use status::{compact_tray_status_label, friendly_provider_error};
@@ -1057,6 +1061,10 @@ pub struct SettingsSnapshot {
     codex_external_oauth_sources_allowed: bool,
     codex_local_session_cost_ledger_enabled: bool,
     codex_openai_web_battery_saver_enabled: bool,
+    /// OpenAI API Live Usage (upstream #4495): fetch Tokens/min on each refresh.
+    openai_live_usage_enabled: bool,
+    /// Manual per-model organization limits, read by the card's limit line and the editor.
+    openai_model_rate_limits: Vec<ModelRateLimitSnapshot>,
     disable_keychain_access: bool,
     wayfinder_gateway_url: String,
     provider_metrics: std::collections::HashMap<String, &'static str>,
@@ -1118,6 +1126,12 @@ impl From<Settings> for SettingsSnapshot {
         let claude_swap_enabled = settings.claude_swap_enabled();
         let claude_swap_executable_path = settings.claude_swap_executable_path().to_string();
         let codex_spark_usage_visible = settings.codex_spark_usage_visible();
+        let openai_live_usage_enabled = settings.live_usage_enabled(ProviderId::OpenAIApi);
+        let openai_model_rate_limits = settings
+            .model_rate_limits(ProviderId::OpenAIApi)
+            .iter()
+            .map(ModelRateLimitSnapshot::from)
+            .collect();
         let codex_openai_web_extras = settings.codex_openai_web_extras();
         let codex_historical_tracking = settings.codex_historical_tracking();
         let codex_local_session_cost_ledger_enabled =
@@ -1208,6 +1222,8 @@ impl From<Settings> for SettingsSnapshot {
             stay_awake_enabled: settings.stay_awake_enabled,
             agent_session_ssh_hosts: settings.agent_session_ssh_hosts,
             hooks_enabled: settings.hooks_enabled,
+            openai_live_usage_enabled,
+            openai_model_rate_limits,
             http_proxy_enabled: settings.http_proxy_enabled,
             http_proxy_url: settings.http_proxy_url,
             http_proxy_username: settings.http_proxy_username,

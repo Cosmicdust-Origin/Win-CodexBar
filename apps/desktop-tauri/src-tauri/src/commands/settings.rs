@@ -88,6 +88,11 @@ pub struct SettingsUpdate {
     pub codex_external_oauth_sources_allowed: Option<bool>,
     pub codex_local_session_cost_ledger_enabled: Option<bool>,
     pub codex_openai_web_battery_saver_enabled: Option<bool>,
+    /// OpenAI API: fetch the last hour of Tokens/min on each refresh (upstream #4495).
+    pub openai_live_usage_enabled: Option<bool>,
+    /// OpenAI API: manual per-model organization limits; replaces the stored list, and an
+    /// empty list clears it.
+    pub openai_model_rate_limits: Option<Vec<ModelRateLimitSnapshot>>,
     pub disable_keychain_access: Option<bool>,
     /// Map of provider CLI name → metric preference label.
     pub provider_metrics: Option<std::collections::HashMap<String, String>>,
@@ -130,6 +135,7 @@ impl SettingsUpdate {
         self.enabled_providers.is_some()
             || self.claude_allow_reading_claude_code_credentials.is_some()
             || self.codex_openai_web_extras.is_some()
+            || self.openai_live_usage_enabled.is_some()
             || self.codex_external_oauth_sources_allowed.is_some()
             || self.alibaba_token_plan_region.is_some()
             || self.copilot_seat_credit_entitlement.is_some()
@@ -218,6 +224,22 @@ impl SettingsUpdate {
         }
 
         Ok(())
+    }
+
+    /// OpenAI API Live Usage switches. Limits are validated strictly: a bad row is
+    /// reported and nothing is saved.
+    pub(super) fn apply_openai_live_settings(
+        self,
+        settings: &mut Settings,
+    ) -> Result<Self, String> {
+        if let Some(v) = self.openai_live_usage_enabled {
+            settings.set_live_usage_enabled(ProviderId::OpenAIApi, v);
+        }
+        if let Some(rows) = self.openai_model_rate_limits.as_deref() {
+            let limits = super::openai_live::validated_model_rate_limits(rows)?;
+            settings.set_model_rate_limits(ProviderId::OpenAIApi, limits);
+        }
+        Ok(self)
     }
 
     fn apply_provider_settings(self, settings: &mut Settings) -> Self {
@@ -609,7 +631,8 @@ impl SettingsUpdate {
             settings.set_seat_credit_entitlement(codexbar::core::ProviderId::Copilot, value)?;
         }
         let float_bar_patch = self.float_bar_patch();
-        self.apply_provider_settings(settings)
+        self.apply_openai_live_settings(settings)?
+            .apply_provider_settings(settings)
             .apply_general_settings(settings)?
             .apply_display_settings(settings)
             .apply_notification_settings(settings)?

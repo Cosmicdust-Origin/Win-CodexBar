@@ -288,6 +288,8 @@ fn main() {
             commands::set_provider_usage_source,
             commands::set_provider_auto_resume_after_quota_reset,
             commands::set_provider_optional_details,
+            commands::get_openai_live_usage,
+            commands::get_openai_org_rate_limits,
             commands::has_openrouter_management_api_key,
             commands::set_openrouter_management_api_key,
             commands::remove_openrouter_management_api_key,
