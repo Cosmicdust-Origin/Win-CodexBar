@@ -72,6 +72,7 @@ const settings: SettingsSnapshot = {
   quotaWarningMarkersVisible: true,
   workdayTickStyle: "subtle",
   menuBarColorPace: false,
+  menuBarColorByProvider: false,
   menuBarPaceReservePositive: false,
   providersSortedAlphabetically: false,
   showAsUsed: false,

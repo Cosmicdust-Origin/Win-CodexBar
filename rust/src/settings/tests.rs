@@ -245,6 +245,25 @@ fn tray_pace_color_defaults_off_and_round_trips() {
 }
 
 #[test]
+fn color_by_provider_defaults_off_and_round_trips() {
+    // Old settings files carry no key and must load with the toggle off.
+    let legacy: Settings = serde_json::from_str(r#"{ "enabled_providers": [] }"#)
+        .expect("legacy settings without color by provider load");
+    assert!(!legacy.menu_bar_color_by_provider);
+    assert!(!Settings::default().menu_bar_color_by_provider);
+
+    let enabled = Settings {
+        menu_bar_color_by_provider: true,
+        ..Settings::default()
+    };
+    let json = serde_json::to_string(&enabled).expect("serialize color by provider");
+    assert!(json.contains(r#""menu_bar_color_by_provider":true"#));
+
+    let loaded: Settings = serde_json::from_str(&json).expect("deserialize color by provider");
+    assert!(loaded.menu_bar_color_by_provider);
+}
+
+#[test]
 fn pace_reserve_positive_defaults_off_and_round_trips() {
     let defaulted: Settings = serde_json::from_str(r#"{ "enabled_providers": [] }"#)
         .expect("missing pace sign defaults to ahead-of-pace positive");

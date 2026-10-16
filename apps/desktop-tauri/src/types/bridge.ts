@@ -250,6 +250,8 @@ export interface SettingsSnapshot {
   highlightMenuCardsOnHover?: boolean;
   workdayTickStyle: WorkdayTickStyle;
   menuBarColorPace: boolean;
+  /** Tint the tray usage meter with each shown provider's accent color (`menu_bar_color_by_provider`). */
+  menuBarColorByProvider: boolean;
   /** Signed pace shows reserve as `+` (deficit as `-`) instead of the default deficit-positive sign. */
   menuBarPaceReservePositive: boolean;
   /** Settings sidebar lists providers alphabetically, enabled first. Display only. */
@@ -410,6 +412,7 @@ export interface SettingsUpdate {
   highlightMenuCardsOnHover?: boolean;
   workdayTickStyle?: WorkdayTickStyle;
   menuBarColorPace?: boolean;
+  menuBarColorByProvider?: boolean;
   menuBarPaceReservePositive?: boolean;
   providersSortedAlphabetically?: boolean;
   showAsUsed?: boolean;
