@@ -79,7 +79,7 @@ export type OverviewLayout = "detailed" | "compact";
 /** How cost is rendered on provider MenuCards (#2976). */
 export type CostSummaryDisplayStyle = "compact" | "detailed" | "hidden";
 /** Settings > Menu Bar > Menu bar style (`menu_bar_icon_style`). */
-export type MenuBarIconStyle = "bars" | "percent";
+export type MenuBarIconStyle = "bars" | "percent" | "stackedBars";
 /** Settings > Menu > Workday tick appearance (`workday_tick_style`). */
 export type WorkdayTickStyle = "hidden" | "subtle" | "high_contrast";
 export type FloatBarOrientation = "horizontal" | "vertical";
@@ -312,6 +312,10 @@ export interface SettingsSnapshot {
   codexExternalOauthSourcesAllowed?: boolean;
   codexLocalSessionCostLedgerEnabled?: boolean;
   codexOpenaiWebBatterySaverEnabled?: boolean;
+  /** OpenAI API Live Usage (on by default); absent on older shells. */
+  openAiLiveUsageEnabled?: boolean;
+  /** OpenAI API manual per-model organization limits. */
+  openAiModelRateLimits?: ModelRateLimitSnapshot[];
   disableKeychainAccess: boolean;
   wayfinderGatewayUrl?: string;
   providerMetrics: Record<string, MetricPreference>;
@@ -462,6 +466,10 @@ export interface SettingsUpdate {
   codexExternalOauthSourcesAllowed?: boolean;
   codexLocalSessionCostLedgerEnabled?: boolean;
   codexOpenaiWebBatterySaverEnabled?: boolean;
+  /** Fetch the last hour of OpenAI API Tokens/min on each refresh. */
+  openAiLiveUsageEnabled?: boolean;
+  /** Replaces the stored OpenAI API limit list; an empty list clears it. */
+  openAiModelRateLimits?: ModelRateLimitSnapshot[];
   disableKeychainAccess?: boolean;
   /** Map of provider CLI name → metric preference label. */
   providerMetrics?: Record<string, MetricPreference>;
@@ -1149,6 +1157,29 @@ export interface ProviderThroughputSnapshot {
   fetchedAt: number;
   /** Project scope; `null` covers the whole organization (only then can limits apply). */
   projectId: string | null;
+}
+
+/** Manual organization limit for one model (OpenAI API Live Usage, upstream #4495). */
+export interface ModelRateLimitSnapshot {
+  model: string;
+  tokensPerMinute: number;
+  /** `null` or absent means no requests-per-minute limit. */
+  requestsPerMinute?: number | null;
+}
+
+export interface OrgModelRateLimitSnapshot {
+  model: string;
+  tokensPerMinute: number;
+  requestsPerMinute: number | null;
+}
+
+/** Project caps read across the organization, sorted by model ID. */
+export interface OrgRateLimitsSnapshot {
+  byModel: OrgModelRateLimitSnapshot[];
+  projectsSampled: number;
+  truncated: boolean;
+  /** Epoch seconds. */
+  fetchedAt: number;
 }
 
 export interface RefreshCompletePayload {

@@ -5,6 +5,9 @@ import {
   setProviderWorkspaceId,
 } from "../../../../../lib/tauri";
 
+/** Fired on `window` after a workspace ID is saved; `detail` is the provider id. */
+export const PROVIDER_WORKSPACE_ID_SAVED_EVENT = "codexbar:provider-workspace-id-saved";
+
 interface Props {
   providerId?: string;
   t: (key: LocaleKey) => string;
@@ -47,6 +50,9 @@ export function OpenAiExtras({ providerId = "openaiapi", t }: Props) {
       const next = projectId.trim();
       await setProviderWorkspaceId(providerId, next);
       setSavedProjectId(next);
+      window.dispatchEvent(
+        new CustomEvent<string>(PROVIDER_WORKSPACE_ID_SAVED_EVENT, { detail: providerId }),
+      );
     } catch (e) {
       setError(String(e));
     } finally {
@@ -89,6 +95,11 @@ export function OpenAiExtras({ providerId = "openaiapi", t }: Props) {
   }
 
   return null;
+}
+
+/** Providers that show a workspace, organization or base-URL field next to their key. */
+export function hasWorkspaceExtra(providerId: string): boolean {
+  return WORKSPACE_EXTRA_IDS[providerId] === true;
 }
 
 const WORKSPACE_EXTRA_IDS: Record<string, true> = {

@@ -26,6 +26,7 @@ import DetailSections from "./card/DetailSections";
 import InlineDashboard from "./card/InlineDashboard";
 import ExtraUsageBlock from "./card/ExtraUsageBlock";
 import WayfinderBlock from "./card/WayfinderBlock";
+import { OpenAITokensPerMinuteChart } from "./OpenAITokensPerMinuteChart";
 import { describeCard } from "./card/describeCard";
 import { hideEmailsInText } from "../lib/personalInfo";
 
@@ -297,12 +298,16 @@ export default function MenuCard({
             />
           )}
           {presence.wayfinderUsage && <WayfinderBlock usage={presence.wayfinderUsage} />}
+          {presence.openAiThroughput && (
+            <OpenAITokensPerMinuteChart throughput={presence.openAiThroughput} t={t} />
+          )}
           {dashboard && <InlineDashboard model={dashboard} />}
           {showCost && provider.cost && (
             <>
               {(presence.hasMetrics ||
                 presence.planDateNote ||
                 showDetailSections ||
+                presence.openAiThroughput ||
                 dashboard) && (
                 <div className="menu-card__separator" />
               )}
