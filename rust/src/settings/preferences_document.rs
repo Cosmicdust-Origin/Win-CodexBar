@@ -95,6 +95,7 @@ const ALLOWED_PREFERENCES: &[(&str, Validator)] = &[
     ("menu_bar_icon_style", |v| {
         one_of(v, &["bars", "percent", "stackedBars"])
     }),
+    ("menu_bar_color_by_provider", typed::<bool>),
     (
         "merged_overview_selected_providers",
         merged_overview_selection,
@@ -188,6 +189,8 @@ pub const EXCLUDED_KEYS: &[&str] = &[
     "weekly_progress_work_days",
     "alibaba_token_plan_region",
     "cost_summary_display_style",
+    // Settings sidebar view filter: local to this machine, as upstream keeps it.
+    "providers_enabled_only",
     // Kept out of the portable set, as upstream (0.70.0) keeps them.
     "menu_bar_color_pace",
     "menu_bar_pace_reserve_positive",

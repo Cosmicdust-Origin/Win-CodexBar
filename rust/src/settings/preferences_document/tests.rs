@@ -49,6 +49,7 @@ fn customized_settings() -> Settings {
         menu_bar_shows_highest_usage: true,
         menu_bar_shows_percent: true,
         menu_bar_icon_style: crate::settings::MenuBarIconStyle::Percent,
+        menu_bar_color_by_provider: true,
         merged_overview_selected_providers: vec!["claude".to_string(), "codex".to_string()],
         quota_warning_markers_visible: false,
         workday_tick_style: crate::settings::WorkdayTickStyle::HighContrast,

@@ -34,6 +34,7 @@ const baseSettings = {
   menuBarShowsPercent: false,
   menuBarIconStyle: "bars",
   menuBarColorPace: false,
+  menuBarColorByProvider: false,
   promoteTrayIcon: false,
   mergedOverviewSelectedProviders: [],
 } as unknown as SettingsSnapshot;
@@ -63,6 +64,7 @@ describe("MenuBarTab layout", () => {
     expect(fieldLabels(screen.getByRole("region", { name: "MenuBarIconSectionTitle" }))).toEqual([
       "MenuBarIconStyleLabel",
       "ColorPaceInTray",
+      "ColorByProviderInTray",
       "PaceSignLabel",
       "PromoteTrayIconLabel",
     ]);
@@ -126,6 +128,22 @@ describe("MenuBarTab Icon section", () => {
     const { set } = renderTab();
     fireEvent.click(screen.getByRole("checkbox", { name: "ColorPaceInTray" }));
     expect(set).toHaveBeenCalledWith({ menuBarColorPace: true });
+  });
+
+  it("updates Color by provider and keeps it independent of the pace toggle", () => {
+    const { set } = renderTab();
+    const colorByProvider = screen.getByRole("checkbox", { name: "ColorByProviderInTray" }) as HTMLInputElement;
+    expect(colorByProvider.checked).toBe(false);
+    fireEvent.click(colorByProvider);
+    expect(set).toHaveBeenCalledWith({ menuBarColorByProvider: true });
+    expect(set).not.toHaveBeenCalledWith(expect.objectContaining({ menuBarColorPace: expect.anything() }));
+  });
+
+  it("shows a saved Color by provider as checked and not disabled by stacked icons", () => {
+    renderTab({ menuBarColorByProvider: true, trayIconMode: "stacked" });
+    const colorByProvider = screen.getByRole("checkbox", { name: "ColorByProviderInTray" }) as HTMLInputElement;
+    expect(colorByProvider.checked).toBe(true);
+    expect(colorByProvider.disabled).toBe(false);
   });
 
   it("saves the Pace sign with ahead-of-pace positive as the default", () => {

@@ -97,6 +97,14 @@ export default function MenuBarTab({
             onChange={(v) => set({ menuBarColorPace: v })}
           />
         </Field>
+        <Field label={t("ColorByProviderInTray")} description={t("ColorByProviderInTrayHelper")}>
+          <Toggle
+            variant="switch"
+            checked={settings.menuBarColorByProvider ?? false}
+            disabled={saving}
+            onChange={(v) => set({ menuBarColorByProvider: v })}
+          />
+        </Field>
         <Field label={t("PaceSignLabel")} description={t("PaceSignHelper")}>
           <Select
             variant="menu"

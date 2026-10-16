@@ -585,7 +585,8 @@
 }
 
 .settings-sidebar__search-clear svg,
-.settings-sidebar__sort svg {
+.settings-sidebar__sort svg,
+.settings-sidebar__filter svg {
   fill: none;
   stroke: currentColor;
   stroke-width: 1.6;
@@ -607,23 +608,43 @@
   cursor: pointer;
 }
 
+/* Options chevron: the sort button's look at a narrower width. */
+.settings-sidebar__filter {
+  width: 18px;
+  height: 28px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
 .settings-sidebar__search-clear:hover,
-.settings-sidebar__sort:hover:not(:disabled) {
+.settings-sidebar__sort:hover:not(:disabled),
+.settings-sidebar__filter:hover:not(:disabled),
+.settings-sidebar__filter[aria-expanded="true"] {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
 }
 
-.settings-sidebar__sort--on {
+.settings-sidebar__sort--on,
+.settings-sidebar__filter--on {
   color: var(--accent);
 }
 
-.settings-sidebar__sort:disabled {
+.settings-sidebar__sort:disabled,
+.settings-sidebar__filter:disabled {
   cursor: default;
   opacity: 0.5;
 }
 
 .settings-sidebar__search-clear:focus-visible,
 .settings-sidebar__sort:focus-visible,
+.settings-sidebar__filter:focus-visible,
 .settings-sidebar__pane:focus-visible,
 .providers-sidebar__row:focus-visible {
   outline: 2px solid var(--accent);
@@ -782,6 +803,9 @@
 }
 
 .providers-sidebar-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 8px;
   border: 0;
   border-radius: 4px;
@@ -791,6 +815,20 @@
   font-size: 13px;
   text-align: left;
   cursor: pointer;
+}
+
+/* Check column of a checkbox item; empty when unchecked so labels stay aligned. */
+.providers-sidebar-menu__check {
+  width: 12px;
+  flex-shrink: 0;
+  font-size: 11px;
+  text-align: center;
+}
+
+.providers-sidebar-menu__separator {
+  height: 1px;
+  margin: 4px 4px;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .providers-sidebar-menu__item:hover:not(:disabled),

@@ -245,6 +245,25 @@ fn tray_pace_color_defaults_off_and_round_trips() {
 }
 
 #[test]
+fn color_by_provider_defaults_off_and_round_trips() {
+    // Old settings files carry no key and must load with the toggle off.
+    let legacy: Settings = serde_json::from_str(r#"{ "enabled_providers": [] }"#)
+        .expect("legacy settings without color by provider load");
+    assert!(!legacy.menu_bar_color_by_provider);
+    assert!(!Settings::default().menu_bar_color_by_provider);
+
+    let enabled = Settings {
+        menu_bar_color_by_provider: true,
+        ..Settings::default()
+    };
+    let json = serde_json::to_string(&enabled).expect("serialize color by provider");
+    assert!(json.contains(r#""menu_bar_color_by_provider":true"#));
+
+    let loaded: Settings = serde_json::from_str(&json).expect("deserialize color by provider");
+    assert!(loaded.menu_bar_color_by_provider);
+}
+
+#[test]
 fn pace_reserve_positive_defaults_off_and_round_trips() {
     let defaulted: Settings = serde_json::from_str(r#"{ "enabled_providers": [] }"#)
         .expect("missing pace sign defaults to ahead-of-pace positive");
@@ -279,6 +298,62 @@ fn providers_sorted_alphabetically_defaults_off_and_round_trips() {
 
     let loaded: Settings = serde_json::from_str(&json).expect("deserialize sidebar sort");
     assert!(loaded.providers_sorted_alphabetically);
+}
+
+#[test]
+fn providers_enabled_only_defaults_off_and_round_trips() {
+    assert!(!Settings::default().providers_enabled_only);
+
+    let legacy: Settings = serde_json::from_str(r#"{ "enabled_providers": [] }"#)
+        .expect("legacy file without the sidebar enabled-only key");
+    assert!(!legacy.providers_enabled_only);
+
+    let filtered = Settings {
+        providers_enabled_only: true,
+        ..Settings::default()
+    };
+    let json = serde_json::to_string(&filtered).expect("serialize enabled-only filter");
+    assert!(json.contains(r#""providers_enabled_only":true"#));
+
+    let loaded: Settings = serde_json::from_str(&json).expect("deserialize enabled-only filter");
+    assert!(loaded.providers_enabled_only);
+}
+
+#[test]
+fn merge_visible_provider_order_keeps_hidden_slots_in_place() {
+    let full: Vec<String> = ["codex", "kimik2", "claude", "gemini"]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+    let visible: Vec<String> = ["gemini", "codex", "claude"]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+
+    // kimik2 is hidden from the sidebar; it keeps index 1.
+    assert_eq!(
+        merge_visible_provider_order(&full, &visible),
+        Some(
+            ["gemini", "kimik2", "codex", "claude"]
+                .into_iter()
+                .map(str::to_string)
+                .collect()
+        )
+    );
+}
+
+#[test]
+fn merge_visible_provider_order_rejects_unknown_or_repeated_ids() {
+    let full: Vec<String> = ["codex", "claude"]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+    let unknown: Vec<String> = ["codex", "nope"].into_iter().map(str::to_string).collect();
+    let repeated: Vec<String> = ["codex", "codex"].into_iter().map(str::to_string).collect();
+
+    assert_eq!(merge_visible_provider_order(&full, &unknown), None);
+    assert_eq!(merge_visible_provider_order(&full, &repeated), None);
+    assert_eq!(merge_visible_provider_order(&full, &[]), Some(full.clone()));
 }
 
 #[test]
