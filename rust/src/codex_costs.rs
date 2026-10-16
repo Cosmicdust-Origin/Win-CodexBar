@@ -4,7 +4,7 @@
 //! local-scan aggregation and pricing logic.
 
 mod host_costs;
-mod identified_requests;
+pub(crate) mod identified_requests;
 mod quota_windows;
 mod summary_contract;
 
