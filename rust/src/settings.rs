@@ -222,6 +222,11 @@ pub struct Settings {
     #[serde(default)]
     pub menu_bar_color_pace: bool,
 
+    /// Tint the Windows tray usage indicator with each shown provider's accent
+    /// color (upstream "Color by provider", #4321). Defaults off.
+    #[serde(default)]
+    pub menu_bar_color_by_provider: bool,
+
     /// Show reserve as `+` and deficit as `-` in signed pace text (upstream
     /// `menuBarPaceReservePositive`). Display only: the stored pace delta stays
     /// usage-ahead, so pace colours and stages keep their meaning.
@@ -232,6 +237,11 @@ pub struct Settings {
     /// instead of in `provider_order`. Display only; never rewrites the order.
     #[serde(default)]
     pub providers_sorted_alphabetically: bool,
+
+    /// Settings sidebar lists only enabled providers (upstream `providersEnabledOnly`).
+    /// Local browsing filter: not part of the portable preferences document.
+    #[serde(default)]
+    pub providers_enabled_only: bool,
 
     /// Show usage bars as "used" (true) or "remaining" (false)
     pub show_as_used: bool,
@@ -629,6 +639,33 @@ pub fn normalize_provider_order(requested: &[String]) -> Vec<String> {
     out
 }
 
+/// Replace only the slots held by `visible` inside `full`, so every other
+/// provider (for example a soft-removed one) keeps its position. Returns
+/// `None` unless `full` and `visible` have no repeats and every visible id is
+/// present in `full`.
+pub fn merge_visible_provider_order(full: &[String], visible: &[String]) -> Option<Vec<String>> {
+    let full_set: HashSet<&str> = full.iter().map(String::as_str).collect();
+    let visible_set: HashSet<&str> = visible.iter().map(String::as_str).collect();
+    if full_set.len() != full.len()
+        || visible_set.len() != visible.len()
+        || !visible_set.is_subset(&full_set)
+    {
+        return None;
+    }
+    let mut next = visible.iter();
+    Some(
+        full.iter()
+            .map(|id| {
+                if visible_set.contains(id.as_str()) {
+                    next.next().cloned().unwrap_or_else(|| id.clone())
+                } else {
+                    id.clone()
+                }
+            })
+            .collect(),
+    )
+}
+
 fn default_global_shortcut() -> String {
     "Ctrl+Shift+U".to_string()
 }
@@ -718,8 +755,10 @@ impl Default for Settings {
             highlight_menu_cards_on_hover: true,
             workday_tick_style: WorkdayTickStyle::Subtle,
             menu_bar_color_pace: false,
+            menu_bar_color_by_provider: false,
             menu_bar_pace_reserve_positive: false,
             providers_sorted_alphabetically: false,
+            providers_enabled_only: false,
             show_as_used: false,
             enable_animations: true,   // Animations enabled by default
             reset_time_relative: true, // Show relative times by default

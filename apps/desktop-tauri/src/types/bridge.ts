@@ -174,6 +174,8 @@ export interface ProviderCatalogEntry {
   id: string;
   displayName: string;
   cookieDomain: string | null;
+  /** CLI aliases the Settings search also matches. Absent on older shells. */
+  cliAliases?: string[];
 }
 
 /** Upstream `ProviderStatusIndicator` raw values; `none` is operational. */
@@ -250,10 +252,14 @@ export interface SettingsSnapshot {
   highlightMenuCardsOnHover?: boolean;
   workdayTickStyle: WorkdayTickStyle;
   menuBarColorPace: boolean;
+  /** Tint the tray usage meter with each shown provider's accent color (`menu_bar_color_by_provider`). */
+  menuBarColorByProvider: boolean;
   /** Signed pace shows reserve as `+` (deficit as `-`) instead of the default deficit-positive sign. */
   menuBarPaceReservePositive: boolean;
   /** Settings sidebar lists providers alphabetically, enabled first. Display only. */
   providersSortedAlphabetically: boolean;
+  /** Settings sidebar lists only enabled providers. Local, not portable. Absent on older shells: off. */
+  providersEnabledOnly?: boolean;
   showAsUsed: boolean;
   showAllTokenAccountsInMenu: boolean;
   enableAnimations: boolean;
@@ -410,8 +416,10 @@ export interface SettingsUpdate {
   highlightMenuCardsOnHover?: boolean;
   workdayTickStyle?: WorkdayTickStyle;
   menuBarColorPace?: boolean;
+  menuBarColorByProvider?: boolean;
   menuBarPaceReservePositive?: boolean;
   providersSortedAlphabetically?: boolean;
+  providersEnabledOnly?: boolean;
   showAsUsed?: boolean;
   showAllTokenAccountsInMenu?: boolean;
   enableAnimations?: boolean;

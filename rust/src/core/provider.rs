@@ -745,6 +745,140 @@ impl ProviderId {
         }
     }
 
+    /// Lowercase CLI aliases that `from_cli_name` also resolves to this provider,
+    /// excluding `cli_name` itself. Feeds the Settings provider search.
+    pub fn cli_aliases(&self) -> &'static [&'static str] {
+        match self {
+            ProviderId::DevPass => &[],
+            ProviderId::Manus => &[],
+            ProviderId::Xapi => &["x-api", "x api"],
+            ProviderId::Kilo => &[],
+            ProviderId::Devin => &[],
+            ProviderId::Warp => &["warp-ai", "warp-terminal"],
+            ProviderId::DeepInfra => &["deep-infra", "di"],
+            ProviderId::Fireworks => &["fireworks-ai", "fw"],
+            ProviderId::MuseAI => &["muse (muse.ai)"],
+            ProviderId::AzureOpenAI => &["azure-openai", "azure openai"],
+            ProviderId::Nous => &["nous-portal", "nous portal", "hermes"],
+            ProviderId::Venice => &[],
+            ProviderId::OpenCodeGo => &["opencode-go", "opencode go"],
+            ProviderId::Bifrost => &["bifrost-gateway", "bifrost gateway"],
+            ProviderId::Claude => &["anthropic"],
+            ProviderId::Tavily => &[],
+            ProviderId::LLMMan => &[],
+            ProviderId::IBMBob => &["ibm-bob", "ibm bob", "bob", "bobshell"],
+            ProviderId::Pi => &["pi-mono"],
+            ProviderId::Poe => &[],
+            ProviderId::Sakana => &["sakana-ai", "sakana ai"],
+            ProviderId::Linkup => &[],
+            ProviderId::Zed => &["zed-ai"],
+            ProviderId::WorkBuddy => &[],
+            ProviderId::JetBrains => &["jetbrains-ai", "jetbrains ai", "intellij"],
+            ProviderId::CodeBuddy => {
+                &["code-buddy", "codebuddy-cn", "codebuddycn", "腾讯codebuddy"]
+            }
+            ProviderId::NanoGPT => &["nano-gpt"],
+            ProviderId::Deepgram => &["dg"],
+            ProviderId::Wayfinder => &[],
+            ProviderId::Hyper => &["charm-hyper", "charm hyper"],
+            ProviderId::MiMo => &["xiaomi", "xiaomimimo", "xiaomi-mimo", "xiaomi mimo"],
+            ProviderId::Langdock => &[],
+            ProviderId::Infini => &["infini-ai"],
+            ProviderId::Kiro => &["aws"],
+            ProviderId::OpenRouter => &["or"],
+            ProviderId::Sub2Api => &["sub-2-api", "sub 2 api"],
+            ProviderId::Mistral => &["mistral-ai", "mistral ai"],
+            ProviderId::ZenMux => &["zen-mux"],
+            ProviderId::CommandCode => &["command-code", "command code"],
+            ProviderId::Factory => &["droid"],
+            ProviderId::XKiro => &["x-kiro"],
+            ProviderId::Flora => &[],
+            ProviderId::QwenCloud => &["qwencloud", "qwen", "qwen-token-plan", "qwen cloud"],
+            ProviderId::Doubao => &["ark", "volcengine"],
+            ProviderId::SailResearch => &["sail research"],
+            ProviderId::Raycast => &["raycast-ai"],
+            ProviderId::DeepSeek => &["deep-seek", "ds"],
+            ProviderId::Augment => &[],
+            ProviderId::Notion => &["notion-ai", "notionai", "notion ai"],
+            ProviderId::Xai => &["x.ai", "x-ai"],
+            ProviderId::AtlasCloud => &["atlas-cloud", "atlas cloud"],
+            ProviderId::Copilot => &["github"],
+            ProviderId::CrossModel => &["cross-model", "cross model", "crossmodel (removed)"],
+            ProviderId::LongCat => &["long-cat", "lc"],
+            ProviderId::Aixy => &["aixy-gateway", "aixy gateway"],
+            ProviderId::GitKraken => &["gitkraken-ai", "gitkraken ai"],
+            ProviderId::Windsurf => &["codeium"],
+            ProviderId::Vercel => &[
+                "vercel-ai-gateway",
+                "vercel ai gateway",
+                "ai-gateway",
+                "ai gateway",
+            ],
+            ProviderId::LithosAI => &[],
+            ProviderId::Sofya => &[],
+            ProviderId::TypeSafe => &["type-safe", "type safe"],
+            ProviderId::T3Chat => &["t3-chat", "t3 chat"],
+            ProviderId::OpenCode => &[],
+            ProviderId::ClinePass => &["cline-pass", "cline"],
+            ProviderId::TinyApi => &["tiny-api"],
+            ProviderId::MiniMax => &[],
+            ProviderId::Ollama => &[],
+            ProviderId::Grok => &["supergrok", "super-grok"],
+            ProviderId::HuggingFace => &["hugging-face", "hugging face", "hf"],
+            ProviderId::Meta => &[
+                "metaspark",
+                "meta-spark",
+                "muse-spark",
+                "musespark",
+                "muse spark",
+                "meta muse spark",
+            ],
+            ProviderId::ZoomMate => &["zoom-mate", "zoom mate"],
+            ProviderId::Abacus => &["abacus ai", "abacus-ai"],
+            ProviderId::Qoder => &[],
+            ProviderId::Kimi => &["moonshot"],
+            ProviderId::Replicate => &["r8"],
+            ProviderId::Perplexity => &["pplx"],
+            ProviderId::Helmcode => &["nan-builders", "nan builders"],
+            ProviderId::Cosmic => &["cosmic ai"],
+            ProviderId::Synthetic => &["synthetic.new"],
+            ProviderId::V0 => &["v0-dev", "v0.dev"],
+            ProviderId::AiAnd => &["ai&", "ai-and", "ai and"],
+            ProviderId::Cursor => &[],
+            ProviderId::CodeRabbit => &["code-rabbit", "code rabbit"],
+            ProviderId::Aerostack => &[],
+            ProviderId::ClawRouter => &["claw-router"],
+            ProviderId::Bedrock => &["aws-bedrock", "aws bedrock"],
+            ProviderId::Zai => &["z.ai"],
+            ProviderId::AlibabaTokenPlan => &[
+                "alibaba-token-plan",
+                "alibaba token plan",
+                "alibaba-token",
+                "bailian-token-plan",
+            ],
+            ProviderId::LiteLLM => &["lite-llm", "lite llm"],
+            ProviderId::Fal => &[],
+            ProviderId::Chutes => &["chutes-ai", "chutes ai"],
+            ProviderId::Codex => &["openai"],
+            ProviderId::Antigravity => &["agy"],
+            ProviderId::Alibaba => &["tongyi", "qianwen"],
+            ProviderId::ElevenLabs => &["eleven-labs", "11labs"],
+            ProviderId::Groq => &["groqcloud", "groq-cloud", "groq cloud"],
+            ProviderId::OpenAIApi => &["openai-api", "openai api", "openai-balance"],
+            ProviderId::LLMProxy => &["llm-proxy", "llm proxy"],
+            ProviderId::Codebuff => &["manicode"],
+            ProviderId::Exa => &[],
+            ProviderId::Parallel => &["parallel.ai"],
+            ProviderId::KimiK2 => &["kimi-k2", "kimi k2", "k2", "kimi k2 (removed)"],
+            ProviderId::Neuralwatt => &["neural-watt", "nw", "neural"],
+            ProviderId::Gemini => &["google"],
+            ProviderId::StepFun => &["step-fun", "step fun"],
+            ProviderId::Muse => &["muse-code", "muse code"],
+            ProviderId::Amp => &["sourcegraph"],
+            ProviderId::VertexAI => &["vertex", "vertex ai"],
+        }
+    }
+
     /// Soft-removed providers (upstream #2254: Kimi K2 + CrossModel).
     ///
     /// Modules and CLI resolution stay so existing configs and `--provider kimik2`
@@ -1723,6 +1857,40 @@ mod tests {
         assert_eq!(map.get("codex"), Some(&ProviderId::Codex));
         assert_eq!(map.get("openai"), Some(&ProviderId::Codex));
         assert_eq!(map.get("agy"), Some(&ProviderId::Antigravity));
+    }
+
+    #[test]
+    fn cli_aliases_resolve_back_to_their_provider_and_are_unique() {
+        let mut seen = std::collections::HashMap::new();
+        for id in ProviderId::all() {
+            for alias in id.cli_aliases() {
+                assert_ne!(*alias, id.cli_name(), "alias repeats cli_name for {id:?}");
+                assert_eq!(
+                    ProviderId::from_cli_name(alias),
+                    Some(*id),
+                    "alias {alias:?} does not resolve to {id:?}"
+                );
+                assert_eq!(
+                    alias.to_lowercase(),
+                    *alias,
+                    "alias {alias:?} must be lowercase"
+                );
+                assert!(
+                    seen.insert(*alias, *id).is_none(),
+                    "alias {alias:?} is claimed by more than one provider"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn cli_aliases_cover_the_documented_search_aliases() {
+        assert!(ProviderId::Codex.cli_aliases().contains(&"openai"));
+        assert!(ProviderId::Claude.cli_aliases().contains(&"anthropic"));
+        assert!(ProviderId::Factory.cli_aliases().contains(&"droid"));
+        assert!(ProviderId::Antigravity.cli_aliases().contains(&"agy"));
+        assert!(!ProviderId::Zai.cli_aliases().is_empty());
+        assert!(!ProviderId::Codex.cli_aliases().contains(&"codex"));
     }
 
     #[test]
