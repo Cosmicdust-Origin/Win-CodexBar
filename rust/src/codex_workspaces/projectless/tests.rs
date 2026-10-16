@@ -63,6 +63,7 @@ fn session(id: &str, project_id: &str, title: &str) -> SessionUsage {
         totals: UsageTotals::from_parts(10, 0, 5),
         cost_estimate: CostEstimate::default(),
         top_model: None,
+        turn_performance: None,
     }
 }
 

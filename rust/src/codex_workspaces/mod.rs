@@ -9,6 +9,7 @@ mod project_names;
 mod projectless;
 mod sidecar;
 mod thread_names;
+mod turn_performance;
 mod types;
 
 #[cfg(test)]
