@@ -5,6 +5,8 @@ use std::cmp::Ordering;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use super::turn_performance::CodexTurnPerformanceSummary;
+
 /// Progress phases emitted while building a workspaces snapshot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -132,6 +134,10 @@ pub struct SessionUsage {
     pub totals: UsageTotals,
     pub cost_estimate: CostEstimate,
     pub top_model: Option<String>,
+    /// Native Codex turn latency and throughput (upstream #4304). `None` when no
+    /// completed turn in the window has agreeing timing and token evidence.
+    #[serde(default)]
+    pub turn_performance: Option<CodexTurnPerformanceSummary>,
 }
 
 impl SessionUsage {

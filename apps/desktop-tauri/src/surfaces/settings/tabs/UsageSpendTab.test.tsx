@@ -453,5 +453,6 @@ function chatSession(id: string, projectId: string, displayTitle: string): Codex
     totals: { inputTokens: 10, cachedInputTokens: 0, outputTokens: 5, totalTokens: 15 },
     costEstimate: { knownUsd: 0.5, unknownTokens: 0 },
     topModel: "gpt-5",
+    turnPerformance: null,
   };
 }

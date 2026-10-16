@@ -1,6 +1,6 @@
 //! Scan Codex rollout JSONL + read-only catalog → project usage snapshot.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -16,6 +16,7 @@ use super::project_names::apply_saved_project_names;
 use super::projectless::apply_projectless_chats;
 use super::sidecar::{SidecarError, WorkspaceUsageSidecar};
 use super::thread_names::apply_session_names_and_ranking;
+use super::turn_performance::{CodexTurnPerformanceSummary, TurnSample, scan_session_turns};
 use super::types::{
     CodexLocalProjectUsageSnapshot, CostEstimate, DailyPoint, Progress, ProgressPhase,
     ProjectUsage, SessionUsage, SourceStatus, UsageTotals, untitled_session_label,
@@ -220,6 +221,9 @@ impl CodexWorkspacesIndex {
 
         progress(Progress::phase(ProgressPhase::IndexingProjects));
         let mut session_buckets: HashMap<String, SessionBucket> = HashMap::new();
+        // Completed turns keyed by turn id per session, so a turn copied into
+        // two rollout files counts once.
+        let mut session_turns: HashMap<String, BTreeMap<String, TurnSample>> = HashMap::new();
         let mut daily_acc: HashMap<String, DailyAcc> = HashMap::new();
         let mut indexed = 0u32;
         let mut skipped = 0u32;
@@ -228,6 +232,11 @@ impl CodexWorkspacesIndex {
             match index_one_file(path, &range) {
                 Some(parsed) => {
                     merge_daily(&mut daily_acc, &parsed.day_models);
+                    let turns = scan_session_turns(path, &parsed.session_id, &range);
+                    session_turns
+                        .entry(parsed.session_id.clone())
+                        .or_default()
+                        .extend(turns.into_iter().map(|turn| (turn.turn_id.clone(), turn)));
                     let entry = session_buckets
                         .entry(parsed.session_id.clone())
                         .or_insert_with(|| SessionBucket::new(&parsed));
@@ -251,6 +260,13 @@ impl CodexWorkspacesIndex {
                     indexed_file_count: indexed,
                     skipped_file_count: skipped,
                 });
+            }
+        }
+
+        for (session_id, turns) in session_turns {
+            if let Some(bucket) = session_buckets.get_mut(&session_id) {
+                let samples = turns.into_values().collect::<Vec<_>>();
+                bucket.turn_performance = CodexTurnPerformanceSummary::from_samples(&samples);
             }
         }
 
@@ -335,6 +351,7 @@ struct SessionBucket {
     model_tokens: HashMap<String, u64>,
     started_at: Option<DateTime<Utc>>,
     latest_activity: Option<DateTime<Utc>>,
+    turn_performance: Option<CodexTurnPerformanceSummary>,
 }
 
 impl SessionBucket {
@@ -351,6 +368,7 @@ impl SessionBucket {
             model_tokens: HashMap::new(),
             started_at: None,
             latest_activity: None,
+            turn_performance: None,
         }
     }
 
@@ -406,6 +424,7 @@ impl SessionBucket {
             totals: self.totals,
             cost_estimate: self.cost,
             top_model: self.top_model(),
+            turn_performance: self.turn_performance.clone(),
         }
     }
 }
@@ -1046,6 +1065,7 @@ mod tests {
                 totals: UsageTotals::from_parts(10, 0, 5),
                 cost_estimate: CostEstimate::default(),
                 top_model: Some("gpt-5".into()),
+                turn_performance: None,
             }],
             projects: vec![ProjectUsage {
                 id: "project-abc".into(),
@@ -1066,6 +1086,7 @@ mod tests {
                     totals: UsageTotals::from_parts(10, 0, 5),
                     cost_estimate: CostEstimate::default(),
                     top_model: Some("gpt-5".into()),
+                    turn_performance: None,
                 }],
                 is_projectless: false,
             }],

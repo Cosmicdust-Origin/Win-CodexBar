@@ -490,9 +490,9 @@ fn collect_jsonl_files(root: &Path, files: &mut Vec<PathBuf>) -> std::io::Result
     Ok(complete)
 }
 
-type Usage = (i64, i64, i64, i64);
+pub(crate) type Usage = (i64, i64, i64, i64);
 
-fn non_empty_str(value: Option<&Value>) -> Option<&str> {
+pub(crate) fn non_empty_str(value: Option<&Value>) -> Option<&str> {
     value
         .and_then(Value::as_str)
         .map(str::trim)
@@ -525,7 +525,7 @@ fn token_int(
 }
 
 /// `(input, cached, output, reasoning)` from one request-usage object.
-fn request_usage(value: Option<&Value>) -> Option<Usage> {
+pub(crate) fn request_usage(value: Option<&Value>) -> Option<Usage> {
     let usage = value?.as_object()?;
     let input = token_int(usage, "input_tokens", None)?;
     let output = token_int(usage, "output_tokens", None)?;
@@ -535,11 +535,11 @@ fn request_usage(value: Option<&Value>) -> Option<Usage> {
         .then_some((input, cached, output, reasoning))
 }
 
-fn totals_at_least(total: Usage, usage: Usage) -> bool {
+pub(crate) fn totals_at_least(total: Usage, usage: Usage) -> bool {
     total.0 >= usage.0 && total.1 >= usage.1 && total.2 >= usage.2 && total.3 >= usage.3
 }
 
-fn turn_id(payload: &Value) -> Option<String> {
+pub(crate) fn turn_id(payload: &Value) -> Option<String> {
     [Some(payload), payload.get("info")]
         .into_iter()
         .flatten()
@@ -591,7 +591,7 @@ fn request_usage_record(object: &Value) -> Option<RequestUsageRecord> {
     })
 }
 
-fn timestamp_unix_ms(timestamp: &str) -> Option<i64> {
+pub(crate) fn timestamp_unix_ms(timestamp: &str) -> Option<i64> {
     let parsed = chrono::DateTime::parse_from_rfc3339(timestamp.trim()).ok()?;
     let round_up = parsed.timestamp_subsec_nanos() % 1_000_000 >= 500_000;
     Some(parsed.timestamp_millis() + i64::from(round_up))
@@ -603,13 +603,16 @@ fn file_fingerprint(path: &Path) -> Option<(u64, Option<SystemTime>)> {
         .map(|metadata| (metadata.len(), metadata.modified().ok()))
 }
 
-enum JsonlLine {
+pub(crate) enum JsonlLine {
     Complete(Vec<u8>),
     /// Over [`MAX_LINE_BYTES`]; only the retained prefix is kept.
     Oversized(Vec<u8>),
 }
 
-fn read_line<R: BufRead>(reader: &mut R, consumed: &mut u64) -> std::io::Result<Option<JsonlLine>> {
+pub(crate) fn read_line<R: BufRead>(
+    reader: &mut R,
+    consumed: &mut u64,
+) -> std::io::Result<Option<JsonlLine>> {
     let mut bytes = Vec::new();
     let mut length = 0_usize;
     let mut saw_any = false;

@@ -220,6 +220,7 @@ fn overlay_changes_only_labels_and_keeps_totals_sessions_and_order() {
         totals: UsageTotals::from_parts(3, 0, 1),
         cost_estimate: CostEstimate::default(),
         top_model: None,
+        turn_performance: None,
     };
     let mut snap = snapshot(vec![
         project("p1", &format!("{base}/alpha")),
