@@ -10,10 +10,13 @@ import { AutoResumeSection } from "./AutoResumeSection";
 import { OptionalDetailsSection } from "./OptionalDetailsSection";
 import { ClaudeSwapPathField } from "./credentials/ClaudeSwapPathField";
 import { AntigravityProfileHomesField } from "./AntigravityProfileHomesField";
+import { OpenAiLiveUsageSection } from "./OpenAiLiveUsageSection";
 
 export type OptionSettings = Pick<
   SettingsSnapshot,
   | "antigravityAdditionalProfileHomes"
+  | "openAiLiveUsageEnabled"
+  | "openAiModelRateLimits"
   | "codexOpenaiWebExtras"
   | "codexHistoricalTracking"
   | "codexExternalOauthSourcesAllowed"
@@ -192,6 +195,14 @@ export function OptionsSection({
           )}
         </Fragment>
       ))}
+      {detail.id === "openaiapi" && (
+        <OpenAiLiveUsageSection
+          settings={settings}
+          disabled={disabled}
+          t={t}
+          onSettingsChange={onSettingsChange}
+        />
+      )}
       {detail.id === "antigravity" && (
         <AntigravityProfileHomesField
           value={settings.antigravityAdditionalProfileHomes}
