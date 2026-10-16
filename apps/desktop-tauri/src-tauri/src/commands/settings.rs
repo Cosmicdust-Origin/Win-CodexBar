@@ -44,8 +44,10 @@ pub struct SettingsUpdate {
     pub highlight_menu_cards_on_hover: Option<bool>,
     pub workday_tick_style: Option<codexbar::settings::WorkdayTickStyle>,
     pub menu_bar_color_pace: Option<bool>,
+    pub menu_bar_color_by_provider: Option<bool>,
     pub menu_bar_pace_reserve_positive: Option<bool>,
     pub providers_sorted_alphabetically: Option<bool>,
+    pub providers_enabled_only: Option<bool>,
     pub show_as_used: Option<bool>,
     pub show_all_token_accounts_in_menu: Option<bool>,
     pub enable_animations: Option<bool>,
@@ -185,6 +187,7 @@ impl SettingsUpdate {
             || self.menu_bar_shows_percent.is_some()
             || self.menu_bar_icon_style.is_some()
             || self.menu_bar_color_pace.is_some()
+            || self.menu_bar_color_by_provider.is_some()
             || self.show_as_used.is_some()
             || self.reset_time_relative.is_some()
             || self.menu_bar_display_mode.is_some()
@@ -395,11 +398,17 @@ impl SettingsUpdate {
         if let Some(v) = self.menu_bar_color_pace {
             settings.menu_bar_color_pace = v;
         }
+        if let Some(v) = self.menu_bar_color_by_provider {
+            settings.menu_bar_color_by_provider = v;
+        }
         if let Some(v) = self.menu_bar_pace_reserve_positive {
             settings.menu_bar_pace_reserve_positive = v;
         }
         if let Some(v) = self.providers_sorted_alphabetically {
             settings.providers_sorted_alphabetically = v;
+        }
+        if let Some(v) = self.providers_enabled_only {
+            settings.providers_enabled_only = v;
         }
         if let Some(v) = self.show_all_token_accounts_in_menu {
             settings.show_all_token_accounts_in_menu = v;
@@ -1138,6 +1147,26 @@ mod tests {
         }
         .apply_display_settings(&mut settings);
         assert!(!settings.menu_bar_color_pace);
+    }
+
+    #[test]
+    fn apply_display_settings_updates_color_by_provider() {
+        let mut settings = Settings::default();
+        assert!(!settings.menu_bar_color_by_provider);
+
+        SettingsUpdate {
+            menu_bar_color_by_provider: Some(true),
+            ..Default::default()
+        }
+        .apply_display_settings(&mut settings);
+        assert!(settings.menu_bar_color_by_provider);
+
+        SettingsUpdate {
+            menu_bar_color_by_provider: Some(false),
+            ..Default::default()
+        }
+        .apply_display_settings(&mut settings);
+        assert!(!settings.menu_bar_color_by_provider);
     }
 
     #[test]
