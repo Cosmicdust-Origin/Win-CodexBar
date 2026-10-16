@@ -306,6 +306,17 @@ describe("Settings sidebar", () => {
     ]);
   });
 
+  it("turns sorting back on when restoring the default order fails", async () => {
+    mocks.restoreDefaultProviderOrder.mockRejectedValue(new Error("save failed"));
+    render(<Settings state={makeState({ providersSortedAlphabetically: true })} />);
+    fireEvent.click(optionsButton());
+    fireEvent.click(screen.getByRole("menuitem", { name: "ProviderSidebarRestoreDefaultOrder" }));
+    expect(mocks.update).toHaveBeenCalledWith({ providersSortedAlphabetically: false });
+    await waitFor(() =>
+      expect(mocks.update).toHaveBeenLastCalledWith({ providersSortedAlphabetically: true }),
+    );
+  });
+
   it("drives the main window surface only outside the detached window", () => {
     mocks.windowLabel = "main";
     render(<Settings state={state} />);

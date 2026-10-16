@@ -234,7 +234,9 @@ export function SettingsSidebar({
           setUndo({ before, after: ids, restoreAlphabetical: wasSorted ? true : null });
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (wasSorted) set({ providersSortedAlphabetically: true });
+      });
   };
 
   const undoOrder = () => {
