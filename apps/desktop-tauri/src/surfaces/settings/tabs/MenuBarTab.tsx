@@ -84,6 +84,7 @@ export default function MenuBarTab({
             options={[
               { value: "bars", label: t("MenuBarIconStyleBars") },
               { value: "percent", label: t("MenuBarIconStylePercent") },
+              { value: "stackedBars", label: t("MenuBarIconStyleStackedBars") },
             ]}
             onChange={(v) => set({ menuBarIconStyle: v as MenuBarIconStyle })}
           />
