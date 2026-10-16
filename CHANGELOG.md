@@ -9,6 +9,7 @@
 
 ## [Windows] Unreleased
 
+- Browser cookies: automatic import reads browsers one at a time and stops at the first session the site accepts. Typesafe, HelmCode, Hyper, Claude (web), OpenCode Go (web), Zed, Notion, and Cursor now move on to the next browser when a signed-out or expired session is rejected, instead of failing on the first browser that had any cookies, and later browsers are not decrypted once a session works. Cookie source Off still never reads a browser (upstream v0.75.0).
 - Ollama: the account email is read only from the settings page header (`id="header-email"`) instead of the first address anywhere on the page, so a footer or support address is no longer shown as the account; a page without that header shows no email (upstream v0.75.0).
 - **Claude**: in Auto mode, a Claude CLI probe timeout now falls back to the retained CLI usage from the last 15 minutes, as other CLI failures already did, instead of failing the refresh outright. Without a retained result the timeout is reported as before.
 - Settings providers: show the FLORA Workspace ID and Fireworks account slug fields, which were defined but never displayed, so they no longer need the `FLORA_WORKSPACE_ID` / `FIREWORKS_ACCOUNT_SLUG` environment variables.

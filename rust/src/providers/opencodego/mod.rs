@@ -672,10 +672,19 @@ impl OpenCodeGoProvider {
             return Err(ProviderError::AuthRequired);
         }
 
-        match crate::providers::browser_cookie_header(session_overlay::COOKIE_DOMAINS) {
-            Ok(cookie_header) => self.fetch_with_cookies(ctx, &cookie_header).await,
-            Err(ProviderError::NoCookies) => Err(ProviderError::AuthRequired),
-            Err(e) => Err(e),
+        // A signed-out browser session moves on to the next browser's session.
+        let mut sessions =
+            crate::providers::browser_cookie_sessions(ctx, session_overlay::COOKIE_DOMAINS);
+        let mut rejected = None;
+        for cookie_header in sessions.by_ref() {
+            match self.fetch_with_cookies(ctx, &cookie_header).await {
+                Err(ProviderError::AuthRequired) => rejected = Some(ProviderError::AuthRequired),
+                result => return result,
+            }
+        }
+        match rejected.unwrap_or_else(|| sessions.exhaustion_error()) {
+            ProviderError::NoCookies => Err(ProviderError::AuthRequired),
+            error => Err(error),
         }
     }
 }

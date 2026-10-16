@@ -369,11 +369,24 @@ impl ClaudeWebApiFetcher {
             }
         }
 
-        let cookie_header = crate::providers::browser_cookie_header(&domains)?;
-        let result = self.fetch_with_cookie_header(&cookie_header).await?;
-        let _stored =
-            CookieHeaderCache::store(crate::core::ProviderId::Claude, &cookie_header, "browser");
-        Ok(result)
+        // A signed-out browser session moves on to the next browser's session.
+        let mut sessions = crate::providers::unscoped_browser_cookie_sessions(&domains);
+        let mut rejected = None;
+        for cookie_header in sessions.by_ref() {
+            match self.fetch_with_cookie_header(&cookie_header).await {
+                Ok(result) => {
+                    let _stored = CookieHeaderCache::store(
+                        crate::core::ProviderId::Claude,
+                        &cookie_header,
+                        "browser",
+                    );
+                    return Ok(result);
+                }
+                Err(error) if is_cookie_authentication_failure(&error) => rejected = Some(error),
+                Err(error) => return Err(error),
+            }
+        }
+        Err(rejected.unwrap_or_else(|| sessions.exhaustion_error()))
     }
 
     /// Fetch usage with a provided cookie header

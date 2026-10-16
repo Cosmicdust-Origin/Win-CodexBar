@@ -392,10 +392,14 @@ pub(crate) fn build_fetch_context(
         && !provider.cookie_source_scopes_session_only()
         && !cookies_only_enrich_usage
     {
-        if cookie_header
-            .as_deref()
-            .map(str::trim)
-            .is_none_or(|s| s.is_empty())
+        // Providers that own browser cookie resolution try each browser's
+        // session themselves; a pre-resolved first-browser header would pin
+        // them to that browser.
+        if !defer_provider_browser_cookie_lookup
+            && cookie_header
+                .as_deref()
+                .map(str::trim)
+                .is_none_or(|s| s.is_empty())
         {
             cookie_header = provider_cookie_domain(id, settings).and_then(|domain| {
                 codexbar::browser::cookies::get_cookie_header(domain)

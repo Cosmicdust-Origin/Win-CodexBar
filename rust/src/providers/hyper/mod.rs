@@ -184,6 +184,20 @@ impl HyperProvider {
         ctx: &FetchContext,
         key: Option<&str>,
     ) -> Result<ProviderFetchResult, ProviderError> {
+        self.fetch_with_sessions(ctx, key, || session_cookies(ctx))
+            .await
+    }
+
+    /// `sessions` is called only on paths that may read a browser.
+    async fn fetch_with_sessions<I>(
+        &self,
+        ctx: &FetchContext,
+        key: Option<&str>,
+        sessions: impl FnOnce() -> I + Send,
+    ) -> Result<ProviderFetchResult, ProviderError>
+    where
+        I: Iterator<Item = String> + Send,
+    {
         if ctx.source_mode == SourceMode::Cli {
             return Err(ProviderError::UnsupportedSource(SourceMode::Cli));
         }
@@ -195,19 +209,18 @@ impl HyperProvider {
 
         // Upstream turns browser cookies off for the API source.
         if ctx.source_mode != SourceMode::OAuth {
-            match session_cookie(ctx) {
-                Some(cookie) => match self.request_dashboard(&cookie).await {
+            let mut session_rejected = false;
+            for cookie in sessions() {
+                match self.request_dashboard(&cookie).await {
                     Ok(reply) => {
                         if let Some(result) = classify_dashboard(&reply)? {
                             return Ok(result);
                         }
                         // Upstream also drops its cached browser cookie here.
                         // This port keeps no cookie cache, so the next refresh
-                        // reads the browser again.
-                        if fallback_key.is_none() {
-                            return Err(ProviderError::Other(SESSION_EXPIRED.into()));
-                        }
-                        tracing::debug!("Charm Hyper session was rejected; trying the API key");
+                        // reads the browser again. A rejected browser session
+                        // moves on to the next browser's session first.
+                        session_rejected = true;
                     }
                     Err(error) if fallback_key.is_none() => {
                         tracing::debug!(%error, "Charm Hyper session request failed");
@@ -215,10 +228,18 @@ impl HyperProvider {
                     }
                     Err(error) => {
                         tracing::debug!(%error, "Charm Hyper session request failed; trying the API key");
+                        session_rejected = false;
+                        break;
                     }
-                },
-                None if fallback_key.is_none() => return Err(missing_credential()),
-                None => {}
+                }
+            }
+            match (session_rejected, fallback_key.is_some()) {
+                (true, false) => return Err(ProviderError::Other(SESSION_EXPIRED.into())),
+                (true, true) => {
+                    tracing::debug!("Charm Hyper session was rejected; trying the API key");
+                }
+                (false, false) => return Err(missing_credential()),
+                (false, true) => {}
             }
         }
 
@@ -389,23 +410,18 @@ fn collapse_whitespace(raw: &str) -> String {
     raw.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-/// The session cookie upstream's browser broker would hand out: a manual or
-/// shell-resolved header first, nothing when the cookie source is off or an
-/// empty manual source, otherwise the browser's hyper.charm.land session.
-fn session_cookie(ctx: &FetchContext) -> Option<String> {
+/// The session cookies upstream's browser broker would hand out: a manual or
+/// shell-resolved header alone, nothing when the cookie source is off or an
+/// empty manual source, otherwise each browser's hyper.charm.land session in
+/// browser order, read only as far as needed.
+fn session_cookies(ctx: &FetchContext) -> Box<dyn Iterator<Item = String> + Send> {
     if let Some(header) = ctx.manual_cookie_header.as_deref() {
-        return crate::providers::normalize_cookie_header(header);
+        return Box::new(crate::providers::normalize_cookie_header(header).into_iter());
     }
-    if ctx.manual_cookie_missing {
-        return None;
-    }
-    match crate::providers::browser_cookie_header(&[COOKIE_DOMAIN]) {
-        Ok(header) => crate::providers::normalize_cookie_header(&header),
-        Err(error) => {
-            tracing::debug!(%error, "Charm Hyper browser session is unavailable");
-            None
-        }
-    }
+    Box::new(
+        crate::providers::browser_cookie_sessions(ctx, &[COOKIE_DOMAIN])
+            .filter_map(|header| crate::providers::normalize_cookie_header(&header)),
+    )
 }
 
 /// Upstream's `SettingsValue.cleaned`: trimmed, one pair of wrapping quotes

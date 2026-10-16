@@ -296,6 +296,77 @@ pub(crate) fn browser_cookie_header(
         .map_err(map_browser_cookie_error)
 }
 
+/// Browser `Cookie` headers for `domains`, read one browser at a time.
+///
+/// A provider tries each header and asks for the next one only after the site
+/// rejects the previous session, so a browser holding stale cookies no longer
+/// hides a later browser's valid login, and browsers after an accepted session
+/// are never read. Yields nothing when the cookie source forbids browser
+/// import (`FetchContext::manual_cookie_missing`: an empty Manual source or
+/// Off). Callers handle a pasted `manual_cookie_header` themselves first.
+pub(crate) fn browser_cookie_sessions(
+    ctx: &crate::core::FetchContext,
+    domains: &[&str],
+) -> BrowserCookieSessions {
+    browser_cookie_sessions_from(
+        crate::browser::session_scan::SystemCookieStore,
+        ctx,
+        domains,
+    )
+}
+
+/// [`browser_cookie_sessions`] for a path that has no `FetchContext` because
+/// its caller already decided that browser import is allowed.
+pub(crate) fn unscoped_browser_cookie_sessions(domains: &[&str]) -> BrowserCookieSessions {
+    BrowserCookieSessions {
+        scan: Some(crate::browser::session_scan::BrowserCookieScan::new(domains).browser_major()),
+    }
+}
+
+pub(crate) fn browser_cookie_sessions_from<S: crate::browser::session_scan::BrowserCookieStore>(
+    store: S,
+    ctx: &crate::core::FetchContext,
+    domains: &[&str],
+) -> BrowserCookieSessions<S> {
+    BrowserCookieSessions {
+        scan: (!ctx.manual_cookie_missing).then(|| {
+            crate::browser::session_scan::BrowserCookieScan::with_store(store, domains)
+                .browser_major()
+        }),
+    }
+}
+
+pub(crate) struct BrowserCookieSessions<
+    S: crate::browser::session_scan::BrowserCookieStore =
+        crate::browser::session_scan::SystemCookieStore,
+> {
+    scan: Option<crate::browser::session_scan::BrowserCookieScan<S>>,
+}
+
+impl<S: crate::browser::session_scan::BrowserCookieStore> BrowserCookieSessions<S> {
+    /// Why no (further) browser session is available: `NoCookies` when no
+    /// browser holds cookies or import is disabled, otherwise a read error
+    /// such as App-Bound Encryption.
+    pub(crate) fn exhaustion_error(&self) -> crate::core::ProviderError {
+        self.scan
+            .as_ref()
+            .map_or(crate::core::ProviderError::NoCookies, |scan| {
+                map_browser_cookie_error(scan.exhaustion_error())
+            })
+    }
+}
+
+impl<S: crate::browser::session_scan::BrowserCookieStore> Iterator for BrowserCookieSessions<S> {
+    type Item = String;
+
+    fn next(&mut self) -> Option<String> {
+        self.scan
+            .as_mut()?
+            .next()
+            .map(|candidate| candidate.header())
+    }
+}
+
 pub(crate) fn browser_cookie_headers_for_domain(
     domain: &str,
 ) -> Result<Vec<(String, String)>, crate::core::ProviderError> {
@@ -558,8 +629,48 @@ pub(crate) fn extract_renewal(text: &str) -> Option<chrono::DateTime<chrono::Utc
 
 #[cfg(test)]
 mod tests {
-    use super::{BoundedBodyError, normalize_cookie_header, read_bounded_stream};
+    use super::{
+        BoundedBodyError, browser_cookie_sessions_from, normalize_cookie_header,
+        read_bounded_stream,
+    };
+    use crate::browser::detection::BrowserType;
+    use crate::browser::session_scan::test_support::FakeCookieStore;
+    use crate::core::{FetchContext, ProviderError};
     use futures::stream;
+
+    #[test]
+    fn browser_sessions_never_read_a_browser_when_import_is_disabled() {
+        let store =
+            FakeCookieStore::default().cookies(BrowserType::Chrome, "a.test", &[("s", "1")]);
+        let ctx = FetchContext {
+            manual_cookie_missing: true,
+            ..FetchContext::default()
+        };
+        let mut sessions = browser_cookie_sessions_from(&store, &ctx, &["a.test"]);
+        assert_eq!(sessions.next(), None);
+        assert!(matches!(
+            sessions.exhaustion_error(),
+            ProviderError::NoCookies
+        ));
+        assert!(store.reads().is_empty());
+    }
+
+    #[test]
+    fn browser_sessions_yield_headers_lazily_in_browser_order() {
+        let store = FakeCookieStore::default()
+            .cookies(BrowserType::Edge, "a.test", &[("s", "stale")])
+            .cookies(BrowserType::Firefox, "a.test", &[("s", "valid")]);
+        let ctx = FetchContext::default();
+        let mut sessions = browser_cookie_sessions_from(&store, &ctx, &["a.test"]);
+        assert_eq!(sessions.next().as_deref(), Some("s=stale"));
+        assert_eq!(store.reads().len(), 1);
+        assert_eq!(sessions.next().as_deref(), Some("s=valid"));
+        assert_eq!(sessions.next(), None);
+        assert!(matches!(
+            sessions.exhaustion_error(),
+            ProviderError::NoCookies
+        ));
+    }
 
     #[tokio::test]
     async fn bounded_stream_rejects_oversized_body_without_content_length() {

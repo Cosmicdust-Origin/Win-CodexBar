@@ -796,3 +796,94 @@ fn provider_capabilities_match_the_upstream_descriptor() {
         ProviderStateKind::Unknown
     );
 }
+
+/// Browser sessions as the lazy scan yields them: Edge's stale cookie first,
+/// then Brave's signed-in one. No real browser store is read.
+fn browser_sessions<'a>(
+    log: &'a std::sync::Mutex<Vec<&'static str>>,
+) -> impl Iterator<Item = String> + Send + 'a {
+    [
+        "session=stale-edge",
+        "session=valid-brave",
+        "session=never-read",
+    ]
+    .into_iter()
+    .inspect(move |cookie| log.lock().unwrap().push(cookie))
+    .map(str::to_string)
+}
+
+#[tokio::test]
+async fn rejected_browser_session_moves_on_to_the_next_browser() {
+    let mut server = Server::new_async().await;
+    let stale = session_mock(&mut server, "session=stale-edge", 200, LANDING_HTML, 1).await;
+    let valid = session_mock(&mut server, "session=valid-brave", 200, DASHBOARD_HTML, 1).await;
+    let api = api_mock(&mut server, 200, BALANCE_BODY, 0).await;
+    let provider = test_provider(&server.url());
+    let ctx = FetchContext {
+        source_mode: SourceMode::Auto,
+        ..FetchContext::default()
+    };
+    let read = std::sync::Mutex::new(Vec::new());
+
+    let result = provider
+        .fetch_with_sessions(&ctx, Some(KEY), || browser_sessions(&read))
+        .await
+        .unwrap();
+
+    stale.assert_async().await;
+    valid.assert_async().await;
+    api.assert_async().await;
+    assert_eq!(result.source_label, "web");
+    assert_eq!(
+        *read.lock().unwrap(),
+        ["session=stale-edge", "session=valid-brave"],
+        "the browser after the accepted session must not be read"
+    );
+}
+
+#[tokio::test]
+async fn api_source_never_asks_for_browser_sessions() {
+    let mut server = Server::new_async().await;
+    let api = api_mock(&mut server, 200, BALANCE_BODY, 1).await;
+    let provider = test_provider(&server.url());
+    let ctx = FetchContext {
+        source_mode: SourceMode::OAuth,
+        ..FetchContext::default()
+    };
+
+    provider
+        .fetch_with_sessions(&ctx, Some(KEY), || -> std::vec::IntoIter<String> {
+            panic!("the API source must not read a browser")
+        })
+        .await
+        .unwrap();
+
+    api.assert_async().await;
+}
+
+#[tokio::test]
+async fn every_rejected_browser_session_reports_an_expired_session_in_web() {
+    let mut server = Server::new_async().await;
+    let stale = server
+        .mock("GET", "/")
+        .match_header("authorization", Matcher::Missing)
+        .with_status(401)
+        .expect(2)
+        .create_async()
+        .await;
+    let provider = test_provider(&server.url());
+    let ctx = FetchContext {
+        source_mode: SourceMode::Web,
+        ..FetchContext::default()
+    };
+
+    let error = provider
+        .fetch_with_sessions(&ctx, None, || {
+            ["session=a", "session=b"].into_iter().map(str::to_string)
+        })
+        .await
+        .unwrap_err();
+
+    stale.assert_async().await;
+    assert_eq!(message(&error), SESSION_EXPIRED);
+}
