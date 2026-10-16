@@ -839,18 +839,22 @@ mod tests {
         assert!(!domain_matches("chatgpt.com.evil.test", "chatgpt.com"));
     }
 
+    /// Manual live check against this machine's installed browsers. It reads
+    /// and decrypts real `claude.ai` cookies, so it is ignored by default and
+    /// also requires `CODEXBAR_LIVE_COOKIE_TEST=1`. Prints counts and cookie
+    /// names only, never values.
     #[test]
+    #[ignore = "reads real browser cookie stores; opt in with --ignored and CODEXBAR_LIVE_COOKIE_TEST=1"]
     fn test_cookie_extraction() {
-        // This test will only work on a machine with Chrome installed
+        if std::env::var("CODEXBAR_LIVE_COOKIE_TEST").as_deref() != Ok("1") {
+            eprintln!("skipping: set CODEXBAR_LIVE_COOKIE_TEST=1 to run the live cookie check");
+            return;
+        }
         match get_cookies_for_domain("claude.ai") {
             Ok(cookies) => {
                 println!("Found {} cookies for claude.ai", cookies.len());
                 for cookie in &cookies {
-                    println!(
-                        "  {}={}",
-                        cookie.name,
-                        &cookie.value[..20.min(cookie.value.len())]
-                    );
+                    println!("  {}", cookie.name);
                 }
             }
             Err(e) => {
