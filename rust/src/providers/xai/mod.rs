@@ -25,7 +25,7 @@ use serde_json::Value;
 
 use crate::core::{
     CostDailyPoint, CostSnapshot, FetchContext, Provider, ProviderError, ProviderFetchResult,
-    ProviderId, ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    ProviderId, RateWindow, SourceMode, UsageSnapshot,
 };
 
 const BASE_URL: &str = "https://management-api.x.ai";
@@ -182,7 +182,6 @@ fn format_balance_line(balance_usd: f64) -> String {
 }
 
 pub struct XaiProvider {
-    metadata: ProviderMetadata,
     client: Client,
     base_url: String,
 }
@@ -191,19 +190,6 @@ impl XaiProvider {
     pub fn new() -> Self {
         Self {
             base_url: BASE_URL.to_string(),
-            metadata: ProviderMetadata {
-                id: ProviderId::Xai,
-                display_name: "xAI",
-                session_label: "Spend",
-                weekly_label: "Spend",
-                supports_opus: false,
-                supports_credits: false,
-                default_enabled: false,
-                is_primary: false,
-                dashboard_url: Some("https://console.x.ai"),
-                status_page_url: Some("https://status.x.ai"),
-                tertiary_label_key: None,
-            },
             client: crate::core::credentialed_http_client_builder()
                 .timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS))
                 .build()
@@ -396,10 +382,6 @@ impl Default for XaiProvider {
 impl Provider for XaiProvider {
     fn id(&self) -> ProviderId {
         ProviderId::Xai
-    }
-
-    fn metadata(&self) -> &ProviderMetadata {
-        &self.metadata
     }
 
     async fn fetch_usage(&self, ctx: &FetchContext) -> Result<ProviderFetchResult, ProviderError> {

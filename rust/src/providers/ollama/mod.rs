@@ -14,7 +14,7 @@ use reqwest::Url;
 
 use crate::core::{
     CostSnapshot, FetchContext, ManualEmptyCookiePolicy, Provider, ProviderError,
-    ProviderFetchResult, ProviderId, ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    ProviderFetchResult, ProviderId, RateWindow, SourceMode, UsageSnapshot,
 };
 use crate::settings::ApiKeys;
 
@@ -38,9 +38,8 @@ pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
     crate::core::ProviderPaceCapability::CALENDAR_MONTH_RESET_WINDOW;
 
 /// Ollama provider
-pub struct OllamaProvider {
-    metadata: ProviderMetadata,
-}
+#[derive(Default)]
+pub struct OllamaProvider;
 
 #[derive(Debug, Clone, PartialEq)]
 struct UsageBlock {
@@ -52,21 +51,7 @@ struct UsageBlock {
 
 impl OllamaProvider {
     pub fn new() -> Self {
-        Self {
-            metadata: ProviderMetadata {
-                id: ProviderId::Ollama,
-                display_name: "Ollama",
-                session_label: "Session",
-                weekly_label: "Weekly",
-                supports_opus: false,
-                supports_credits: false,
-                default_enabled: false,
-                is_primary: false,
-                dashboard_url: Some("https://ollama.com/settings"),
-                status_page_url: None,
-                tertiary_label_key: None,
-            },
-        }
+        Self
     }
 
     /// Fetch usage by scraping ollama.com/settings
@@ -504,20 +489,10 @@ impl OllamaProvider {
     }
 }
 
-impl Default for OllamaProvider {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[async_trait]
 impl Provider for OllamaProvider {
     fn id(&self) -> ProviderId {
         ProviderId::Ollama
-    }
-
-    fn metadata(&self) -> &ProviderMetadata {
-        &self.metadata
     }
 
     async fn fetch_usage(&self, ctx: &FetchContext) -> Result<ProviderFetchResult, ProviderError> {
@@ -546,14 +521,6 @@ impl Provider for OllamaProvider {
 
     fn available_sources(&self) -> Vec<SourceMode> {
         vec![SourceMode::Auto, SourceMode::Web]
-    }
-
-    fn supports_web(&self) -> bool {
-        true
-    }
-
-    fn supports_cli(&self) -> bool {
-        false
     }
 
     fn retains_last_good_on_transport_failure(&self) -> bool {
@@ -767,6 +734,7 @@ fn ollama_api_key_error() -> ProviderError {
 mod tests {
     use super::*;
     use crate::core::LastGoodFailurePolicy;
+    use crate::providers::test_support::mock_response;
 
     #[tokio::test]
     async fn settings_fetch_follows_same_origin_redirects() {
@@ -777,12 +745,14 @@ mod tests {
             .with_header("location", "/settings/account")
             .create_async()
             .await;
-        let second = server
-            .mock("GET", "/settings/account")
-            .with_status(200)
-            .with_body("<html>usage</html>")
-            .create_async()
-            .await;
+        let second = mock_response(
+            &mut server,
+            "GET",
+            "/settings/account",
+            200,
+            "<html>usage</html>",
+        )
+        .await;
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .build()

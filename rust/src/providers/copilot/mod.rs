@@ -8,8 +8,7 @@ pub mod device_flow;
 use async_trait::async_trait;
 
 use crate::core::{
-    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
-    SourceMode,
+    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, SourceMode,
 };
 
 pub use api::{CopilotApi, SEAT_CREDIT_WINDOW_ID};
@@ -25,26 +24,12 @@ pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
 
 /// GitHub Copilot provider for fetching AI usage limits
 pub struct CopilotProvider {
-    metadata: ProviderMetadata,
     api: CopilotApi,
 }
 
 impl CopilotProvider {
     pub fn new() -> Self {
         Self {
-            metadata: ProviderMetadata {
-                id: ProviderId::Copilot,
-                display_name: "GitHub Copilot",
-                session_label: "Premium",
-                weekly_label: "Chat",
-                supports_opus: false,
-                supports_credits: false,
-                default_enabled: true,
-                is_primary: false,
-                dashboard_url: Some("https://github.com/settings/copilot"),
-                status_page_url: Some("https://www.githubstatus.com/"),
-                tertiary_label_key: None,
-            },
             api: CopilotApi::new(),
         }
     }
@@ -72,10 +57,6 @@ impl Provider for CopilotProvider {
 
     fn id(&self) -> ProviderId {
         ProviderId::Copilot
-    }
-
-    fn metadata(&self) -> &ProviderMetadata {
-        &self.metadata
     }
 
     async fn fetch_usage(&self, ctx: &FetchContext) -> Result<ProviderFetchResult, ProviderError> {

@@ -58,6 +58,7 @@ pub mod hyper;
 pub mod ibmbob;
 pub mod infini;
 pub mod jetbrains;
+pub(crate) mod json;
 pub mod kilo;
 pub mod kimi;
 pub mod kimik2;
@@ -102,6 +103,8 @@ pub mod sub2api;
 pub mod synthetic;
 pub mod t3chat;
 pub mod tavily;
+#[cfg(test)]
+pub(crate) mod test_support;
 pub mod tinyapi;
 pub mod typesafe;
 pub mod v0;
@@ -415,14 +418,33 @@ pub(crate) fn cookie_values<'a>(cookie_header: &'a str, name: &str) -> Vec<&'a s
 /// Empty values and control characters are rejected before the value reaches an
 /// HTTP client.
 pub(crate) fn normalize_cookie_header(raw: &str) -> Option<String> {
-    let trimmed = raw.trim();
-    let value = trimmed
-        .get(.."cookie:".len())
-        .filter(|prefix| prefix.eq_ignore_ascii_case("cookie:"))
-        .map_or(trimmed, |_| &trimmed["cookie:".len()..])
-        .trim();
-
+    let value = strip_cookie_prefix(raw.trim());
     (!value.is_empty() && !value.chars().any(char::is_control)).then(|| value.to_string())
+}
+
+/// Drops a leading, case-insensitive `Cookie:` label and the whitespace after
+/// it. Input without the label is returned unchanged.
+pub(crate) fn strip_cookie_prefix(header: &str) -> &str {
+    match header.get(.."cookie:".len()) {
+        Some(prefix) if prefix.eq_ignore_ascii_case("cookie:") => header["cookie:".len()..].trim(),
+        _ => header,
+    }
+}
+
+/// Rebuilds a cookie header from its `name=value` pairs, trimming both sides
+/// and dropping chunks with no `=`, an empty name or an empty value. `None`
+/// when no pair remains.
+pub(crate) fn normalize_cookie_pairs(header: &str) -> Option<String> {
+    let pairs = header
+        .split(';')
+        .filter_map(|chunk| {
+            let (name, value) = chunk.trim().split_once('=')?;
+            let name = name.trim();
+            let value = value.trim();
+            (!name.is_empty() && !value.is_empty()).then(|| format!("{name}={value}"))
+        })
+        .collect::<Vec<_>>();
+    (!pairs.is_empty()).then(|| pairs.join("; "))
 }
 
 pub(crate) fn browser_cookies_for_domain(
@@ -632,7 +654,7 @@ pub(crate) fn extract_renewal(text: &str) -> Option<chrono::DateTime<chrono::Utc
 mod tests {
     use super::{
         BoundedBodyError, browser_cookie_sessions_from, normalize_cookie_header,
-        read_bounded_stream,
+        normalize_cookie_pairs, read_bounded_stream, strip_cookie_prefix,
     };
     use crate::browser::detection::BrowserType;
     use crate::browser::session_scan::test_support::FakeCookieStore;
@@ -738,5 +760,22 @@ mod tests {
             normalize_cookie_header("session=abc\r\nInjected: true"),
             None
         );
+    }
+
+    #[test]
+    fn strip_cookie_prefix_drops_only_a_leading_label() {
+        assert_eq!(strip_cookie_prefix("COOKIE:  a=1"), "a=1");
+        assert_eq!(strip_cookie_prefix("a=1; Cookie: b=2"), "a=1; Cookie: b=2");
+        assert_eq!(strip_cookie_prefix(" a=1 "), " a=1 ");
+        assert_eq!(strip_cookie_prefix("é"), "é");
+    }
+
+    #[test]
+    fn normalize_cookie_pairs_keeps_complete_pairs() {
+        assert_eq!(
+            normalize_cookie_pairs(" a = 1 ;b=;=c; junk ; d=2"),
+            Some("a=1; d=2".to_string())
+        );
+        assert_eq!(normalize_cookie_pairs("junk; b="), None);
     }
 }
