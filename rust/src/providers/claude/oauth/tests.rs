@@ -723,3 +723,71 @@ fn gate_survives_a_poisoned_mutex() {
     assert!(joined.is_err());
     assert!(ClaudeOAuthFetcher::gate_precheck(&gate, 1_000_000_000_000, "fp").is_none());
 }
+
+#[test]
+fn standalone_result_takes_saved_labels_and_drops_token_identity() {
+    use crate::core::{ProviderFetchResult, RateWindow, UsageSnapshot};
+
+    let summary = super::super::accounts::ClaudeAccount {
+        id: "a:one".into(),
+        email: "saved@example.com".into(),
+        organization: Some("Saved Org".into()),
+        plan: Some("claude_max_5x".into()),
+        is_active: false,
+        is_saved: true,
+    };
+    let fresh = || {
+        ProviderFetchResult::new(UsageSnapshot::new(RateWindow::new(10.0)), "oauth")
+            .with_account_identity("token-subject")
+    };
+
+    let mut fetched = fresh();
+    super::apply_standalone_summary(&mut fetched, Some(summary));
+    assert_eq!(fetched.account_identity, None);
+    assert_eq!(
+        fetched.usage.account_email.as_deref(),
+        Some("saved@example.com")
+    );
+    assert_eq!(
+        fetched.usage.account_organization.as_deref(),
+        Some("Saved Org")
+    );
+    assert_eq!(fetched.usage.login_method.as_deref(), Some("Claude Max 5x"));
+
+    // Without a saved summary only the token identity is dropped.
+    let mut bare = fresh();
+    super::apply_standalone_summary(&mut bare, None);
+    assert_eq!(bare.account_identity, None);
+    assert_eq!(bare.usage.account_email, None);
+    assert_eq!(bare.usage.login_method, None);
+}
+
+static ENV_TOKEN_TESTS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[test]
+fn environment_token_is_honored_before_standalone_and_consent() {
+    use super::credentials_store::{CredentialSource, environment_token_present, load_credentials};
+    const KEY: &str = "CODEXBAR_CLAUDE_OAUTH_TOKEN";
+    let _guard = ENV_TOKEN_TESTS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    // SAFETY: every test that changes this variable holds ENV_TOKEN_TESTS.
+    unsafe { std::env::set_var(KEY, "env-token") };
+    let present = environment_token_present();
+    // The env check short-circuits, so Claude Code's consent is never read.
+    let standalone = super::standalone_fallback_applies();
+    let loaded = load_credentials();
+    // SAFETY: same guarded test-only mutation as above.
+    unsafe { std::env::set_var(KEY, "   ") };
+    let blank = environment_token_present();
+    // SAFETY: same guarded test-only mutation as above.
+    unsafe { std::env::remove_var(KEY) };
+
+    assert!(present);
+    assert!(!standalone);
+    let (credentials, source) = loaded.expect("environment token loads without consent");
+    assert_eq!(credentials.access_token, "env-token");
+    assert!(matches!(source, CredentialSource::Environment));
+    assert!(!blank);
+}

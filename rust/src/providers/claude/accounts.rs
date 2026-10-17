@@ -383,6 +383,10 @@ impl AccountManager {
             .cloned()
             .ok_or_else(|| io::Error::other("Saved Claude account not found."))?;
         target.validate()?;
+        // Once this login is Claude Code's, its refresh chain is shared and it is
+        // no longer a standalone candidate. Persist that with the save below,
+        // before the credentials change, so a later marker write cannot leave it isolated.
+        store.isolated_accounts.retain(|known| known != id);
         if let Some(current) = read_login(&self.config_dir, &self.config_file)? {
             if current.id()? == id {
                 self.set_installed_in_claude_code(Some(id))?;
@@ -392,6 +396,8 @@ impl AccountManager {
             // This copy is Claude Code's chain, so it loses isolated provenance.
             upsert_shared(&mut store, current)?;
             self.save(&store)?;
+        } else if let Err(error) = self.save(&store) {
+            tracing::warn!(%error, "Could not record the switch before changing Claude Code's login");
         }
         let credential_path = self.config_dir.join(".credentials.json");
         let old_credentials = read_object(&credential_path)?;
@@ -822,6 +828,30 @@ mod tests {
         // A saved account that is the only one left but is shared is not offered.
         manager.remove("a:one").unwrap();
         assert!(manager.standalone_usage_credentials().unwrap().is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn failed_switch_does_not_leave_the_target_isolated() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let manager = manager(dir.path());
+        manager.import(login("a", "one", "isolated")).unwrap();
+        activate(&manager, &login("c", "three", "live"));
+        // The outgoing login is saved before the credentials change. A read-only
+        // config directory makes that change fail after the save.
+        let writable = std::fs::metadata(&manager.config_dir)
+            .unwrap()
+            .permissions();
+        std::fs::set_permissions(&manager.config_dir, std::fs::Permissions::from_mode(0o500))
+            .unwrap();
+        let result = manager.switch("a:one");
+        std::fs::set_permissions(&manager.config_dir, writable).unwrap();
+
+        assert!(result.is_err());
+        let store = manager.load().unwrap();
+        assert!(!store.isolated_accounts.contains(&"a:one".to_string()));
+        assert_eq!(store.installed_in_claude_code, None);
     }
 
     #[test]

@@ -144,6 +144,12 @@ pub(super) fn load_credentials() -> Result<(ClaudeOAuthCredentials, CredentialSo
     Err(file_error)
 }
 
+/// Whether a non-empty `CODEXBAR_CLAUDE_OAUTH_TOKEN` override is set. It is
+/// honored before Claude Code's consent, so callers must check it first.
+pub(super) fn environment_token_present() -> bool {
+    load_from_environment().is_some()
+}
+
 /// Load credentials from environment variables
 fn load_from_environment() -> Option<ClaudeOAuthCredentials> {
     let token = std::env::var(ENV_TOKEN_KEY).ok()?;
