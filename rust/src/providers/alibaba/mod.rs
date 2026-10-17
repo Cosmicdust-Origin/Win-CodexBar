@@ -12,8 +12,8 @@ mod sec_token;
 use async_trait::async_trait;
 
 use crate::core::{
-    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
-    SourceMode, UsageSnapshot,
+    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, SourceMode,
+    UsageSnapshot,
 };
 use crate::providers::browser_cookie_header;
 
@@ -32,27 +32,12 @@ const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) \
 pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
     crate::core::ProviderPaceCapability::CALENDAR_MONTH_RESET_WINDOW;
 
-pub struct AlibabaProvider {
-    metadata: ProviderMetadata,
-}
+#[derive(Default)]
+pub struct AlibabaProvider;
 
 impl AlibabaProvider {
     pub fn new() -> Self {
-        Self {
-            metadata: ProviderMetadata {
-                id: ProviderId::Alibaba,
-                display_name: "Alibaba",
-                session_label: "5-Hour",
-                weekly_label: "Weekly",
-                supports_opus: false,
-                supports_credits: false,
-                default_enabled: false,
-                is_primary: false,
-                dashboard_url: Some("https://modelstudio.console.alibabacloud.com"),
-                status_page_url: None,
-                tertiary_label_key: None,
-            },
-        }
+        Self
     }
 
     /// Resolve the [`AlibabaRegion`] from a settings value.
@@ -257,20 +242,10 @@ impl AlibabaProvider {
     }
 }
 
-impl Default for AlibabaProvider {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[async_trait]
 impl Provider for AlibabaProvider {
     fn id(&self) -> ProviderId {
         ProviderId::Alibaba
-    }
-
-    fn metadata(&self) -> &ProviderMetadata {
-        &self.metadata
     }
 
     async fn fetch_usage(&self, ctx: &FetchContext) -> Result<ProviderFetchResult, ProviderError> {
@@ -287,14 +262,6 @@ impl Provider for AlibabaProvider {
 
     fn available_sources(&self) -> Vec<SourceMode> {
         vec![SourceMode::Auto, SourceMode::Web]
-    }
-
-    fn supports_web(&self) -> bool {
-        true
-    }
-
-    fn supports_cli(&self) -> bool {
-        false
     }
 }
 

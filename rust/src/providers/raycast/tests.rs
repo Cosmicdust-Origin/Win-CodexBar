@@ -1,6 +1,7 @@
 use super::*;
 use crate::browser::cookies::Cookie;
 use crate::browser::detection::BrowserType;
+use crate::providers::test_support::{mock_response_expect, mock_status_expect};
 use chrono::TimeZone;
 use parse::parse_credits;
 
@@ -531,12 +532,14 @@ async fn rejected_candidates_advance_within_the_same_refresh() {
 #[tokio::test]
 async fn all_candidates_rejected_means_the_session_expired() {
     let mut server = mockito::Server::new_async().await;
-    let mock = server
-        .mock("GET", "/frontend_api/current_user/ai_credits")
-        .with_status(401)
-        .expect(2)
-        .create_async()
-        .await;
+    let mock = mock_status_expect(
+        &mut server,
+        "GET",
+        "/frontend_api/current_user/ai_credits",
+        401,
+        2,
+    )
+    .await;
 
     let provider = RaycastProvider::with_origin(&server.url());
     let error = provider
@@ -555,12 +558,14 @@ async fn all_candidates_rejected_means_the_session_expired() {
 #[tokio::test]
 async fn manual_stops_after_its_single_rejected_candidate() {
     let mut server = mockito::Server::new_async().await;
-    let mock = server
-        .mock("GET", "/frontend_api/current_user/ai_credits")
-        .with_status(401)
-        .expect(1)
-        .create_async()
-        .await;
+    let mock = mock_status_expect(
+        &mut server,
+        "GET",
+        "/frontend_api/current_user/ai_credits",
+        401,
+        1,
+    )
+    .await;
 
     let provider = RaycastProvider::with_origin(&server.url());
     let error = provider
@@ -578,11 +583,7 @@ async fn manual_stops_after_its_single_rejected_candidate() {
 #[tokio::test]
 async fn no_candidates_is_a_missing_credential_without_a_request() {
     let mut server = mockito::Server::new_async().await;
-    let mock = server
-        .mock("GET", mockito::Matcher::Any)
-        .expect(0)
-        .create_async()
-        .await;
+    let mock = mock_status_expect(&mut server, "GET", mockito::Matcher::Any, 200, 0).await;
 
     let provider = RaycastProvider::with_origin(&server.url());
     let error = provider
@@ -605,11 +606,7 @@ async fn no_candidates_is_a_missing_credential_without_a_request() {
 #[tokio::test]
 async fn empty_manual_selection_fails_closed_without_browser_access() {
     let mut server = mockito::Server::new_async().await;
-    let mock = server
-        .mock("GET", mockito::Matcher::Any)
-        .expect(0)
-        .create_async()
-        .await;
+    let mock = mock_status_expect(&mut server, "GET", mockito::Matcher::Any, 200, 0).await;
 
     let provider = RaycastProvider::with_origin(&server.url());
     let mut fetch_context = ctx(SourceMode::Web, None);
@@ -626,11 +623,7 @@ async fn empty_manual_selection_fails_closed_without_browser_access() {
 #[tokio::test]
 async fn off_makes_no_request_and_no_cookie_access() {
     let mut server = mockito::Server::new_async().await;
-    let mock = server
-        .mock("GET", mockito::Matcher::Any)
-        .expect(0)
-        .create_async()
-        .await;
+    let mock = mock_status_expect(&mut server, "GET", mockito::Matcher::Any, 200, 0).await;
 
     let provider = RaycastProvider::with_origin(&server.url());
     // The shell maps the Off cookie source to Cli, and a stored header must
@@ -658,13 +651,15 @@ async fn non_authentication_failures_stop_retries_and_keep_the_session() {
         (204, "Raycast credits API returned HTTP 204"),
     ] {
         let mut server = mockito::Server::new_async().await;
-        let mock = server
-            .mock("GET", "/frontend_api/current_user/ai_credits")
-            .with_status(status)
-            .with_body("invalid JSON")
-            .expect(1)
-            .create_async()
-            .await;
+        let mock = mock_response_expect(
+            &mut server,
+            "GET",
+            "/frontend_api/current_user/ai_credits",
+            status,
+            "invalid JSON",
+            1,
+        )
+        .await;
 
         let provider = RaycastProvider::with_origin(&server.url());
         let error = provider
@@ -686,13 +681,15 @@ async fn non_authentication_failures_stop_retries_and_keep_the_session() {
 #[tokio::test]
 async fn malformed_success_body_is_a_parse_failure_that_stops_retries() {
     let mut server = mockito::Server::new_async().await;
-    let mock = server
-        .mock("GET", "/frontend_api/current_user/ai_credits")
-        .with_status(200)
-        .with_body("invalid JSON")
-        .expect(1)
-        .create_async()
-        .await;
+    let mock = mock_response_expect(
+        &mut server,
+        "GET",
+        "/frontend_api/current_user/ai_credits",
+        200,
+        "invalid JSON",
+        1,
+    )
+    .await;
 
     let provider = RaycastProvider::with_origin(&server.url());
     let error = provider

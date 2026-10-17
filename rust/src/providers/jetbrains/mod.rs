@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use crate::core::{
     FetchContext, Provider, ProviderDisplayDetail, ProviderError, ProviderFetchResult, ProviderId,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    RateWindow, SourceMode, UsageSnapshot,
 };
 
 use ide::{IdeInstall, VendorRoot};
@@ -43,33 +43,12 @@ struct Snapshot {
 }
 
 /// JetBrains AI provider
-pub struct JetBrainsProvider {
-    metadata: ProviderMetadata,
-}
+#[derive(Default)]
+pub struct JetBrainsProvider;
 
 impl JetBrainsProvider {
     pub fn new() -> Self {
-        Self {
-            metadata: ProviderMetadata {
-                id: ProviderId::JetBrains,
-                display_name: "JetBrains AI",
-                session_label: "Credits",
-                weekly_label: "Monthly",
-                supports_opus: false,
-                supports_credits: true,
-                default_enabled: false,
-                is_primary: false,
-                dashboard_url: Some("https://www.jetbrains.com/ai/"),
-                status_page_url: None,
-                tertiary_label_key: None,
-            },
-        }
-    }
-}
-
-impl Default for JetBrainsProvider {
-    fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
@@ -227,10 +206,6 @@ impl Provider for JetBrainsProvider {
         ProviderId::JetBrains
     }
 
-    fn metadata(&self) -> &ProviderMetadata {
-        &self.metadata
-    }
-
     async fn fetch_usage(&self, ctx: &FetchContext) -> Result<ProviderFetchResult, ProviderError> {
         tracing::debug!("Fetching JetBrains AI usage");
 
@@ -260,14 +235,6 @@ impl Provider for JetBrainsProvider {
 
     fn available_sources(&self) -> Vec<SourceMode> {
         vec![SourceMode::Auto, SourceMode::Cli]
-    }
-
-    fn supports_web(&self) -> bool {
-        false
-    }
-
-    fn supports_cli(&self) -> bool {
-        true
     }
     /// JetBrains' local IDE probe raises `NotInstalled` when the AI
     /// Assistant plugin is not found in any IDE configuration — an

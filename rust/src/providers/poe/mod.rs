@@ -8,12 +8,19 @@ use crate::core::{
     CostDailyPoint, CostSnapshot, FetchContext, Provider, ProviderError, ProviderFetchResult,
     ProviderId, ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
 };
+use crate::providers::http_util::{StatusPolicy, send_json};
 
 const POE_BALANCE_URL: &str = "https://api.poe.com/usage/current_balance";
 const POE_HISTORY_URL: &str = "https://api.poe.com/usage/points_history";
 const CREDENTIAL_TARGET: &str = "codexbar-poe";
 const POE_HISTORY_PAGE_LIMIT: usize = 100;
 const POE_HISTORY_MAX_PAGES: usize = 5;
+const BALANCE_KEYS: &[&str] = &[
+    "current_point_balance",
+    "currentPointBalance",
+    "balance",
+    "points",
+];
 
 #[derive(Debug, Clone, PartialEq)]
 struct PoeHistoryEntry {
@@ -82,36 +89,16 @@ impl Provider for PoeProvider {
                 )?;
                 // Capture one refresh instant for the complete balance/history snapshot.
                 let refresh_now = Utc::now();
-                let response = self
-                    .client
-                    .get(POE_BALANCE_URL)
-                    .bearer_auth(&key)
-                    .header("Accept", "application/json")
-                    .send()
-                    .await?;
-                if response.status() == reqwest::StatusCode::UNAUTHORIZED
-                    || response.status() == reqwest::StatusCode::FORBIDDEN
-                {
-                    return Err(ProviderError::AuthRequired);
-                }
-                if !response.status().is_success() {
-                    return Err(ProviderError::Other(format!(
-                        "Poe usage returned status {}",
-                        response.status()
-                    )));
-                }
-                let value: Value = response.json().await.map_err(|e| {
-                    ProviderError::Parse(format!("Failed to parse Poe balance: {e}"))
-                })?;
-                let balance = first_number(
-                    &value,
-                    &[
-                        "current_point_balance",
-                        "currentPointBalance",
-                        "balance",
-                        "points",
-                    ],
-                );
+                let value: Value = send_json(
+                    self.client
+                        .get(POE_BALANCE_URL)
+                        .bearer_auth(&key)
+                        .header("Accept", "application/json"),
+                    &StatusPolicy::auth_401_403("Poe usage"),
+                    "Poe balance",
+                )
+                .await?;
+                let balance = first_number(&value, BALANCE_KEYS);
                 let mut result =
                     ProviderFetchResult::new(snapshot_from_balance_at(&value, refresh_now), "api");
                 if ctx.include_credits
@@ -153,22 +140,15 @@ async fn fetch_points_history(
             }
         }
 
-        let response = client
-            .get(url)
-            .bearer_auth(key)
-            .header("Accept", "application/json")
-            .send()
-            .await?;
-        if !response.status().is_success() {
-            return Err(ProviderError::Other(format!(
-                "Poe history returned status {}",
-                response.status()
-            )));
-        }
-        let root: Value = response
-            .json()
-            .await
-            .map_err(|e| ProviderError::Parse(format!("Failed to parse Poe history: {e}")))?;
+        let root: Value = send_json(
+            client
+                .get(url)
+                .bearer_auth(key)
+                .header("Accept", "application/json"),
+            &StatusPolicy::status_only("Poe history"),
+            "Poe history",
+        )
+        .await?;
         let rows = history_rows(&root);
         for row in &rows {
             if let Some(entry) = parse_history_entry(row)
@@ -194,15 +174,7 @@ async fn fetch_points_history(
 }
 
 fn snapshot_from_balance_at(value: &Value, updated_at: DateTime<Utc>) -> UsageSnapshot {
-    let balance = first_number(
-        value,
-        &[
-            "current_point_balance",
-            "currentPointBalance",
-            "balance",
-            "points",
-        ],
-    );
+    let balance = first_number(value, BALANCE_KEYS);
     let mut primary = RateWindow::new(0.0);
     primary.reset_description = balance.map(|v| format!("Balance: {v:.0} points"));
     let label = primary
@@ -364,6 +336,45 @@ fn value_as_number(value: &Value) -> Option<f64> {
 mod tests {
     use super::*;
     use chrono::TimeZone;
+
+    #[test]
+    fn history_json_sample_parses_rows() {
+        let root: Value = serde_json::from_str(
+            r#"{"data":[{"creation_time":1788220800,"cost_points":12.5,"query_id":"q1"},{"timestamp":"2026-08-30T00:00:00Z","points":3},{"created_at":"2026-08-29T12:00:00Z"}],"has_more":false}"#,
+        )
+        .expect("history sample");
+        let entries: Vec<PoeHistoryEntry> = history_rows(&root)
+            .into_iter()
+            .filter_map(parse_history_entry)
+            .collect();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].points, 12.5);
+        assert_eq!(entries[1].points, 3.0);
+    }
+
+    #[test]
+    fn status_messages_are_pinned() {
+        use crate::providers::http_util::{StatusPolicy, status_outcome};
+        let usage = StatusPolicy::auth_401_403("Poe usage");
+        assert_eq!(status_outcome(&usage, 200), "ok");
+        assert_eq!(status_outcome(&usage, 401), "auth");
+        assert_eq!(status_outcome(&usage, 403), "auth");
+        assert_eq!(
+            status_outcome(&usage, 503),
+            "Poe usage returned status 503 Service Unavailable"
+        );
+
+        let history = StatusPolicy::status_only("Poe history");
+        assert_eq!(status_outcome(&history, 204), "ok");
+        assert_eq!(
+            status_outcome(&history, 401),
+            "Poe history returned status 401 Unauthorized"
+        );
+        assert_eq!(
+            status_outcome(&history, 403),
+            "Poe history returned status 403 Forbidden"
+        );
+    }
 
     #[test]
     fn parses_balance_label() {

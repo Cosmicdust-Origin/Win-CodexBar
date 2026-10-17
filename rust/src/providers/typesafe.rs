@@ -10,10 +10,10 @@ use std::time::Duration;
 use super::{BoundedBodyError, read_bounded_response};
 use crate::core::{
     CostSnapshot, FetchContext, Provider, ProviderDisplayDetail, ProviderError,
-    ProviderFetchResult, ProviderId, ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    ProviderFetchResult, ProviderId, RateWindow, SourceMode, UsageSnapshot,
 };
 
-const BILLING_URL: &str = "https://console.typesafe.ai/settings/billing";
+pub(crate) const BILLING_URL: &str = "https://console.typesafe.ai/settings/billing";
 const ORIGIN: &str = "https://console.typesafe.ai";
 const COOKIE_DOMAINS: [&str; 2] = ["console.typesafe.ai", "typesafe.ai"];
 const MAX_CHUNKS: usize = 60;
@@ -38,26 +38,12 @@ struct Billing {
 }
 
 pub struct TypeSafeProvider {
-    metadata: ProviderMetadata,
     client: Client,
 }
 
 impl TypeSafeProvider {
     pub fn new() -> Self {
         Self {
-            metadata: ProviderMetadata {
-                id: ProviderId::TypeSafe,
-                display_name: "TypeSafe",
-                session_label: "Balance",
-                weekly_label: "Spend",
-                supports_opus: false,
-                supports_credits: true,
-                default_enabled: false,
-                is_primary: false,
-                dashboard_url: Some(BILLING_URL),
-                status_page_url: None,
-                tertiary_label_key: None,
-            },
             client: crate::core::credentialed_http_client_builder()
                 .redirect(Policy::none())
                 .timeout(REQUEST_TIMEOUT)
@@ -184,9 +170,6 @@ impl Default for TypeSafeProvider {
 impl Provider for TypeSafeProvider {
     fn id(&self) -> ProviderId {
         ProviderId::TypeSafe
-    }
-    fn metadata(&self) -> &ProviderMetadata {
-        &self.metadata
     }
     async fn fetch_usage(&self, ctx: &FetchContext) -> Result<ProviderFetchResult, ProviderError> {
         match ctx.source_mode {
