@@ -18,7 +18,13 @@ pub async fn fetch_provider_text_output(provider_id: ProviderId, command: &Usage
             if command.brief {
                 render_brief_text(provider_id, &result)
             } else {
-                render_text_with_status(provider_id, &result, status.as_ref(), command.use_color)
+                render_text_with_status(
+                    provider_id,
+                    &result,
+                    status.as_ref(),
+                    command.use_color,
+                    command.weekly_work_days,
+                )
             }
         }
         Err(e) => render_text_error(provider_id, &e.to_string(), command.use_color),
@@ -30,7 +36,12 @@ pub async fn fetch_provider_json_output(
     command: &UsageCommand,
 ) -> serde_json::Value {
     match fetch_provider_result(provider_id, command).await {
-        Ok((result, status)) => render_json_result(provider_id, result, status.as_ref()),
+        Ok((result, status)) => render_json_result(
+            provider_id,
+            result,
+            status.as_ref(),
+            command.weekly_work_days,
+        ),
         Err(e) => crate::cli::error_kind::usage_error_row(provider_id, &e),
     }
 }
@@ -42,7 +53,7 @@ pub async fn fetch_provider_result(
     let provider = instantiate_provider(provider_id);
     let status_future = command
         .fetch_status
-        .then(|| fetch_provider_status(provider_id.cli_name()));
+        .then(|| fetch_provider_status(provider_id));
     let mut ctx = command.ctx.clone();
     let account_projected = project_cli_account(provider_id, command.account.as_deref(), &mut ctx)?;
     populate_api_region_from_settings(provider_id, &Settings::load(), &mut ctx);

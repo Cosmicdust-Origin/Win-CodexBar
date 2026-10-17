@@ -462,8 +462,9 @@ fn is_plausible_reset(
 
 /// Remaining seconds until weekly reset, optionally counting only work days.
 ///
-/// `work_days` in `[2, 6]` keeps ISO weekdays `1..=work_days` (Mon..).
-/// Anything else falls back to wall-clock remaining time.
+/// `work_days` in `[2, 7]` keeps ISO weekdays `1..=work_days` (Mon..); 7 counts
+/// every day, which equals wall-clock time. Anything else falls back to
+/// wall-clock remaining time.
 pub fn effective_remaining_seconds(
     now: DateTime<Utc>,
     resets_at: DateTime<Utc>,
@@ -473,7 +474,7 @@ pub fn effective_remaining_seconds(
     let Some(work_days) = work_days else {
         return wall;
     };
-    if !(2..=6).contains(&work_days) {
+    if !(2..=7).contains(&work_days) {
         return wall;
     }
 
@@ -1198,7 +1199,19 @@ mod tests {
         let reset = now + Duration::days(2);
         let wall = effective_remaining_seconds(now, reset, None);
         assert!((effective_remaining_seconds(now, reset, Some(1)) - wall).abs() < 1e-9);
+        assert!((effective_remaining_seconds(now, reset, Some(8)) - wall).abs() < 1e-9);
+    }
+
+    #[test]
+    fn seven_work_days_count_every_day() {
+        // A full week that spans a weekend: 7 work days equals wall clock,
+        // 5 work days drops the two weekend days.
+        let now = ts(1_700_400_000);
+        let reset = now + Duration::days(7);
+        let wall = effective_remaining_seconds(now, reset, None);
         assert!((effective_remaining_seconds(now, reset, Some(7)) - wall).abs() < 1e-9);
+        let five = effective_remaining_seconds(now, reset, Some(5));
+        assert!((wall - five - 2.0 * 86_400.0).abs() < 1e-9);
     }
 
     #[test]

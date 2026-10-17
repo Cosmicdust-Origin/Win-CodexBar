@@ -13,11 +13,24 @@ use async_trait::async_trait;
 use std::os::windows::process::CommandExt;
 
 use crate::core::{
-    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
-    ResetCreditsObservation, SourceMode,
+    FetchContext, Provider, ProviderDisplayDetail, ProviderError, ProviderFetchResult, ProviderId,
+    ProviderMetadata, ResetCreditsObservation, SourceMode,
 };
 
 pub use api::CodexApi;
+
+/// Limit reset detection (upstream `UsageStore+LimitResetCelebration.swift`):
+/// a weekly reset needs a known boundary that advanced, and samples without an
+/// owner key are not tracked.
+pub(crate) const LIMIT_RESET_POLICY: crate::core::ProviderLimitResetPolicy =
+    crate::core::ProviderLimitResetPolicy {
+        supported: true,
+        weekly: crate::core::WeeklyResetRule::AdvancedBoundary {
+            reset_threshold_percent: 5.0,
+            requires_previous_boundary: true,
+        },
+        missing_identity: crate::core::MissingIdentityRule::Skip,
+    };
 
 /// Codex provider for fetching AI usage limits
 pub struct CodexProvider {
@@ -54,7 +67,8 @@ fn fetch_result(
     reset_credits: Option<&api::ResetCredits>,
 ) -> ProviderFetchResult {
     let account_email = usage.account_email.clone();
-    let mut result = ProviderFetchResult::new(usage, source);
+    let credits = cost.as_ref().and_then(credits_detail);
+    let mut result = ProviderFetchResult::new(usage, source).with_display_detail(credits);
     if let Some(cost) = cost.map(|cost| {
         if cost.account_id.is_none()
             && let Some(account) = account_email.as_deref()
@@ -82,6 +96,62 @@ fn fetch_result(
         });
     }
     result
+}
+
+/// Upstream Credits section (`MenuCardView+Costs`): "125.5 left" over a bar.
+/// A spend-control limit gives "of <limit>" and the remaining share; a plain
+/// balance is drawn against the next power of ten, labelled in tokens.
+/// Unlimited or absent credits produce no cost and so no row.
+fn credits_detail(cost: &crate::core::CostSnapshot) -> Option<ProviderDisplayDetail> {
+    use crate::providers::format;
+    let (remaining, scale, scale_text) = match cost.limit {
+        Some(limit) if cost.period == "Monthly credits" => {
+            let remaining = (limit - cost.used).max(0.0);
+            (remaining, limit, format!("of {}", format::number(limit, 2)))
+        }
+        Some(_) => return None,
+        None if cost.period == "Credits" => {
+            let balance = cost.used;
+            let scale = fallback_credits_scale(balance)?;
+            let scale_text = if scale <= u64::MAX as f64 {
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    clippy::cast_sign_loss,
+                    reason = "scale is a positive power of ten within u64 range"
+                )]
+                let whole = scale as u64;
+                format::token_count(whole)
+            } else {
+                format::number(scale, 2)
+            };
+            (balance, scale, format!("{scale_text} tokens"))
+        }
+        None => return None,
+    };
+    if !remaining.is_finite() {
+        return None;
+    }
+    ProviderDisplayDetail::new(
+        "codex-credits",
+        "Credits",
+        format!("{} left", format::number(remaining, 2)),
+    )?
+    .with_secondary_value(scale_text)?
+    .with_progress(remaining.clamp(0.0, scale), scale)
+}
+
+/// `fallbackCreditsScale`: the next power of ten above the balance (1 for 0).
+fn fallback_credits_scale(balance: f64) -> Option<f64> {
+    if !balance.is_finite() {
+        return None;
+    }
+    let maximum = balance.max(0.0);
+    let exponent = if maximum > 0.0 {
+        maximum.log10().floor() + 1.0
+    } else {
+        0.0
+    };
+    Some(10f64.powf(exponent).min(f64::MAX))
 }
 
 fn pat_allows_auto_fallback(error: &ProviderError) -> bool {
@@ -115,6 +185,12 @@ impl Default for CodexProvider {
 impl Provider for CodexProvider {
     fn automatic_metric_prioritizes_exhausted_window(&self) -> bool {
         false
+    }
+
+    /// Upstream `menuBarPaceWindow` paces Codex on its weekly lane, which
+    /// `normalize_named_windows` puts in the secondary slot.
+    fn menu_bar_pace_lane(&self) -> Option<crate::core::IconLane> {
+        Some(crate::core::IconLane::Secondary)
     }
 
     fn id(&self) -> ProviderId {
@@ -277,6 +353,125 @@ mod reset_credit_result_tests {
         let unknown = fetch_result(usage, None, "pat", None, None);
         assert!(unknown.inventory.is_empty());
         assert!(unknown.reset_credits.is_none());
+    }
+
+    /// Cost history scoping: the email only labels the cost snapshot when no
+    /// account id came from the API, and the account identity (the
+    /// ChatGPT account id that scopes weekly-reset state) is untouched by it.
+    #[test]
+    fn oauth_email_labels_cost_but_does_not_replace_account_identity() {
+        let usage = UsageSnapshot::new(RateWindow::new(10.0)).with_email("parity.user@example.com");
+        let cost = crate::core::CostSnapshot::new(125.5, "USD", "Credits");
+        let result = fetch_result(
+            usage.clone(),
+            Some(cost),
+            "oauth",
+            Some("acct_123".to_string()),
+            None,
+        );
+        assert_eq!(
+            result.usage.account_email.as_deref(),
+            Some("parity.user@example.com")
+        );
+        assert_eq!(
+            result.cost.as_ref().and_then(|c| c.account_id.as_deref()),
+            Some("parity.user@example.com")
+        );
+        assert_eq!(result.account_identity.as_deref(), Some("acct_123"));
+
+        let keyed = crate::core::CostSnapshot::new(125.5, "USD", "Credits").with_account_id("api");
+        let result = fetch_result(usage, Some(keyed), "oauth", None, None);
+        assert_eq!(
+            result.cost.as_ref().and_then(|c| c.account_id.as_deref()),
+            Some("api")
+        );
+        assert!(result.account_identity.is_none());
+    }
+}
+
+#[cfg(test)]
+mod credits_detail_tests {
+    use super::*;
+    use crate::core::CostSnapshot;
+
+    fn row(cost: &CostSnapshot) -> Option<(String, Option<String>, f64, f64)> {
+        credits_detail(cost).map(|detail| {
+            let progress = detail.progress().expect("credits bar");
+            (
+                detail.value().to_string(),
+                detail.secondary_value().map(str::to_string),
+                progress.used(),
+                progress.total(),
+            )
+        })
+    }
+
+    #[test]
+    fn balance_matches_the_upstream_credits_line_and_token_scale() {
+        let detail = credits_detail(&CostSnapshot::new(125.5, "USD", "Credits")).expect("row");
+        assert_eq!(detail.id(), "codex-credits");
+        assert_eq!(detail.title(), "Credits");
+        assert_eq!(
+            row(&CostSnapshot::new(125.5, "USD", "Credits")),
+            Some((
+                "125.5 left".to_string(),
+                Some("1K tokens".to_string()),
+                125.5,
+                1000.0
+            ))
+        );
+    }
+
+    #[test]
+    fn fallback_scale_is_the_next_power_of_ten() {
+        let cases = [
+            (0.0, "0 left", "1 tokens", 1.0),
+            (9.5, "9.5 left", "10 tokens", 10.0),
+            (999.99, "999.99 left", "1K tokens", 1000.0),
+            (1000.0, "1,000 left", "10K tokens", 10000.0),
+            (2_500_000.0, "2,500,000 left", "10M tokens", 10_000_000.0),
+        ];
+        for (balance, value, scale_text, scale) in cases {
+            let (v, secondary, _, total) =
+                row(&CostSnapshot::new(balance, "USD", "Credits")).expect("row");
+            assert_eq!(v, value, "balance {balance}");
+            assert_eq!(secondary.as_deref(), Some(scale_text), "balance {balance}");
+            assert_eq!(total, scale, "balance {balance}");
+        }
+    }
+
+    #[test]
+    fn spend_control_limit_shows_remaining_of_limit() {
+        let cost = CostSnapshot::new(40.0, "USD", "Monthly credits").with_limit(100.0);
+        assert_eq!(
+            row(&cost),
+            Some((
+                "60 left".to_string(),
+                Some("of 100".to_string()),
+                60.0,
+                100.0
+            ))
+        );
+    }
+
+    #[test]
+    fn other_costs_produce_no_credits_row() {
+        assert!(credits_detail(&CostSnapshot::new(3.0, "USD", "Monthly")).is_none());
+    }
+
+    #[test]
+    fn fetch_result_carries_the_credits_row_only_with_credits() {
+        let usage = crate::core::UsageSnapshot::new(crate::core::RateWindow::new(10.0));
+        let with = fetch_result(
+            usage.clone(),
+            Some(CostSnapshot::new(125.5, "USD", "Credits")),
+            "oauth",
+            None,
+            None,
+        );
+        assert_eq!(with.display_details().len(), 1);
+        let without = fetch_result(usage, None, "oauth", None, None);
+        assert!(without.display_details().is_empty());
     }
 }
 

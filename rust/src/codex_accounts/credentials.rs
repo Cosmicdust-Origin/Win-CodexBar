@@ -213,14 +213,7 @@ pub(super) fn identity_from_credentials(credentials: &AuthCredentials) -> AuthBa
         .and_then(|v| v.as_object())
         .cloned()
         .unwrap_or_default();
-    let profile = payload
-        .get("https://api.openai.com/profile")
-        .and_then(|v| v.as_object())
-        .cloned()
-        .unwrap_or_default();
-
-    let email = normalize_string(payload.get("email").and_then(|v| v.as_str()))
-        .or_else(|| normalize_string(profile.get("email").and_then(|v| v.as_str())));
+    let email = email_from_payload(&payload);
     let auth_subject = normalize_string(payload.get("sub").and_then(|v| v.as_str()));
     let plan = normalize_string(auth.get("chatgpt_plan_type").and_then(|v| v.as_str()))
         .or_else(|| normalize_string(payload.get("chatgpt_plan_type").and_then(|v| v.as_str())));
@@ -252,6 +245,23 @@ pub fn jwt_payload(token: &str) -> Option<serde_json::Map<String, serde_json::Va
         .ok()?
         .as_object()
         .cloned()
+}
+
+/// The account email in an id_token payload: the top-level `email` claim, or
+/// the OpenAI profile claim (upstream `UsageFetcher` id_token reading).
+pub(crate) fn email_from_id_token(id_token: &str) -> Option<String> {
+    email_from_payload(&jwt_payload(id_token)?)
+}
+
+fn email_from_payload(payload: &serde_json::Map<String, serde_json::Value>) -> Option<String> {
+    normalize_string(payload.get("email").and_then(|v| v.as_str())).or_else(|| {
+        normalize_string(
+            payload
+                .get("https://api.openai.com/profile")
+                .and_then(|profile| profile.get("email"))
+                .and_then(|v| v.as_str()),
+        )
+    })
 }
 
 pub(super) fn account_id_from_id_token(id_token: Option<&str>) -> Option<String> {

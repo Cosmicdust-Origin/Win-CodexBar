@@ -32,6 +32,7 @@ fn stub_input() -> SnapshotInput {
         identity: DashboardIdentity::Redacted,
         version: None,
         usage_bars_show_used: None,
+        weekly_work_days: None,
     }
 }
 

@@ -21,8 +21,8 @@ function detail(overrides: Partial<IdentityDetails> = {}): IdentityDetails {
 const t = (key: LocaleKey) => key;
 
 describe("IdentitySection OpenAI project privacy", () => {
-  it("masks project ids in account and plan rows when privacy is enabled", () => {
-    render(
+  it("drops the project account row and masks the plan's project id when privacy is enabled", () => {
+    const { container } = render(
       <IdentitySection
         provider={detail()}
         subtitle=""
@@ -31,9 +31,9 @@ describe("IdentitySection OpenAI project privacy", () => {
       />,
     );
 
-    expect(screen.getByText("Project: ••••")).toBeInTheDocument();
+    expect(screen.queryByText("Account")).toBeNull();
     expect(screen.getByText("Admin API: ••••")).toBeInTheDocument();
-    expect(screen.queryByText("proj-private")).toBeNull();
+    expect(container.innerHTML).not.toContain("proj-private");
   });
 
   it("keeps project ids visible when privacy is disabled", () => {
@@ -44,8 +44,8 @@ describe("IdentitySection OpenAI project privacy", () => {
 });
 
 describe("IdentitySection account privacy for every provider", () => {
-  it("masks the account email of non-OpenAI providers when privacy is enabled", () => {
-    render(
+  it("drops the account email of non-OpenAI providers when privacy is enabled", () => {
+    const { container } = render(
       <IdentitySection
         provider={detail({ id: "codex", displayName: "Codex", email: "person@example.com", organization: null, plan: "Pro" })}
         subtitle=""
@@ -54,13 +54,14 @@ describe("IdentitySection account privacy for every provider", () => {
       />,
     );
 
-    expect(screen.getByText("p•••••@example.com")).toBeInTheDocument();
-    expect(screen.queryByText("person@example.com")).toBeNull();
+    expect(container.innerHTML).not.toContain("@");
+    expect(container.innerHTML).not.toContain("example.com");
+    expect(screen.queryByText("Account")).toBeNull();
     expect(screen.getByText("Pro")).toBeInTheDocument();
   });
 
-  it("masks an email embedded in the organization label", () => {
-    render(
+  it("drops an organization label that embeds the email", () => {
+    const { container } = render(
       <IdentitySection
         provider={detail({ id: "claude", displayName: "Claude", email: null, organization: "person@example.com's Organization", plan: null })}
         subtitle=""
@@ -69,7 +70,24 @@ describe("IdentitySection account privacy for every provider", () => {
       />,
     );
 
-    expect(screen.getByText("p•••••@example.com's Organization")).toBeInTheDocument();
+    expect(container.innerHTML).not.toContain("@");
+    expect(container.innerHTML).not.toContain("example.com");
+    expect(screen.queryByText("Account")).toBeNull();
+  });
+
+  it("drops an organization label without an email too", () => {
+    render(
+      <IdentitySection
+        provider={detail({ id: "claude", displayName: "Claude", email: null, organization: "Acme Research", plan: "Max" })}
+        subtitle=""
+        t={t}
+        hidePersonalInfo
+      />,
+    );
+
+    expect(screen.queryByText("Account")).toBeNull();
+    expect(screen.queryByText("Acme Research")).toBeNull();
+    expect(screen.getByText("Max")).toBeInTheDocument();
   });
 
   it("shows the account email when privacy is disabled", () => {
@@ -82,5 +100,30 @@ describe("IdentitySection account privacy for every provider", () => {
     );
 
     expect(screen.getByText("person@example.com")).toBeInTheDocument();
+  });
+});
+
+describe("IdentitySection source row", () => {
+  it("falls back to the provider's source hint before the first fetch", () => {
+    render(
+      <IdentitySection
+        provider={detail({ id: "langdock", displayName: "Langdock", organization: null, plan: null })}
+        subtitle=""
+        t={t}
+      />,
+    );
+    expect(screen.getByText("ProviderSourceWebShort")).toBeInTheDocument();
+  });
+
+  it("prefers the fetched source label", () => {
+    render(
+      <IdentitySection
+        provider={detail({ id: "synthetic", displayName: "Synthetic", organization: null, plan: null, sourceLabel: "api" })}
+        subtitle=""
+        t={t}
+      />,
+    );
+    expect(screen.getByText("api")).toBeInTheDocument();
+    expect(screen.queryByText("ProviderSourceApiShort")).toBeNull();
   });
 });

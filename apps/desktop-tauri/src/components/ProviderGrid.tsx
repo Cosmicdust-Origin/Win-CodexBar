@@ -3,7 +3,7 @@ import type { ProviderUsageSnapshot } from "../types/bridge";
 import { ProviderIcon } from "./providers/ProviderIcon";
 import { getProviderIcon } from "./providers/providerIcons";
 import { useLocale } from "../hooks/useLocale";
-import { prioritizeProviders } from "./providerGridUtils";
+import { prioritizeProviders, switcherWeeklyPercent } from "./providerGridUtils";
 
 export default function ProviderGrid({
   providers,
@@ -66,12 +66,8 @@ export default function ProviderGrid({
     if (expanded === undefined) setUncontrolledExpanded(next);
     onExpandedChange?.(next);
   };
-  const gridPercent = (provider: ProviderUsageSnapshot) => {
-    const pct = showAsUsed
-      ? provider.primary.usedPercent
-      : provider.primary.remainingPercent;
-    return Math.max(0, Math.min(100, pct));
-  };
+  const gridPercent = (provider: ProviderUsageSnapshot) =>
+    switcherWeeklyPercent(provider, showAsUsed);
   const totalItems = providers.length + 1;
   const shouldCollapse = totalItems > 32;
   const collapsedProviders = useMemo(

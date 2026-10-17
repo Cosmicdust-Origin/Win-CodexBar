@@ -213,6 +213,7 @@ impl CodexApi {
                                 usage,
                             )
                             .await;
+                        let usage = with_credential_email(usage, &creds);
                         return Ok((usage, cost, creds.account_id.clone(), displayed_credits));
                     }
                 };
@@ -265,6 +266,7 @@ impl CodexApi {
             )
             .await;
         let usage = apply_reset_credits_window(usage, displayed_credits.as_ref());
+        let usage = with_credential_email(usage, &creds);
         Ok((usage, cost, creds.account_id.clone(), displayed_credits))
     }
 
@@ -483,7 +485,9 @@ impl CodexApi {
         if !response.status().is_success() {
             return Err(super::authenticated_http_error(response, "Codex reset credits").await);
         }
-        decode_reset_credits(&response.bytes().await?)
+        let mut credits = decode_reset_credits(&response.bytes().await?)?;
+        credits.observed_at = Some(Utc::now());
+        Ok(credits)
     }
 
     /// Load credentials, tolerating a brief owner publication of `auth.json`.
@@ -580,6 +584,7 @@ impl CodexApi {
                     is_external_oauth: false,
                     access_token_expires_at: None,
                     last_refresh: None,
+                    account_email: None,
                 });
             }
         }
@@ -617,6 +622,10 @@ impl CodexApi {
             .and_then(parse_timestamp);
 
         let access_token_expires_at = parse_access_token_expiry(&access_token);
+        let account_email = tokens
+            .get("id_token")
+            .and_then(|v| v.as_str())
+            .and_then(crate::codex_accounts::credentials::email_from_id_token);
 
         Ok(CodexCredentials {
             access_token,
@@ -624,6 +633,7 @@ impl CodexApi {
             is_external_oauth: has_refresh_token,
             access_token_expires_at,
             last_refresh,
+            account_email,
         })
     }
 
@@ -973,7 +983,7 @@ impl CodexApi {
 
         let balance = credits
             .get("balance")
-            .and_then(|v| v.as_f64())
+            .and_then(credit_balance_value)
             .unwrap_or(0.0);
 
         Some(CostSnapshot::new(balance, "USD", "Credits"))
@@ -1119,6 +1129,17 @@ fn normalize_named_windows(
 /// Returns (session, weekly, monthly, code_review). F5 (upstream 0.48.0):
 /// monthly (30-day) windows are routed to their own lane so surfaces can
 /// display a monthly reset instead of swallowing it into the weekly label.
+/// The usage API sends `credits.balance` as a number or as a numeric string
+/// ("125.50"). Upstream `CreditDetails` accepts both; anything else is unknown.
+fn credit_balance_value(value: &serde_json::Value) -> Option<f64> {
+    let balance = match value {
+        serde_json::Value::Number(number) => number.as_f64(),
+        serde_json::Value::String(text) => text.trim().parse::<f64>().ok(),
+        _ => None,
+    }?;
+    balance.is_finite().then_some(balance)
+}
+
 fn normalize_array_windows(
     windows: Vec<RateWindow>,
 ) -> (
@@ -1201,6 +1222,15 @@ fn format_plan_type(plan_type: &str) -> String {
     }
 }
 
+/// The card header shows the auth.json account email (upstream reads it from
+/// the id_token). An email already on the snapshot wins.
+fn with_credential_email(usage: UsageSnapshot, creds: &CodexCredentials) -> UsageSnapshot {
+    match (&usage.account_email, &creds.account_email) {
+        (None, Some(email)) => usage.with_email(email.clone()),
+        _ => usage,
+    }
+}
+
 impl Default for CodexApi {
     fn default() -> Self {
         Self::new()
@@ -1226,6 +1256,9 @@ struct CodexCredentials {
     /// supplies provenance when the external-source opt-in setting is OFF;
     /// its age is not an access-token expiry signal.
     last_refresh: Option<DateTime<Utc>>,
+    /// Account email from the auth.json `id_token` (claim `email`, or the
+    /// OpenAI profile claim). Shown in the card header; never logged.
+    account_email: Option<String>,
 }
 
 struct CachedCodexCredentials {
@@ -1294,6 +1327,10 @@ pub(super) struct ResetCredits {
     #[serde(default)]
     pub(super) credits: Vec<ResetCredit>,
     pub(super) available_count: u32,
+    /// When the endpoint answered. A cached inventory keeps its original time
+    /// so weekly-reset evidence can tell it apart from a fresh read.
+    #[serde(skip)]
+    pub(super) observed_at: Option<DateTime<Utc>>,
 }
 
 fn decode_reset_credits(data: &[u8]) -> Result<ResetCredits, ProviderError> {
@@ -1746,6 +1783,7 @@ mod tests {
                     expires_at: Some("2026-07-10T12:00:00Z".into()),
                 },
             ],
+            observed_at: None,
         };
         let window = reset_credits_rate_window(&reset, now);
         assert!(window.is_informational);
@@ -1771,6 +1809,7 @@ mod tests {
         let reset = ResetCredits {
             available_count: 1,
             credits: vec![],
+            observed_at: None,
         };
         let window = reset_credits_rate_window(&reset, now);
         assert!(window.is_informational);
@@ -2347,6 +2386,37 @@ mod tests {
         assert!(usage.extra_rate_windows.is_empty());
     }
 
+    fn credits_cost_from_json(balance: serde_json::Value) -> Option<CostSnapshot> {
+        CodexApi::new()
+            .build_result_from_json_for_test(&json!({
+                "rate_limit": {
+                    "primary_window": { "used_percent": 10, "limit_window_seconds": 18000 }
+                },
+                "credits": { "has_credits": true, "unlimited": false, "balance": balance }
+            }))
+            .expect("codex usage")
+            .1
+    }
+
+    #[test]
+    fn credits_balance_accepts_numeric_string() {
+        let cost = credits_cost_from_json(json!("125.50")).expect("credits cost");
+        assert_eq!(cost.used, 125.5);
+        assert_eq!(cost.currency_code, "USD");
+    }
+
+    #[test]
+    fn credits_balance_accepts_number() {
+        let cost = credits_cost_from_json(json!(7.5)).expect("credits cost");
+        assert_eq!(cost.used, 7.5);
+    }
+
+    #[test]
+    fn credits_balance_falls_back_to_zero_for_non_numeric_string() {
+        let cost = credits_cost_from_json(json!("abc")).expect("credits cost");
+        assert_eq!(cost.used, 0.0);
+    }
+
     #[test]
     fn maps_top_level_individual_credit_limit_to_cost_snapshot() {
         let api = CodexApi::new();
@@ -2510,8 +2580,9 @@ mod tests {
             is_external_oauth: true,
             access_token_expires_at: None,
             last_refresh: None,
+            account_email: None,
         };
-        let err = CodexApi::enforce_external_oauth_gate(&creds)
+        let err = CodexApi::enforce_external_oauth_gate_at(&creds, false, Utc::now())
             .expect_err("external OAuth without provenance must fail closed");
         assert!(matches!(err, ProviderError::AuthRequired));
     }
@@ -2525,6 +2596,7 @@ mod tests {
             is_external_oauth: true,
             access_token_expires_at: None,
             last_refresh: Some(old),
+            account_email: None,
         };
         assert!(CodexApi::enforce_external_oauth_gate(&creds).is_ok());
     }
@@ -2538,6 +2610,7 @@ mod tests {
             is_external_oauth: true,
             access_token_expires_at: None,
             last_refresh: Some(fresh),
+            account_email: None,
         };
         assert!(CodexApi::enforce_external_oauth_gate(&creds).is_ok());
     }
@@ -2574,6 +2647,64 @@ mod tests {
         assert!(matches!(err, ProviderError::AuthRequired));
     }
 
+    fn id_token(payload: &str) -> String {
+        let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(payload);
+        format!("header.{payload}.signature")
+    }
+
+    #[test]
+    fn credentials_read_account_email_from_id_token() {
+        let token = id_token(r#"{"email":"parity.user@example.com"}"#);
+        let json = format!(
+            r#"{{"tokens":{{"access_token":"access","refresh_token":"refresh","id_token":"{token}"}}}}"#
+        );
+        let creds = CodexApi::parse_credentials_json(&json).expect("credentials");
+        assert_eq!(
+            creds.account_email.as_deref(),
+            Some("parity.user@example.com")
+        );
+    }
+
+    #[test]
+    fn credentials_fall_back_to_the_openai_profile_email_claim() {
+        let token = id_token(
+            r#"{"email":"  ","https://api.openai.com/profile":{"email":"profile@example.com"}}"#,
+        );
+        let json = format!(r#"{{"tokens":{{"access_token":"access","id_token":"{token}"}}}}"#);
+        let creds = CodexApi::parse_credentials_json(&json).expect("credentials");
+        assert_eq!(creds.account_email.as_deref(), Some("profile@example.com"));
+    }
+
+    #[test]
+    fn credentials_without_a_readable_id_token_have_no_email() {
+        let json = r#"{"tokens":{"access_token":"access","id_token":"not-a-jwt"}}"#;
+        let creds = CodexApi::parse_credentials_json(json).expect("credentials");
+        assert!(creds.account_email.is_none());
+        let api_key = CodexApi::parse_credentials_json(r#"{"OPENAI_API_KEY":"sk-test"}"#)
+            .expect("credentials");
+        assert!(api_key.account_email.is_none());
+    }
+
+    #[test]
+    fn credential_email_fills_the_snapshot_but_never_overrides_one() {
+        let creds = CodexCredentials {
+            access_token: "access".to_string(),
+            account_id: None,
+            is_external_oauth: true,
+            access_token_expires_at: None,
+            last_refresh: None,
+            account_email: Some("parity.user@example.com".to_string()),
+        };
+        let usage = with_credential_email(UsageSnapshot::new(RateWindow::new(10.0)), &creds);
+        assert_eq!(
+            usage.account_email.as_deref(),
+            Some("parity.user@example.com")
+        );
+        let existing = UsageSnapshot::new(RateWindow::new(10.0)).with_email("whoami@example.com");
+        let usage = with_credential_email(existing, &creds);
+        assert_eq!(usage.account_email.as_deref(), Some("whoami@example.com"));
+    }
+
     #[test]
     fn external_oauth_gate_requires_cli_refresh_when_jwt_is_near_expiry() {
         let soon = Utc::now() + chrono::Duration::minutes(2);
@@ -2598,6 +2729,7 @@ mod tests {
             is_external_oauth: true,
             access_token_expires_at: None,
             last_refresh: None,
+            account_email: None,
         };
         assert!(CodexApi::enforce_external_oauth_gate_at(&creds, true, Utc::now()).is_ok());
     }

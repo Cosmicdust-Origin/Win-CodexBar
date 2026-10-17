@@ -18,6 +18,21 @@ export function loadStyles(): string {
   return cached;
 }
 
+const sheets = new Map<string, string>();
+
+/** Contents of another stylesheet under src/, by path relative to src/. */
+export function loadStylesheet(path: string): string {
+  let text = sheets.get(path);
+  if (text === undefined) {
+    if (!import.meta.dirname) {
+      throw new Error("import.meta.dirname unavailable to vitest runner");
+    }
+    text = readFileSync(`${import.meta.dirname}/../${path}`, "utf8");
+    sheets.set(path, text);
+  }
+  return text;
+}
+
 /**
  * Declarations of the first rule whose selector is exactly `selector`. The
  * match is anchored to a line start so `.a` cannot match inside `.b .a`.

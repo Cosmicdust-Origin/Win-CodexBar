@@ -110,8 +110,11 @@ mod tests {
             reserve_description: None,
             reserve_will_last_to_reset: false,
             reserve_eta_seconds: None,
+            pace: None,
             monthly_limit_block: None,
             description_is_detail: false,
+            reset_regenerates: false,
+            hidden_on_card: false,
         }
     }
 
@@ -123,6 +126,7 @@ mod tests {
             primary_label: None,
             secondary: None,
             secondary_label: None,
+            secondary_label_key: None,
             model_specific: None,
             tertiary: None,
             tertiary_label: None,
@@ -132,6 +136,7 @@ mod tests {
             cost: None,
             plan_name: None,
             account_email: None,
+            account_label: None,
             subscription: None,
             source_label: String::new(),
             has_successful_claude_cli_quota: false,
@@ -139,12 +144,14 @@ mod tests {
             error: None,
             error_state: codexbar::core::ProviderStateKind::Ready,
             pace: None,
+            pace_authoritative: true,
             account_organization: None,
             tray_status_label: None,
             fetch_duration_ms: None,
             wayfinder_usage: None,
             quota_burndown: None,
             open_ai_api_usage: None,
+            throughput: None,
             session_equivalent_forecast: None,
         }
     }

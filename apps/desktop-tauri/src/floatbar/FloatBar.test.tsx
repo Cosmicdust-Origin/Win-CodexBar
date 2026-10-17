@@ -134,6 +134,7 @@ function settings(overrides: Partial<SettingsSnapshot> = {}): SettingsSnapshot {
     refreshIntervalSecs: 300,
     adaptiveRefresh: false,
     refreshAllProvidersOnMenuOpen: false,
+    statusChecksEnabled: true,
     lowPowerMode: false,
     startAtLogin: false,
     startMinimized: false,
@@ -157,7 +158,14 @@ function settings(overrides: Partial<SettingsSnapshot> = {}): SettingsSnapshot {
     switcherShowsIcons: true,
     menuBarShowsHighestUsage: false,
     menuBarShowsPercent: false,
+    menuBarIconStyle: "bars",
+    mergedOverviewSelectedProviders: [],
+    quotaWarningMarkersVisible: true,
+    workdayTickStyle: "subtle",
     menuBarColorPace: false,
+    menuBarColorByProvider: false,
+    menuBarPaceReservePositive: false,
+    providersSortedAlphabetically: false,
     showAsUsed: true,
     showAllTokenAccountsInMenu: false,
     enableAnimations: true,
@@ -172,7 +180,9 @@ function settings(overrides: Partial<SettingsSnapshot> = {}): SettingsSnapshot {
     globalShortcut: "Ctrl+Shift+U",
     switcherShortcuts: {},
     codexCustomSessionsDirs: [],
+    antigravityAdditionalProfileHomes: [],
     uiLanguage: "english",
+    uiLanguageFollowsSystem: false,
     theme: "dark",
     windowScalePercent: 125,
     trayScalePercent: 100,
@@ -684,6 +694,64 @@ describe("FloatBar", () => {
     });
   });
 
+  it("follows a provider's Custom quota warnings and drops the tone when they are Off", async () => {
+    // 50% used is below the global 70% high threshold, but above a Custom 40%.
+    tauriMocks.getCachedProviders.mockResolvedValue([snapshot("claude", "Claude", 50)]);
+    const customWarnings: Partial<SettingsSnapshot> = {
+      providerQuotaWarnings: { claude: { session: { enabled: true, high: 40, critical: 90 } } },
+    };
+    tauriMocks.getSettingsSnapshot.mockResolvedValue(settings(customWarnings));
+    const custom = renderFloatBar(bootstrap(customWarnings));
+    await waitFor(() => {
+      expect(custom.container.querySelector(".floatbar__pill--warn")).not.toBeNull();
+    });
+    custom.unmount();
+
+    tauriMocks.getCachedProviders.mockResolvedValue([snapshot("claude", "Claude", 95)]);
+    const offWarnings: Partial<SettingsSnapshot> = {
+      providerQuotaWarnings: { claude: { session: { enabled: false } } },
+    };
+    tauriMocks.getSettingsSnapshot.mockResolvedValue(settings(offWarnings));
+    const off = renderFloatBar(bootstrap(offWarnings));
+    await waitFor(() => {
+      expect(off.container.querySelector(".floatbar__pill--ok")).not.toBeNull();
+    });
+  });
+
+  it("picks the quota warning window by card lane, not by window length", async () => {
+    // A monthly primary lane is the Session window for cards and toasts, so
+    // Session Off drops its tone even though the window is longer than a week.
+    const monthly = { ...rateWindow(95), windowMinutes: 30 * 24 * 60 };
+    tauriMocks.getCachedProviders.mockResolvedValue([
+      { ...snapshot("claude", "Claude", 95), primary: monthly, selectedMetric: monthly },
+    ]);
+    const sessionOff: Partial<SettingsSnapshot> = {
+      providerQuotaWarnings: { claude: { session: { enabled: false } } },
+    };
+    tauriMocks.getSettingsSnapshot.mockResolvedValue(settings(sessionOff));
+    const off = renderFloatBar(bootstrap(sessionOff));
+    await waitFor(() => {
+      expect(off.container.querySelector(".floatbar__pill--ok")).not.toBeNull();
+    });
+    off.unmount();
+
+    // A selected secondary lane with no window length is the Weekly window.
+    tauriMocks.getCachedProviders.mockResolvedValue([
+      snapshot("claude", "Claude", 10, {
+        informational: true,
+        secondary: { used: 50 },
+      }),
+    ]);
+    const weeklyCustom: Partial<SettingsSnapshot> = {
+      providerQuotaWarnings: { claude: { weekly: { high: 40, critical: 90 } } },
+    };
+    tauriMocks.getSettingsSnapshot.mockResolvedValue(settings(weeklyCustom));
+    const weekly = renderFloatBar(bootstrap(weeklyCustom));
+    await waitFor(() => {
+      expect(weekly.container.querySelector(".floatbar__pill--warn")).not.toBeNull();
+    });
+  });
+
   it("applies critical tone when the provider is exhausted", async () => {
     tauriMocks.getCachedProviders.mockResolvedValue([
       snapshot("claude", "Claude", 100, { exhausted: true }),
@@ -713,6 +781,40 @@ describe("FloatBar", () => {
       expect(pills.length).toBe(1);
       expect(pills[0].getAttribute("title")).toMatch(/Codex/);
     });
+  });
+
+  it("gives near-black brands a lifted tint for the dark floating glass only", async () => {
+    tauriMocks.getCachedProviders.mockResolvedValue([
+      snapshot("typesafe", "TypeSafe", 60),
+      snapshot("grok", "Grok", 40),
+    ]);
+    tauriMocks.getSettingsSnapshot.mockResolvedValue(
+      settings({ enabledProviders: ["typesafe", "grok"] }),
+    );
+
+    const { container } = renderFloatBar(
+      bootstrap({ enabledProviders: ["typesafe", "grok"] }),
+    );
+    await waitFor(() => {
+      expect(container.querySelectorAll(".floatbar__pill").length).toBe(2);
+    });
+    const [typesafe, grok] = Array.from(
+      container.querySelectorAll<HTMLElement>(".floatbar__pill"),
+    );
+    // TypeSafe keeps the Mac #111111 and adds the dark-surface tint.
+    expect(typesafe.style.getPropertyValue("--brand")).toBe("#111111");
+    expect(typesafe.style.getPropertyValue("--brand-dark")).toBe("#707070");
+    const icon = typesafe.querySelector<HTMLElement>(".provider-icon")!;
+    expect(icon.style.getPropertyValue("--provider-brand")).toBe("#111111");
+    expect(icon.style.getPropertyValue("--provider-brand-dark")).toBe("#707070");
+    // Grok's Mac green already reads on dark and gets no tint.
+    expect(grok.style.getPropertyValue("--brand")).toBe("#10a37f");
+    expect(grok.style.getPropertyValue("--brand-dark")).toBe("");
+    expect(
+      grok.querySelector<HTMLElement>(".provider-icon")!.style.getPropertyValue(
+        "--provider-brand-dark",
+      ),
+    ).toBe("");
   });
 
   it("does not show stale cached providers when all providers are disabled", async () => {

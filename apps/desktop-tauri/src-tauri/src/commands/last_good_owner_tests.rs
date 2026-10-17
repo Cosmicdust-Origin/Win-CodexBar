@@ -23,8 +23,13 @@ fn cached_balance() -> ProviderUsageSnapshot {
         .metadata()
         .clone();
     let result = ProviderFetchResult::new(UsageSnapshot::new(RateWindow::new(0.0)), "web");
-    let mut snapshot =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::DeepSeek, &metadata, &result, None);
+    let mut snapshot = ProviderUsageSnapshot::from_fetch_result(
+        ProviderId::DeepSeek,
+        &metadata,
+        &result,
+        None,
+        None,
+    );
     snapshot.updated_at = MEASURED_AT.to_string();
     snapshot
 }
@@ -139,7 +144,7 @@ fn other_providers_keep_their_existing_failure_policy() {
     let metadata = instantiate_provider(ProviderId::Codex).metadata().clone();
     let result = ProviderFetchResult::new(UsageSnapshot::new(RateWindow::new(42.0)), "OAuth");
     let good =
-        ProviderUsageSnapshot::from_fetch_result(ProviderId::Codex, &metadata, &result, None);
+        ProviderUsageSnapshot::from_fetch_result(ProviderId::Codex, &metadata, &result, None, None);
     let failed = ProviderUsageSnapshot::from_error(
         ProviderId::Codex,
         &metadata,

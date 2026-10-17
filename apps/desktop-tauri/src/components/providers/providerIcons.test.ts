@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { TEST_PROVIDER_CATALOG } from "../../test/providerCatalog";
-import { loadStyles } from "../../test/styles";
-import { PROVIDER_ICON_REGISTRY } from "./providerIcons";
+import { loadStyles, loadStylesheet, ruleBlock } from "../../test/styles";
+import { PROVIDER_ICON_REGISTRY, brandColorOnDark, providerBarAccent } from "./providerIcons";
 
 // Repository root, from apps/desktop-tauri/src/components/providers.
 const REPO_ROOT = import.meta.dirname + "/../../../../../";
@@ -64,6 +64,37 @@ const ADOPTED_ACCENTS: Array<[string, string]> = [
   ["venice", "#3c8fdd"],
 ];
 
+// Mac CodexBar 0.70.0 brand colors adopted for parity (card PR 4,
+// tray-card-spec section 4). Vercel is the one deliberate exception.
+const MAC_PARITY_ACCENTS: Array<[string, string]> = [
+  ["chutes", "#3184ff"],
+  ["deepgram", "#6467f2"],
+  ["doubao", "#3370ff"],
+  ["exa", "#0143d9"],
+  ["grok", "#10a37f"],
+  ["groq", "#f56844"],
+  ["helmcode", "#4934e1"],
+  ["kilo", "#f27027"],
+  ["litellm", "#4c89f0"],
+  ["llmproxy", "#24b47e"],
+  ["ollama", "#888888"],
+  ["openaiapi", "#0f826e"],
+  ["openrouter", "#6467f2"],
+  ["perplexity", "#20b2aa"],
+  ["poe", "#5d5cde"],
+  ["qoder", "#10b981"],
+  ["sakana", "#2975db"],
+  ["stepfun", "#2196f2"],
+  ["t3chat", "#f56647"],
+  ["tinyapi", "#f97316"],
+  ["typesafe", "#111111"],
+  ["v0", "#111111"],
+  ["warp", "#938bb4"],
+  ["wayfinder", "#10a37f"],
+  ["windsurf", "#34e8bb"],
+  ["zed", "#084eff"],
+];
+
 describe("provider icon registry", () => {
   it("has explicit icon metadata for every provider in the catalog", () => {
     for (const [id] of TEST_PROVIDER_CATALOG) {
@@ -78,6 +109,14 @@ describe("provider icon registry", () => {
     expect(svg).not.toContain('fill="#000"');
   });
 
+  it("ships the official Devin hexagon mark as a currentColor template", () => {
+    const entry = PROVIDER_ICON_REGISTRY.devin;
+    expect(entry.svgPath).toContain('viewBox="0 0 128 128"');
+    expect(entry.svgPath).toContain('fill="currentColor"');
+    expect(entry.svgPath).not.toContain("<rect");
+    expect(entry.brandColor.toLowerCase()).toBe("#317cff");
+  });
+
   it("does not expose the retired Crof provider", () => {
     expect(PROVIDER_ICON_REGISTRY).not.toHaveProperty("crof");
   });
@@ -86,6 +125,89 @@ describe("provider icon registry", () => {
     for (const [id, color] of ADOPTED_ACCENTS) {
       expect(PROVIDER_ICON_REGISTRY[id]?.brandColor.toLowerCase(), id).toBe(color);
     }
+  });
+
+  it("uses the Mac 0.70.0 brand colors", () => {
+    for (const [id, color] of MAC_PARITY_ACCENTS) {
+      expect(PROVIDER_ICON_REGISTRY[id]?.brandColor.toLowerCase(), id).toBe(color);
+    }
+  });
+
+  it("keeps Vercel on a mid neutral instead of Mac white", () => {
+    // User decision 2026-10-10: Mac #FFFFFF is invisible on the light track.
+    expect(PROVIDER_ICON_REGISTRY.vercel.brandColor.toLowerCase()).toBe("#737373");
+  });
+
+  it("paints ElevenLabs bars in the label color, as Mac does", () => {
+    expect(providerBarAccent("elevenlabs")).toBe("var(--mac-text, rgba(0, 0, 0, 0.85))");
+    expect(providerBarAccent("ElevenLabs", null)).toBe("var(--mac-text, rgba(0, 0, 0, 0.85))");
+    // The icon keeps its brand color.
+    expect(PROVIDER_ICON_REGISTRY.elevenlabs.brandColor.toLowerCase()).toBe("#111827");
+  });
+
+  it("uses the user's override, else the brand color, for card bars", () => {
+    expect(providerBarAccent("claude")).toBe("#cc7c5e");
+    expect(providerBarAccent("claude", "#123456")).toBe("#123456");
+    expect(providerBarAccent("elevenlabs", "#ff0000")).toBe("#ff0000");
+  });
+
+  it("lifts only near-black brand colors on dark surfaces", () => {
+    // Literal values: #111111 is 1.19:1 on #222222, #707070 is the first
+    // 10% white mix that reaches 3:1.
+    expect(brandColorOnDark("#111111")).toBe("#707070");
+    expect(brandColorOnDark("#000000")).toBe("#808080");
+    expect(brandColorOnDark("#111827")).toBe("#70747d");
+    // Colors that already read on dark keep their exact value.
+    expect(brandColorOnDark("#10a37f")).toBeNull();
+    expect(brandColorOnDark("#2563eb")).toBeNull();
+    expect(brandColorOnDark("#737373")).toBeNull();
+    expect(brandColorOnDark("#4c00ff")).toBeNull();
+    expect(brandColorOnDark("var(--mac-text)")).toBeNull();
+
+    const lifted = Object.entries(PROVIDER_ICON_REGISTRY)
+      .filter(([, icon]) => brandColorOnDark(icon.brandColor) !== null)
+      .map(([id]) => id)
+      .sort();
+    expect(lifted).toEqual([
+      "aixy",
+      "deepinfra",
+      "elevenlabs",
+      "flora",
+      "linkup",
+      "manus",
+      "parallel",
+      "replicate",
+      "synthetic",
+      "typesafe",
+      "v0",
+    ]);
+  });
+
+  it("keeps the brand color in light scopes and the lifted tint in dark ones", () => {
+    const css = loadStyles();
+    const dark = css.indexOf('[data-theme="dark"] .provider-icon {');
+    const light = css.indexOf('[data-theme="light"] .provider-icon {');
+    expect(dark).toBeGreaterThan(-1);
+    // The tray panel nests data-theme="light" inside a dark document, so the
+    // light rule must come later to win at equal specificity.
+    expect(light).toBeGreaterThan(dark);
+    expect(ruleBlock(css, '[data-theme="dark"] .provider-icon')).toContain(
+      "var(--provider-brand-dark, var(--provider-brand",
+    );
+    expect(ruleBlock(css, '[data-theme="light"] .provider-icon')).not.toContain(
+      "--provider-brand-dark",
+    );
+
+    const floatbar = loadStylesheet("floatbar/FloatBar.css");
+    expect(ruleBlock(floatbar, ".floatbar .floatbar__provider-icon .provider-icon")).not.toContain(
+      "--provider-brand-dark",
+    );
+    expect(
+      ruleBlock(
+        floatbar,
+        ".floatbar--floating:not(.floatbar--light-bg) .floatbar__provider-icon .provider-icon",
+      ),
+    ).toContain("var(--provider-brand-dark, var(--provider-brand");
   });
 
   it("matches the Rust brand_color table for every provider", () => {
@@ -98,13 +220,23 @@ describe("provider icon registry", () => {
   });
 
   it("keeps provider chart tokens on the brand color", () => {
-    // Grok's chart token has been pure black since before the registry
-    // existed (xAI shares it), so it is the one intentional exception.
-    const checked = chartTokens().filter(
-      ([id]) => id !== "grok" && PROVIDER_ICON_REGISTRY[id] !== undefined,
-    );
+    const checked = chartTokens().filter(([id]) => PROVIDER_ICON_REGISTRY[id] !== undefined);
     expect(checked.map(([id]) => id)).toEqual(
-      expect.arrayContaining(["amp", "augment", "codebuff", "cursor", "deepseek", "kiro", "mistral"]),
+      expect.arrayContaining([
+        "amp",
+        "augment",
+        "codebuff",
+        "cursor",
+        "deepgram",
+        "deepseek",
+        "grok",
+        "groq",
+        "kiro",
+        "llmproxy",
+        "mistral",
+        "windsurf",
+        "xai",
+      ]),
     );
     for (const [id, color] of checked) {
       expect(color, `--chart-${id}`).toBe(PROVIDER_ICON_REGISTRY[id].brandColor.toLowerCase());

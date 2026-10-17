@@ -21,7 +21,7 @@ use std::path::Path;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
-use super::{MetricPreference, Settings};
+use super::{MetricPreference, ProviderQuotaWarnings, Settings};
 use crate::core::ProviderId;
 use crate::cost_reporting_period::CostReportingPeriod;
 
@@ -49,21 +49,42 @@ pub enum PreferencesError {
 
 type Validator = fn(&Value) -> bool;
 
+/// Legacy keys accepted on import only. They are no longer `Settings` fields;
+/// the settings loader migrates them, so they are never exported.
+const IMPORT_ONLY_PREFERENCES: &[(&str, Validator)] = &[
+    // Migration #5: folded into `provider_configs.<id>.quota_warnings`.
+    ("provider_usage_thresholds", provider_usage_thresholds),
+];
+
+/// Portable per-provider preferences that live inside `provider_configs`.
+/// That field is excluded as a whole because it holds secrets, so only these
+/// sub-fields travel, each under its own document key.
+const PROVIDER_PREFERENCES: &[(&str, Validator)] = &[
+    // `provider_configs.<id>.quota_warnings`, as `{ "<id>": { "session": {..},
+    // "weekly": {..} } }`. Windows extension (#827): the Mac document has no
+    // per-provider quota warnings.
+    (PROVIDER_QUOTA_WARNINGS, provider_quota_warnings),
+];
+
+const PROVIDER_QUOTA_WARNINGS: &str = "provider_quota_warnings";
+
 /// Portable keys, named after the `Settings` fields, with their validators.
 const ALLOWED_PREFERENCES: &[(&str, Validator)] = &[
     ("refresh_interval_secs", refresh_interval_secs),
     ("adaptive_refresh", typed::<bool>),
     ("refresh_all_providers_on_menu_open", typed::<bool>),
+    ("status_checks_enabled", typed::<bool>),
     (
         "low_power_mode_preference",
         typed::<super::LowPowerModePreference>,
     ),
     ("show_notifications", typed::<bool>),
+    ("session_quota_notifications_enabled", typed::<bool>),
     ("sound_enabled", typed::<bool>),
     ("high_usage_threshold", percent),
     ("critical_usage_threshold", percent),
-    ("provider_usage_thresholds", provider_usage_thresholds),
     ("predictive_pace_warning_enabled", typed::<bool>),
+    ("limit_reset_notifications_enabled", typed::<bool>),
     ("show_pace", typed::<bool>),
     ("show_as_used", typed::<bool>),
     ("reset_time_relative", typed::<bool>),
@@ -71,8 +92,21 @@ const ALLOWED_PREFERENCES: &[(&str, Validator)] = &[
     ("hide_personal_info", typed::<bool>),
     ("menu_bar_shows_highest_usage", typed::<bool>),
     ("menu_bar_shows_percent", typed::<bool>),
+    ("menu_bar_icon_style", |v| {
+        one_of(v, &["bars", "percent", "stackedBars"])
+    }),
+    ("menu_bar_color_by_provider", typed::<bool>),
+    (
+        "merged_overview_selected_providers",
+        merged_overview_selection,
+    ),
+    ("quota_warning_markers_visible", typed::<bool>),
+    ("workday_tick_style", |v| {
+        one_of(v, &["hidden", "subtle", "high_contrast"])
+    }),
     ("tray_icon_mode", typed::<super::TrayIconMode>),
     ("switcher_shows_icons", typed::<bool>),
+    ("providers_sorted_alphabetically", typed::<bool>),
     ("overview_layout", |v| one_of(v, &["compact", "detailed"])),
     ("menu_bar_display_mode", |v| {
         one_of(v, &["minimal", "compact", "detailed"])
@@ -82,8 +116,12 @@ const ALLOWED_PREFERENCES: &[(&str, Validator)] = &[
     ("provider_metrics", provider_metrics),
     ("theme", typed::<super::ThemePreference>),
     ("ui_language", typed::<super::Language>),
+    ("ui_language_follows_system", typed::<bool>),
     ("window_scale_percent", uint_in::<100, 250>),
-    ("tray_scale_percent", uint_in::<100, 200>),
+    (
+        "tray_scale_percent",
+        uint_in::<{ super::TRAY_SCALE_PERCENT_MIN as u64 }, { super::TRAY_SCALE_PERCENT_MAX as u64 }>,
+    ),
     ("float_bar_opacity", uint_in::<30, 100>),
     ("float_bar_scale", uint_in::<75, 200>),
     ("float_bar_orientation", |v| {
@@ -94,6 +132,12 @@ const ALLOWED_PREFERENCES: &[(&str, Validator)] = &[
     ("float_bar_show_reset_inline", typed::<bool>),
     ("float_bar_show_cost", typed::<bool>),
     ("cost_reporting_period", cost_reporting_period),
+    ("cost_usage_enabled", typed::<bool>),
+    ("spend_dashboard_period", cost_reporting_period),
+    (
+        "spend_dashboard_hidden_source_ids",
+        spend_dashboard_hidden_source_ids,
+    ),
     ("preferred_currency_code", preferred_currency_code),
     ("switcher_shortcuts", switcher_shortcut_overrides),
 ];
@@ -111,6 +155,7 @@ pub const EXCLUDED_KEYS: &[&str] = &[
     // Machine-specific paths, hosts and state.
     "notification_sound_paths",
     "codex_custom_sessions_dirs",
+    "antigravity_additional_profile_homes",
     "agent_session_ssh_hosts",
     // Pinned to this machine's zone on first launch; no settings control.
     "cost_usage_bucket_time_zone",
@@ -144,11 +189,15 @@ pub const EXCLUDED_KEYS: &[&str] = &[
     "weekly_progress_work_days",
     "alibaba_token_plan_region",
     "cost_summary_display_style",
+    // Settings sidebar view filter: local to this machine, as upstream keeps it.
+    "providers_enabled_only",
     // Kept out of the portable set, as upstream (0.70.0) keeps them.
     "menu_bar_color_pace",
+    "menu_bar_pace_reserve_positive",
     "stacked_tray_top_provider",
     "stacked_tray_bottom_provider",
     "credential_expiry_notifications_enabled",
+    "highlight_menu_cards_on_hover",
     // No reader anywhere in the app.
     "merge_tray_icons",
 ];
@@ -189,6 +238,13 @@ fn cost_reporting_period(value: &Value) -> bool {
     })
 }
 
+/// A list of source ids, as stored (sorted, unique, trimmed lowercase).
+fn spend_dashboard_hidden_source_ids(value: &Value) -> bool {
+    serde_json::from_value::<Vec<String>>(value.clone()).is_ok_and(|ids| {
+        super::normalize_spend_dashboard_hidden_source_ids(ids.iter().cloned()) == ids
+    })
+}
+
 /// `AUTO` or a supported currency code, as stored.
 fn preferred_currency_code(value: &Value) -> bool {
     value
@@ -216,6 +272,13 @@ fn provider_id_list(value: &Value) -> bool {
         item.as_str()
             .is_some_and(|id| known.contains(id) && seen.insert(id))
     })
+}
+
+fn merged_overview_selection(value: &Value) -> bool {
+    value
+        .as_array()
+        .is_some_and(|items| items.len() <= super::MERGED_OVERVIEW_PROVIDER_LIMIT)
+        && provider_id_list(value)
 }
 
 fn provider_metrics(value: &Value) -> bool {
@@ -249,6 +312,70 @@ fn provider_usage_thresholds(value: &Value) -> bool {
                 })
             })
     })
+}
+
+/// `{ "<provider>": { "session"?: window, "weekly"?: window } }`, where a
+/// window is `{ "enabled"?: bool, "high"?: percent, "critical"?: percent }`
+/// (each may be `null`). Unknown providers, windows and fields are rejected.
+fn provider_quota_warnings(value: &Value) -> bool {
+    let known = known_provider_ids();
+    let window_ok = |window: &Value| {
+        window.as_object().is_some_and(|fields| {
+            fields.iter().all(|(field, value)| match field.as_str() {
+                "enabled" => value.is_null() || value.is_boolean(),
+                "high" | "critical" => value.is_null() || percent(value),
+                _ => false,
+            })
+        })
+    };
+    value.as_object().is_some_and(|map| {
+        map.iter().all(|(provider, windows)| {
+            known.contains(provider.as_str())
+                && windows.as_object().is_some_and(|windows| {
+                    windows.iter().all(|(name, window)| {
+                        matches!(name.as_str(), "session" | "weekly") && window_ok(window)
+                    })
+                })
+        })
+    })
+}
+
+/// Every provider's non-global quota warnings, keyed by provider id.
+fn export_provider_quota_warnings(settings: &Settings) -> Result<Value, PreferencesError> {
+    let mut map = Map::new();
+    for id in ProviderId::all() {
+        let warnings = settings.quota_warnings(*id).normalized();
+        if !warnings.is_empty() {
+            let value = serde_json::to_value(warnings)
+                .map_err(|error| PreferencesError::Apply(error.to_string()))?;
+            map.insert(id.cli_name().to_string(), value);
+        }
+    }
+    Ok(Value::Object(map))
+}
+
+/// Replace every provider's quota warnings with the document's. Providers the
+/// document does not list go back to the global settings; `null` resets all.
+fn apply_provider_quota_warnings(
+    settings: &mut Settings,
+    value: &Value,
+) -> Result<(), PreferencesError> {
+    for config in settings.provider_configs.values_mut() {
+        config.quota_warnings = ProviderQuotaWarnings::default();
+    }
+    let Some(map) = value.as_object() else {
+        return Ok(());
+    };
+    for (provider, warnings) in map {
+        let id =
+            ProviderId::from_cli_name(provider).ok_or_else(|| invalid(PROVIDER_QUOTA_WARNINGS))?;
+        let warnings: ProviderQuotaWarnings = serde_json::from_value(warnings.clone())
+            .map_err(|_| invalid(PROVIDER_QUOTA_WARNINGS))?;
+        if !warnings.is_empty() {
+            settings.set_quota_warnings(id, warnings);
+        }
+    }
+    Ok(())
 }
 
 fn invalid(key: &str) -> PreferencesError {
@@ -286,7 +413,12 @@ impl PreferencesDocument {
 
     fn validated(preferences: Map<String, Value>) -> Result<Self, PreferencesError> {
         for (key, value) in &preferences {
-            let Some((_, valid)) = ALLOWED_PREFERENCES.iter().find(|(name, _)| name == key) else {
+            let Some((_, valid)) = ALLOWED_PREFERENCES
+                .iter()
+                .chain(IMPORT_ONLY_PREFERENCES)
+                .chain(PROVIDER_PREFERENCES)
+                .find(|(name, _)| name == key)
+            else {
                 return Err(invalid(key));
             };
             if !value.is_null() && !valid(value) {
@@ -323,16 +455,14 @@ impl PreferencesDocument {
         if let Some(Value::Object(metrics)) = preferences.get_mut("provider_metrics") {
             metrics.retain(|provider, _| known.contains(provider.as_str()));
         }
-        if let Some(Value::Object(thresholds)) = preferences.get_mut("provider_usage_thresholds") {
-            thresholds.retain(|key, _| {
-                let provider = key.split_once(':').map_or(key.as_str(), |(id, _)| id);
-                known.contains(provider)
-            });
-        }
         if let Some(Value::Array(ids)) = preferences.get_mut("enabled_providers") {
             // `enabled_providers` is a set; keep exports deterministic.
             ids.sort_by(|a, b| a.as_str().cmp(&b.as_str()));
         }
+        preferences.insert(
+            PROVIDER_QUOTA_WARNINGS.to_string(),
+            export_provider_quota_warnings(settings)?,
+        );
         Self::validated(preferences)
     }
 
@@ -375,6 +505,10 @@ impl PreferencesDocument {
             ));
         };
         for (key, value) in &self.preferences {
+            if PROVIDER_PREFERENCES.iter().any(|(name, _)| name == key) {
+                // Applied below, into `provider_configs`.
+                continue;
+            }
             if !value.is_null() {
                 current.insert(key.clone(), value.clone());
             } else if let Some(default) = defaults.get(key) {
@@ -385,9 +519,26 @@ impl PreferencesDocument {
                 current.remove(key);
             }
         }
+        // A document exported before "System" existed names a language
+        // without the follow flag: keep the language it chose.
+        if self
+            .preferences
+            .get("ui_language")
+            .is_some_and(|value| !value.is_null())
+            && !self.preferences.contains_key("ui_language_follows_system")
+        {
+            current.insert("ui_language_follows_system".to_string(), Value::Bool(false));
+        }
         // Re-read through the normal settings loader so clamping and
         // normalization match what `settings.json` gets on load.
-        *settings = serde_json::from_value(Value::Object(current)).map_err(apply_error)?;
+        let mut next: Settings =
+            serde_json::from_value(Value::Object(current)).map_err(apply_error)?;
+        // After the legacy `provider_usage_thresholds` migration above, so the
+        // current key wins when a document carries both.
+        if let Some(value) = self.preferences.get(PROVIDER_QUOTA_WARNINGS) {
+            apply_provider_quota_warnings(&mut next, value)?;
+        }
+        *settings = next;
         Ok(self.preferences.len())
     }
 

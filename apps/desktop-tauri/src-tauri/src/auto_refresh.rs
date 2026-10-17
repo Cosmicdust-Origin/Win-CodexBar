@@ -214,6 +214,10 @@ fn auto_resume_scheduled_at(
 }
 
 fn local_usage_provider_ids(settings: &Settings) -> Vec<String> {
+    // "Track costs" off: no background local cost-log scan.
+    if !settings.cost_usage_enabled {
+        return Vec::new();
+    }
     settings
         .get_enabled_provider_ids()
         .into_iter()
@@ -311,6 +315,7 @@ mod tests {
         let mut settings = Settings {
             enabled_providers: ["codex".to_string()].into_iter().collect(),
             refresh_interval_secs: 300,
+            adaptive_refresh: false,
             ..Default::default()
         };
         settings.set_auto_resume_after_quota_reset(ProviderId::Codex, true);
@@ -456,6 +461,18 @@ mod tests {
             settings.enabled_providers.clear();
             assert!(local_usage_provider_ids(&settings).is_empty());
         }
+    }
+
+    #[test]
+    fn local_usage_refresh_skips_every_provider_when_cost_tracking_is_off() {
+        let settings = Settings {
+            cost_usage_enabled: false,
+            enabled_providers: ["codex".to_string(), "claude".to_string()]
+                .into_iter()
+                .collect(),
+            ..Default::default()
+        };
+        assert!(local_usage_provider_ids(&settings).is_empty());
     }
 
     #[test]

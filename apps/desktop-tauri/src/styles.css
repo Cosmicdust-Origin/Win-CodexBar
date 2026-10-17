@@ -12,6 +12,9 @@
  */
 :root {
   color-scheme: dark;
+  /* Hover and fill tint for controls: white on dark surfaces, black on light
+     ones (light theme and the light tray panel). */
+  --surface-tint-rgb: 255, 255, 255;
   --font-ui: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   font-family: var(--font-ui);
   text-rendering: optimizeLegibility;
@@ -84,6 +87,12 @@
   --provider-status-error: #ff453a; /* macOS NSColor.systemRed */
   --provider-status-disabled: rgba(235, 235, 245, 0.28);
   --provider-status-loading: #60a5fa;
+  /* Service-status dot: macOS system colors (PreferencesSidebar.swift:236-244). */
+  --service-status-none: #30d158;
+  --service-status-minor: #ffd60a;
+  --service-status-major: #ff9f0a;
+  --service-status-critical: #ff453a;
+  --service-status-gray: #8e8e93;
   --provider-icon-ring: rgba(255, 255, 255, 0.06);
   --provider-icon-bg: rgba(255, 255, 255, 0.04);
 
@@ -115,12 +124,13 @@
   --chart-mistral: rgb(255, 82, 41);
   --chart-codebuff: rgb(0, 255, 149);
   --chart-deepseek: rgb(77, 107, 254);
-  --chart-windsurf: rgb(34, 197, 94);
+  --chart-windsurf: rgb(52, 232, 187);
   --chart-elevenlabs: rgb(17, 24, 39);
-  --chart-deepgram: rgb(19, 239, 147);
-  --chart-grok: rgb(0, 0, 0);
-  --chart-groq: rgb(245, 80, 54);
-  --chart-llmproxy: rgb(79, 70, 229);
+  --chart-deepgram: rgb(100, 103, 242);
+  --chart-grok: rgb(16, 163, 127);
+  --chart-xai: rgb(142, 142, 147);
+  --chart-groq: rgb(245, 104, 68);
+  --chart-llmproxy: rgb(36, 180, 126);
 
   /* Default cost/credits series colors (match egui credits teal). */
   --chart-cost: rgb(93, 135, 255);
@@ -185,6 +195,12 @@
   --provider-status-error: #ff453a; /* macOS NSColor.systemRed */
   --provider-status-disabled: rgba(235, 235, 245, 0.28);
   --provider-status-loading: #60a5fa;
+  /* Service-status dot: macOS system colors (PreferencesSidebar.swift:236-244). */
+  --service-status-none: #30d158;
+  --service-status-minor: #ffd60a;
+  --service-status-major: #ff9f0a;
+  --service-status-critical: #ff453a;
+  --service-status-gray: #8e8e93;
   --provider-icon-ring: rgba(255, 255, 255, 0.06);
   --provider-icon-bg: rgba(255, 255, 255, 0.04);
 
@@ -222,6 +238,7 @@
 
 [data-theme="light"] {
   color-scheme: light;
+  --surface-tint-rgb: 0, 0, 0;
 
   --app-bg: #f5f5f7;
   --app-bg-gradient-top: transparent;
@@ -253,6 +270,11 @@
   --provider-status-error: #b91c1c;
   --provider-status-disabled: rgba(60, 60, 67, 0.28);
   --provider-status-loading: #007aff;
+  --service-status-none: #34c759;
+  --service-status-minor: #ffcc00;
+  --service-status-major: #ff9500;
+  --service-status-critical: #ff3b30;
+  --service-status-gray: #8e8e93;
   --provider-icon-ring: rgba(0, 0, 0, 0.08);
   --provider-icon-bg: rgba(0, 0, 0, 0.04);
 
@@ -378,53 +400,6 @@ html {
 }
 
 /* tab bar */
-.settings-tabs {
-  display: flex;
-  gap: 1px;
-  padding: 2px;
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.06);
-  margin-bottom: 16px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.settings-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.settings-tab {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 5px 12px;
-  border: none;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.78rem;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.settings-tab:hover {
-  color: var(--text-primary);
-}
-
-.settings-tab--active {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary);
-  font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.settings-tab__icon {
-  font-size: 1rem;
-}
 
 /* status strip */
 .settings-status {
@@ -827,9 +802,9 @@ html {
 
 .credential-btn {
   padding: 5px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--surface-tint-rgb), 0.1);
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--surface-tint-rgb), 0.06);
   color: var(--text-secondary);
   font-size: 0.78rem;
   font-weight: 600;
@@ -839,9 +814,9 @@ html {
 }
 
 .credential-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(var(--surface-tint-rgb), 0.1);
   color: var(--text-primary);
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: rgba(var(--surface-tint-rgb), 0.18);
 }
 
 .credential-btn:disabled {
@@ -1047,180 +1022,29 @@ html {
    user never sees the window jump around.  Once layout is measured and
    the window is anchored in its final position, .tray-panel-reveal--ready
    fades the content in smoothly. */
+:root {
+  --mac-panel-bg: #dedee2;
+}
 html:has(.tray-panel-reveal),
-body:has(.tray-panel-reveal) {
-  background: var(--menu-popover-bg);
+body:has(.tray-panel-reveal),
+.tray-panel-reveal {
+  background: var(--mac-panel-bg);
 }
 .tray-panel-reveal {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--menu-popover-bg);
   opacity: 0;
 }
 .tray-panel-reveal--ready {
   opacity: 1;
   transition: opacity 80ms ease-out;
 }
-
-.tray-panel-reveal--dense .menu-surface--tray {
-  min-height: 100vh;
-}
-
-/* User-resized flyout: the window is a fixed (remembered) size, so the surface
-   fills the viewport height and its body scrolls instead of the window growing
-   to fit content. */
-.tray-panel-reveal--usersized {
-  height: 100vh;
-  min-height: 0;
-}
-.tray-panel-reveal--usersized .menu-surface--tray {
-  flex: 1 1 auto;
-  min-height: 0;
-  height: auto;
-  max-height: 100%;
-}
-
-/* User-sized flyout body must scroll vertically when content overflows the
-   remembered window height — the base `.menu-surface--tray .menu-surface__body`
-   rule (below) uses `overflow-y: visible` because auto-fit sizes the window to
-   content instead of scrolling. Usersized mode is a fixed window, so it needs
-   the opposite: clip + scroll. The body also flex-grows to absorb any free
-   space so the footer (Zoom/Refresh/Settings/About/Quit) pins to the bottom
-   edge instead of floating mid-panel after the user widens the flyout.
-   Scoped to `--usersized` only; auto-fit path is untouched. Applies in both
-   narrow (single column) and wide (side-by-side, see the 640px media query
-   below) layouts. */
-.tray-panel-reveal--usersized .menu-surface--tray .menu-surface__body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-/* Side-by-side provider cards once the user has widened the flyout enough to
-   fit two columns. The columns are independent so a tall card in one column
-   doesn't force empty space under the shorter card beside it. */
-@media (min-width: 640px) {
-  .tray-panel-reveal--usersized .menu-surface--tray .menu-stack {
-    display: flex;
-    flex-direction: row;
-    align-content: flex-start;
-    align-items: flex-start;
-    gap: 12px 16px;
-    width: 100%;
-  }
-
-  .tray-panel-reveal--usersized .menu-surface--tray .menu-stack__column {
-    flex: 1 1 0;
-    min-width: min(300px, 100%);
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .tray-panel-reveal--usersized .menu-surface--tray .menu-stack__sep {
-    display: none;
-  }
-}
-
-/* Flyout window handles. Resize grips are invisible strips on every edge and
-   corner (a moved flyout can face open screen on any side); the cursor change
-   signals they're draggable. The move strip spans the top between the corner
-   grips, under the top edge grip, and shows a small grab bar. */
-.tray-resize {
-  position: fixed;
-  z-index: 50;
-}
-.tray-resize--top,
-.tray-resize--bottom {
-  left: 0;
-  right: 0;
-  height: 6px;
-  cursor: ns-resize;
-}
-.tray-resize--top {
-  top: 0;
-}
-.tray-resize--bottom {
-  bottom: 0;
-}
-.tray-resize--left,
-.tray-resize--right {
-  top: 0;
-  bottom: 0;
-  width: 6px;
-  cursor: ew-resize;
-}
-.tray-resize--left {
-  left: 0;
-}
-.tray-resize--right {
-  right: 0;
-}
-.tray-resize--topleft,
-.tray-resize--topright,
-.tray-resize--bottomleft,
-.tray-resize--bottomright {
-  width: 14px;
-  height: 14px;
-  z-index: 51;
-}
-.tray-resize--topleft {
-  top: 0;
-  left: 0;
-  cursor: nwse-resize;
-}
-.tray-resize--bottomright {
-  bottom: 0;
-  right: 0;
-  cursor: nwse-resize;
-}
-.tray-resize--topright {
-  top: 0;
-  right: 0;
-  cursor: nesw-resize;
-}
-.tray-resize--bottomleft {
-  bottom: 0;
-  left: 0;
-  cursor: nesw-resize;
-}
-.tray-move-handle {
-  position: fixed;
-  top: 0;
-  left: 14px;
-  right: 14px;
-  height: 12px;
-  z-index: 49;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: move;
-}
-.tray-move-handle__grip {
-  width: 32px;
-  height: 3px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.16);
-  transition: background 120ms ease-out;
-}
-.tray-move-handle:hover .tray-move-handle__grip {
-  background: rgba(255, 255, 255, 0.36);
-}
-[data-theme="light"] .tray-move-handle__grip {
-  background: rgba(0, 0, 0, 0.14);
-}
-[data-theme="light"] .tray-move-handle:hover .tray-move-handle__grip {
-  background: rgba(0, 0, 0, 0.32);
-}
-/* Keep the tray surface's first row clear of the move strip. */
 .tray-panel-reveal .menu-surface--tray {
-  padding-top: 12px;
+  flex-grow: 1;
 }
-
-.shell--tray-panel {
-  max-width: 320px;
-  padding: 8px 10px 12px;
+.tray-panel-reveal .menu-surface--tray .menu-surface__footer {
+  margin-top: auto;
 }
 
 /* spin animation for refresh */
@@ -1660,7 +1484,7 @@ body:has(.tray-panel-reveal) {
 }
 
 .update-banner__action:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--surface-tint-rgb), 0.06);
 }
 
 /* ── Provider detail: org label ─────────────────────────────────────── */
@@ -1822,75 +1646,6 @@ body:has(.tray-panel-reveal) {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-/* ── Mini bar chart ─────────────────────────────────────────────────── */
-
-.mini-chart {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.mini-chart--empty {
-  opacity: 0.5;
-}
-
-.mini-chart__label {
-  /* Match upstream `.font(.body).fontWeight(.medium)` — same weight as the
-     "Cost" / "Pace" group titles. Not uppercase, not eyebrow-tinted. */
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.mini-chart__empty-msg {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-.mini-chart__svg {
-  display: block;
-  border-radius: 4px;
-  overflow: visible;
-  max-width: 100%;
-}
-
-.mini-chart__axis {
-  position: relative;
-  font-size: 0.68rem;
-  color: var(--text-muted);
-  font-family: "Cascadia Code", "Fira Code", monospace;
-  padding: 0 2px;
-}
-
-.mini-chart__axis > span {
-  position: absolute;
-  transform: translateX(-50%);
-  white-space: nowrap;
-}
-
-.mini-chart__legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  margin-top: 2px;
-}
-
-.mini-chart__legend-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.72rem;
-  color: var(--text-secondary);
-}
-
-.mini-chart__legend-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  flex-shrink: 0;
 }
 
 /* ── Providers tab – sidebar + detail layout ─────────────────────── */
@@ -2081,32 +1836,6 @@ body:has(.tray-panel-reveal) {
   }
 }
 
-.provider-usage-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin-bottom: 8px;
-}
-
-.provider-usage-bar__header {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.72rem;
-}
-
-.provider-usage-bar__label {
-  color: var(--text-secondary);
-}
-
-.provider-usage-bar__pct {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.provider-usage-bar__status {
-  color: var(--text-secondary);
-}
-
 .provider-usage-bar__track {
   height: 5px;
   border-radius: 3px;
@@ -2119,12 +1848,6 @@ body:has(.tray-panel-reveal) {
   border-radius: 3px;
   background: var(--accent);
   transition: width 0.3s;
-}
-
-.provider-usage-bar__reset,
-.provider-usage-bar__detail {
-  font-size: 0.68rem;
-  color: var(--text-muted);
 }
 
 .provider-detail-actions {
@@ -2161,152 +1884,18 @@ body:has(.tray-panel-reveal) {
   text-transform: none;
 }
 
-/* ── Providers sidebar (Phase 6a) ─────────────────────────────────── */
-
-.providers-sidebar-shell {
-  width: 244px;
-  flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  height: 100%;
-  min-height: 0;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+/* Near-black brands (TypeSafe, V0, Replicate...) vanish on dark surfaces, so
+   the dark theme uses ProviderIcon's lifted --provider-brand-dark when it sets
+   one. Light scopes, including the tray panel's nested data-theme="light",
+   keep the exact brand color; the light rule comes second so it wins there. */
+[data-theme="dark"] .provider-icon {
+  color: var(--provider-brand-dark, var(--provider-brand, var(--accent)));
+}
+[data-theme="light"] .provider-icon {
+  color: var(--provider-brand, var(--accent));
 }
 
-.providers-sidebar-search {
-  position: relative;
-  padding: 8px 10px 6px;
-}
-
-.providers-sidebar-search__input {
-  width: 100%;
-  height: 30px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.20);
-  color: var(--text);
-  font-size: var(--font-body);
-  outline: none;
-  padding: 0 30px 0 10px;
-}
-
-.providers-sidebar-search__input:focus-visible {
-  border-color: var(--provider-row-border-selected);
-  box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.22);
-}
-
-.providers-sidebar-search__clear {
-  position: absolute;
-  right: 16px;
-  top: 13px;
-  width: 20px;
-  height: 20px;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 1rem;
-  line-height: 1;
-}
-
-.providers-sidebar-search__clear:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text);
-}
-
-.providers-sidebar {
-  flex: 1;
-  min-height: 0;
-  box-sizing: border-box;
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
-  scrollbar-width: auto;
-  scrollbar-color: rgba(255, 255, 255, 0.45) rgba(255, 255, 255, 0.08);
-  list-style: none;
-  margin: 0;
-  padding: 4px 10px 20px 4px;
-  scroll-padding-bottom: 20px;
-}
-
-.providers-sidebar__empty {
-  padding: 16px 12px;
-  color: var(--muted);
-  font-size: var(--font-body);
-  text-align: center;
-}
-
-.providers-sidebar__row {
-  position: relative;
-  display: grid;
-  grid-template-columns: 8px 24px 1fr auto auto auto;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px 8px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  user-select: none;
-  border: 1px solid transparent;
-  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
-  outline: none;
-}
-
-.providers-sidebar__row:hover {
-  background: var(--provider-row-bg-hover);
-}
-
-.providers-sidebar__row:focus-visible {
-  border-color: var(--provider-row-border-selected);
-  box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.25);
-}
-
-.providers-sidebar__row--selected {
-  background: var(--provider-row-bg-selected);
-  border-color: var(--provider-row-border-selected);
-}
-
-.providers-sidebar__row--selected::before {
-  content: "";
-  position: absolute;
-  left: 2px;
-  top: 10px;
-  bottom: 10px;
-  width: 2px;
-  border-radius: 2px;
-  background: var(--provider-row-accent-selected);
-}
-
-.providers-sidebar__row--disabled .providers-sidebar__name,
-.providers-sidebar__row--disabled .providers-sidebar__subtitle {
-  color: var(--provider-row-text-disabled);
-}
-
-.providers-sidebar__row--dragging {
-  opacity: 0.55;
-}
-
-.providers-sidebar__row--drop {
-  box-shadow: inset 0 2px 0 0 var(--provider-row-drop-outline);
-}
-
-.providers-sidebar__row--reveal {
-  animation: provider-sidebar-reveal 220ms ease-out both;
-}
-
-@keyframes provider-sidebar-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* ── Providers sidebar status dot ──────────────────────────────────── */
 
 .providers-sidebar__status {
   width: 6px;
@@ -2337,112 +1926,35 @@ body:has(.tray-panel-reveal) {
   animation: provider-sidebar-pulse 1.4s ease-in-out infinite;
 }
 
+/* Service-status dot: shown instead of the fetch-status dot while
+   "Check provider status" is on and the provider has a status page. */
+.providers-sidebar__service {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--service-status-gray);
+}
+
+.providers-sidebar__service--none {
+  background: var(--service-status-none);
+}
+
+.providers-sidebar__service--minor {
+  background: var(--service-status-minor);
+}
+
+.providers-sidebar__service--major {
+  background: var(--service-status-major);
+}
+
+.providers-sidebar__service--critical {
+  background: var(--service-status-critical);
+}
+
 @keyframes provider-sidebar-pulse {
   0%, 100% { opacity: 0.5; }
   50%      { opacity: 1; }
-}
-
-.providers-sidebar__text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: 1px;
-}
-
-/* Long names and translated status lines ("Отключено — авто") wrap to a
-   second line instead of ellipsizing in the narrow sidebar; the row's
-   title attribute carries the full text if even two lines are not enough. */
-.providers-sidebar__name {
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--provider-row-text-primary);
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-}
-
-.providers-sidebar__subtitle-primary {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-}
-
-.providers-sidebar__subtitle {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  font-size: 0.72rem;
-  color: var(--provider-row-text-secondary);
-  line-height: 1.25;
-}
-
-.providers-sidebar__subtitle-secondary {
-  color: var(--provider-row-text-secondary);
-  opacity: 0.8;
-  font-variant-numeric: tabular-nums;
-}
-
-.providers-sidebar__handle {
-  opacity: 0;
-  font-size: 0.7rem;
-  color: var(--provider-row-text-secondary);
-  cursor: grab;
-  letter-spacing: -2px;
-  transition: opacity 120ms ease;
-}
-
-.providers-sidebar__row:hover .providers-sidebar__handle,
-.providers-sidebar__row--selected .providers-sidebar__handle,
-.providers-sidebar__row--dragging .providers-sidebar__handle {
-  opacity: 0.7;
-}
-
-.providers-sidebar__reorder-controls {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.providers-sidebar__reorder-button {
-  width: 18px;
-  height: 16px;
-  display: inline-grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--provider-row-text-secondary);
-  cursor: pointer;
-  font-size: 0.62rem;
-  line-height: 1;
-  opacity: 0.72;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, opacity 120ms ease;
-}
-
-.providers-sidebar__reorder-button:hover:not(:disabled),
-.providers-sidebar__reorder-button:focus-visible {
-  background: var(--surface-card-hover);
-  border-color: var(--provider-row-border-selected);
-  color: var(--provider-row-text-primary);
-  opacity: 1;
-  outline: none;
-}
-
-.providers-sidebar__reorder-button:disabled {
-  cursor: default;
-  opacity: 0.2;
-}
-
-.providers-sidebar__checkbox {
-  margin: 0;
-  cursor: pointer;
 }
 
 /* ── Provider detail pane (Phase 6b) ──────────────────────────────── */
@@ -2538,32 +2050,6 @@ body:has(.tray-panel-reveal) {
   flex-shrink: 0;
   flex-wrap: nowrap;
   white-space: nowrap;
-}
-
-.provider-detail-pace__stage {
-  font-size: 0.86rem;
-  font-weight: 600;
-  color: var(--provider-row-text-primary);
-}
-
-.provider-detail-pace__stage[data-stage="far_behind"],
-.provider-detail-pace__stage[data-stage="behind"] {
-  color: var(--provider-status-error);
-}
-
-.provider-detail-pace__stage[data-stage="far_ahead"],
-.provider-detail-pace__stage[data-stage="ahead"] {
-  color: var(--provider-status-stale);
-}
-
-.provider-detail-pace__aux {
-  font-size: 0.78rem;
-  color: var(--provider-row-text-secondary);
-  margin-top: 2px;
-}
-
-.provider-usage-bar__pct[data-exhausted="true"] {
-  color: var(--provider-status-error);
 }
 
 .provider-usage-bar__fill[data-exhausted="true"] {
@@ -3274,6 +2760,126 @@ body:has(.tray-panel-reveal) {
   margin-bottom: 2px;
 }
 
+/* OpenAI API Tokens/min grid (Live Usage, upstream #4495). */
+.openai-tpm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.openai-tpm__title {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.openai-tpm__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.openai-tpm__stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.openai-tpm__stats dt {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.openai-tpm__stats dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.openai-tpm__chart {
+  width: 100%;
+  height: 56px;
+  display: block;
+}
+
+.openai-tpm__bar {
+  fill: var(--provider-accent, #6aa9ff);
+}
+
+.openai-tpm__bar--pending {
+  fill: none;
+  stroke: var(--text-secondary);
+  stroke-width: 0.5;
+  stroke-dasharray: 2 2;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.6;
+}
+
+.openai-tpm__legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.openai-tpm__swatch--pending {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1px dashed var(--text-secondary);
+  box-sizing: border-box;
+}
+
+.openai-tpm__empty,
+.openai-tpm__limit {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.openai-tpm__models ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.openai-tpm__models li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  padding: 2px 0;
+}
+
+.openai-tpm__model-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.openai-tpm__muted {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.openai-limits__row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 6px;
+}
+
+.openai-live {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .openai-usage__list ul {
   list-style: none;
   margin: 0;
@@ -3529,20 +3135,117 @@ html:has(.menu-surface--tray) {
   overflow: visible;
 }
 
-/* Tray variant — auto-sized by JS, no forced min-height. */
 .menu-surface--tray {
-  min-height: 0;
-  border-radius: 10px;
-  overflow: clip;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-  padding: 4px 0;
+  --mac-font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --mac-text-headline: 600 13px/16px var(--mac-font);
+  --mac-text-body-medium: 500 13px/16px var(--mac-font);
+  --mac-text-subheadline: 400 11px/14px var(--mac-font);
+  --mac-text-footnote: 400 10px/13px var(--mac-font);
+  --mac-text-caption: 400 10px/13px var(--mac-font);
+  --mac-text-section: 600 10px/13px var(--mac-font);
+  --mac-text-caption2: 400 10px/13px var(--mac-font);
+  --mac-text-menu: 400 13px/16px var(--mac-font);
+  --mac-text-shortcut: 400 13px/16px var(--mac-font);
+
+  --mac-panel-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  --mac-panel-border: rgba(0, 0, 0, 0.38);
+  --mac-text: rgba(0, 0, 0, 0.85);
+  --mac-text-2: rgba(0, 0, 0, 0.5);
+  --mac-text-3: rgba(0, 0, 0, 0.26);
+  --mac-track: rgba(0, 0, 0, 0.057);
+  --mac-divider: rgba(0, 0, 0, 0.15);
+  --mac-separator: rgba(0, 0, 0, 0.1);
+  --mac-error: #ff3b30;
+  --mac-pace-ok: #34c759;
+  --mac-pace-bad: #ff3b30;
+  --mac-marker: rgba(0, 0, 0, 0.58);
+  --mac-accent: #007aff;
+  --mac-selection-bg: #0078d4;
+  --mac-selection-text: #fff;
+
+  --mac-panel-width: 310px;
+  --mac-panel-radius: 6px;
+  --mac-bar-h: 6px;
+  --mac-bar-r: 3px;
+  --mac-pace-punch: 6px;
+  --mac-pace-stripe: 2px;
+  --mac-warn-punch: 5px;
+  --mac-warn-stripe: 1px;
+  --mac-metric-card-bg: rgba(0, 0, 0, 0.04);
+  --mac-metric-card-r: 10px;
+  --mac-icon-btn-r: 4px;
+  --mac-chart-h: 58px;
+  --mac-chart-bar-r: 1.5px;
+  --mac-sel-inset-x: 6px;
+  --mac-sel-inset-y: 2px;
+  --mac-sel-r: 6px;
+  --mac-sel-fade: 60ms;
+  --mac-sel-r-refresh: 7px;
+
+  --mac-pad-x: 20px;
+  --mac-pad-header-y: 6px;
+  --mac-gap-header: 6px;
+  --mac-section-pt: 6px;
+  --mac-usage-pt: 10px;
+  --mac-section-pb: 6px;
+  --mac-header-line-gap: 4px;
+  --mac-header-col-gap: 12px;
+  --mac-after-divider: 16px;
+  --mac-metric-gap: 12px;
+  --mac-metric-inner: 6px;
+  --mac-inline-gap: 8px;
+  --mac-kv-section: 6px;
+  --mac-kv-row: 3px;
+  --mac-kv-value: 1px;
+  --mac-kv-gap: 12px;
+  --mac-dash-gap: 10px;
+  --mac-kpi-gap: 6px;
+  --mac-row-h: 24px;
+  --mac-menu-row-h: 22px;
+  --mac-row-pl: 15px;
+  --mac-row-icon: 16px;
+  --mac-row-icon-gap: 6px;
+  --mac-shortcut-w: 44px;
+
+  --font-subheadline: 11px;
+  --font-footnote: 10px;
+  --font-caption: 10px;
+
+  --menu-popover-bg: var(--mac-panel-bg);
+  --text-primary: var(--mac-text);
+  --text-secondary: var(--mac-text-2);
+  --text-muted: var(--mac-text-2);
+  --panel-border: var(--mac-divider);
+
+  --usage-bar-track: var(--mac-track);
+  --pace-slow-bg: rgba(0, 122, 255, 0.12);
+  --pace-slow-fg: #007aff;
+  --pace-steady-bg: rgba(21, 128, 61, 0.12);
+  --pace-steady-fg: #15803d;
+  --pace-racing-bg: rgba(180, 83, 9, 0.14);
+  --pace-racing-fg: #b45309;
+  --pace-burning-bg: rgba(185, 28, 28, 0.12);
+  --pace-burning-fg: #b91c1c;
+  --pace-track-expected-fg: rgba(0, 122, 255, 0.45);
+  --chart-cost-fg: #007aff;
+  --chart-credits-fg: var(--chart-credits);
+  --surface-tint-rgb: 0, 0, 0;
+
+  color-scheme: light;
   display: flex;
   flex-direction: column;
-  /* Auto-size to content; JS resizes the Tauri window to match.
-     No max-height here — JS sets an explicit pixel cap after measuring. */
-  height: auto;
+  gap: 0;
   box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  padding: 4px 0;
+  overflow: clip;
+  border: 1px solid var(--mac-panel-border);
+  border-radius: var(--mac-panel-radius);
+  background: var(--mac-panel-bg);
+  box-shadow: var(--mac-panel-highlight);
+  color: var(--mac-text);
 }
 .menu-surface--tray .menu-surface__body {
   flex: 0 1 auto;
@@ -3579,29 +3282,17 @@ html:has(.menu-surface--tray) {
   box-sizing: border-box;
   overflow: visible;
 }
-/* Selected card — subtle highlight like macOS active provider */
 .menu-surface--tray .menu-stack__item--selected {
-  background: rgba(255, 255, 255, 0.06);
   border: none;
   border-radius: 6px;
   padding: 4px 4px;
 }
-/* Tray separators — subtle hairlines matching macOS card dividers */
-.menu-surface--tray .menu-stack__sep {
-  height: 0.5px;
-  margin: 2px 16px;
-  background: rgba(255, 255, 255, 0.08);
+.menu-surface--tray .provider-grid__item .provider-icon {
+  filter: brightness(0);
 }
-[data-theme="light"] .menu-surface--tray .menu-stack__sep {
-  background: rgba(0, 0, 0, 0.08);
-}
-[data-theme="light"] .menu-surface--tray .menu-stack__item {
-  background: rgba(0, 0, 0, 0.03);
-  border: 0.5px solid rgba(0, 0, 0, 0.04);
-}
-[data-theme="light"] .menu-surface--tray .menu-stack__item--selected {
-  background: rgba(0, 0, 0, 0.06);
-  border: none;
+.menu-surface--tray .update-banner--available,
+.menu-surface--tray .update-banner--ready {
+  color: var(--provider-status-ok);
 }
 /* Tray grid — flush with no background container, matching macOS */
 .menu-surface--tray .provider-grid {
@@ -3627,12 +3318,6 @@ html:has(.menu-surface--tray) {
 .menu-surface--tray .provider-grid--sparse .provider-grid__label {
   display: none;
 }
-/* Divider between provider grid and card stack */
-.menu-surface--tray .provider-grid__divider {
-  height: 1px;
-  margin: 2px 0;
-  background: rgba(255, 255, 255, 0.08);
-}
 
 /* Tray font sizing — match macOS: .headline=13pt, .footnote=10pt */
 /* macOS v0.32.2: H padding 20, header-only V padding 7, section V padding 6 */
@@ -3648,43 +3333,6 @@ html:has(.menu-surface--tray) {
 .menu-surface--tray .menu-card--with-details {
   padding-top: var(--menu-card-section-y);
   padding-bottom: var(--menu-card-section-y);
-}
-
-/* Tray name-group — row layout like macOS: HStack { name — Spacer — email } */
-.menu-surface--tray .menu-card__name-group {
-  flex-direction: row;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px;
-  width: 100%;
-}
-
-/* Tray name + email — macOS: .font(.headline) = 13pt semibold */
-.menu-surface--tray .menu-card__name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.menu-surface--tray .menu-card__email {
-  flex: 0 1 auto;
-  text-align: right;
-  max-width: 55%;
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-/* Tray subtitle + error — match macOS .footnote=10pt */
-.menu-surface--tray .menu-card__subtitle,
-.menu-surface--tray .menu-card__error-text {
-  font-size: 10px;
-}
-/* Tray "Updated just now" — secondary color like macOS */
-.menu-surface--tray .menu-card__subtitle:not(.menu-card__subtitle--error) {
-  color: var(--text-secondary);
 }
 
 /* Copy-to-clipboard button — matches macOS CopyIconButton (doc.on.doc, 18×18) */
@@ -3707,69 +3355,13 @@ html:has(.menu-surface--tray) {
 }
 .menu-card__copy-btn:hover {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-/* Tray plan badge — plain text like macOS (not a pill) */
-.menu-surface--tray .menu-card__plan-badge {
-  background: none;
-  padding: 0;
-  border-radius: 0;
-  font-size: 10px;
-  font-weight: 400;
-  color: var(--text-secondary);
+  background: rgba(var(--surface-tint-rgb), 0.08);
 }
 
 /* Hide status dots in tray grid — macOS shows weekly indicators only on hover,
    not persistent colored dots under every icon */
 .menu-surface--tray .provider-grid__dot {
   display: none;
-}
-
-/* ── Context actions (detail mode) ──────────────────────────────────
-   Matches macOS actionsSection: "Usage Dashboard" + "Status Page"
-   with SF Symbol–style icons. Shown only in detail (single provider) mode. */
-.context-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  flex: 0 0 auto;
-  margin-top: 4px;
-  padding: 0 10px;
-}
-.context-actions__divider {
-  height: 1px;
-  margin: 4px 0;
-  background: rgba(255, 255, 255, 0.10);
-}
-[data-theme="light"] .context-actions__divider {
-  background: rgba(0, 0, 0, 0.10);
-}
-.context-actions__btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 2px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-primary, #f5f5f7);
-  font-size: 12px;
-  cursor: pointer;
-  text-align: left;
-}
-.context-actions__btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-[data-theme="light"] .context-actions__btn:hover {
-  background: rgba(0, 0, 0, 0.06);
-}
-.context-actions__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  font-size: 13px;
 }
 
 /* Tray card content — match macOS spacing values from SwiftUI source */
@@ -3789,115 +3381,12 @@ html:has(.menu-surface--tray) {
   font-size: 13px;
   font-weight: 500;
 }
-/* macOS: UsageProgressBar .frame(height: 6) */
-.menu-surface--tray .menu-metric__bar {
-  height: 6px;
-  border-radius: 3px;
-  width: 100%;
-  box-sizing: border-box;
-  max-width: 100%;
-}
+
 .menu-surface--tray .menu-metric__pct,
 .menu-surface--tray .menu-metric__reset,
+.menu-surface--tray .menu-metric__meta,
 .menu-surface--tray .menu-metric__status,
 .menu-surface--tray .menu-metric__detail {
-  font-size: 10px;
-}
-.menu-surface--tray .menu-metric__reserve {
-  margin-top: 0;
-  font-size: 10px;
-}
-/* Secondary charts and pace are available inside the Usage details disclosure. */
-.menu-surface--tray .menu-card__local-grid {
-  gap: 9px 20px;
-}
-.menu-surface--tray .menu-card__local-usage {
-  padding-top: 2px;
-}
-.menu-surface--tray .menu-card__local-note {
-  font-size: 10px;
-  line-height: 1.25;
-}
-/* Hide cost section in tray — macOS compact popover only shows usage metrics */
-.menu-surface--tray .menu-card__cost,
-.menu-surface--tray .menu-card__content > .menu-card__divider:has(+ .menu-card__cost) {
-  display: none;
-}
-
-.menu-card__local-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px 28px;
-}
-.menu-card__local-grid > div,
-.menu-card__local-note {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.menu-card__local-label,
-.menu-card__local-note {
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-.menu-card__local-grid strong {
-  font-size: 13px;
-  line-height: 1.15;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-.menu-card__local-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: 5px;
-  height: 68px;
-  margin-top: 2px;
-}
-.menu-card__local-chart span {
-  width: 8px;
-  border-radius: 2px 2px 0 0;
-  background: #bf8337;
-}
-.menu-card__local-note strong {
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-.menu-card__local-note span {
-  overflow: visible;
-  text-overflow: initial;
-  white-space: normal;
-  line-height: 1.3;
-}
-
-/* Tray footer — match macOS NSMenuItem native look (10pt, ~16px row height) */
-.menu-surface--tray .menu-surface__footer {
-  padding: 4px 0 3px;
-  margin-top: 2px;
-  border-top: 0.5px solid rgba(255, 255, 255, 0.12);
-}
-.menu-surface--tray .menu-surface__footer-row {
-  padding: 3px 16px;
-  font-size: 11px;
-  line-height: 1.3;
-  min-height: 18px;
-}
-/* Indent must override the tray padding above so iconless rows (Settings /
-   About / Quit) align with the iconified Refresh row. */
-.menu-surface--tray .menu-surface__footer-row--no-icon {
-  padding-left: calc(16px + 14px + 8px);
-}
-.menu-surface--tray .menu-surface__footer-icon {
-  font-size: 11px;
-  width: 14px;
-  opacity: 0.7;
-}
-/* Zoom row keeps a taller (16px) slider hit area even though the tray
-   footer's row padding/font-size are otherwise compacted. */
-.menu-surface--tray .menu-surface__footer-zoom {
-  padding-top: 4px;
-  padding-bottom: 4px;
-}
-.menu-surface--tray .menu-surface__footer-zoom-value {
   font-size: 10px;
 }
 
@@ -3925,103 +3414,10 @@ html:has(.menu-surface--tray) {
 
 /* ── Multi-account Codex lanes (ADR 0003, option A) ─────────────────── */
 
-.codex-menu-accounts {
-  margin-top: 4px;
-  border-top: 1px solid var(--divider, var(--provider-row-divider, rgba(128, 128, 128, 0.18)));
-  padding-top: 4px;
-}
-
-.codex-menu-accounts__summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--provider-row-text-secondary);
-  user-select: none;
-}
-
-.codex-menu-accounts__summary::-webkit-details-marker {
-  display: none;
-}
-
-.codex-menu-accounts__summary::before {
-  content: "▸";
-  display: inline-block;
-  width: 0.8em;
-  color: var(--provider-row-text-secondary);
-  transition: transform 0.12s;
-}
-
-.codex-menu-accounts[open] > .codex-menu-accounts__summary::before {
-  transform: rotate(90deg);
-}
-
-.codex-menu-accounts__count {
-  margin-left: auto;
-  font-size: 0.68rem;
-  font-weight: 500;
-  text-transform: none;
-  letter-spacing: 0;
-  color: var(--provider-row-text-secondary);
-}
-
 .codex-menu-accounts__error {
   margin-top: 6px;
   font-size: 0.72rem;
   color: var(--provider-status-error);
-}
-
-.codex-menu-accounts__list {
-  list-style: none;
-  margin: 6px 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.codex-menu-accounts__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.codex-menu-accounts__row--active .codex-menu-accounts__email {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.codex-menu-accounts__meta {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.codex-menu-accounts__email {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.74rem;
-  color: var(--provider-row-text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.codex-menu-accounts__badge {
-  font-size: 0.6rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--provider-status-ok, #4ade80);
 }
 
 .codex-menu-accounts__usage {
@@ -4070,200 +3466,9 @@ html:has(.menu-surface--tray) {
   background: var(--usage-bar-exhausted, var(--accent));
 }
 
-.codex-menu-accounts__switch {
-  flex-shrink: 0;
-  font-size: 0.68rem;
-  font-weight: 600;
-  padding: 2px 6px;
-  white-space: nowrap;
-  border-radius: 5px;
-  color: var(--text-primary);
-  background: transparent;
-  border: 1px solid var(--provider-row-divider, rgba(128, 128, 128, 0.3));
-  cursor: pointer;
-}
-
-.codex-menu-accounts__row-actions {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  flex-shrink: 0;
-  gap: 4px;
-}
-
-.codex-menu-accounts__switch:hover:not(:disabled) {
-  border-color: var(--accent, currentColor);
-}
-
-.codex-menu-accounts__switch:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-/* Header VStack(spacing: 4) with two HStacks */
-.menu-card__header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--menu-card-header-line-gap);
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.menu-card__title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--menu-card-header-column-gap);
-}
-
-.menu-card__refresh-btn {
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-/* Provider brand badge + display name cluster. Tauri-only addition that
-   gives each card a recognizable provider mark before the name. */
-.menu-card__name-group {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.menu-card__provider-icon {
-  flex-shrink: 0;
-}
-
-/* providerName: Font.headline + .semibold — use 500 on Windows for parity */
-.menu-card__name {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* email: Font.subheadline secondary ≈ 12px */
-.menu-card__email {
-  font-size: 12px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 60%;
-  text-align: right;
-}
-
-.menu-card__subtitle-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--menu-card-header-column-gap);
-}
-
-/* When subtitle-row contains error text, align to top (macOS: .top) */
-.menu-card__subtitle-row:has(.menu-card__subtitle--error) {
-  align-items: flex-start;
-  min-width: 0;
-}
-
-/* Error block — simple block layout that respects parent width for text wrapping.
-   Avoids the flex sizing issues that cause text to overflow the panel. */
-.menu-card__error-block {
-  display: block;
-  position: relative;
-  overflow: clip;
-  max-width: 100%;
-  box-sizing: border-box;
-  padding: 4px 0 2px;
-}
-.menu-card__error-text {
-  display: block;
-  font-size: 11px;
-  color: var(--provider-status-error);
-  line-height: 1.4;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  white-space: normal;
-  padding-right: 20px; /* space for copy button */
-  box-sizing: border-box;
-}
-.menu-card__error-block .menu-card__copy-btn {
-  position: absolute;
-  top: 0;
-  right: 0;
-}
-
-/* subtitle: Font.footnote secondary ≈ 11px */
-.menu-card__subtitle {
-  flex: 1;
-  min-width: 0;
-  font-size: 11px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* Error subtitle must wrap — override base truncation.
-   width:0 + flex-grow:1 forces the flex item to respect container bounds
-   instead of sizing to content width and overflowing. */
-.menu-card__subtitle.menu-card__subtitle--error {
-  width: 0;
-  flex-grow: 1;
-  white-space: normal;
-  overflow: hidden;
-  text-overflow: unset;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
-/* plan: Font.footnote secondary ≈ 11px, no special weight upstream */
-.menu-card__plan {
-  font-size: 11px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.menu-card__error {
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: var(--surface-elevated);
-  color: var(--provider-status-error);
-  font-size: 11px;
-  line-height: 1.35;
-}
-
 /* SwiftUI Divider() — single hairline using the system separator. */
 .menu-card__divider {
   margin: 4px 0;
-}
-
-.menu-card__pricing-status {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--divider, var(--provider-row-divider, rgba(128, 128, 128, 0.18)));
-  color: var(--text-secondary);
-  font-size: 10px;
-  line-height: 1.35;
-  font-variant-numeric: tabular-nums;
-}
-
-.menu-card__pricing-status strong {
-  color: var(--text-primary);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.menu-card__pricing-status small {
-  margin-top: 2px;
-  color: var(--text-tertiary, var(--text-secondary));
-  line-height: 1.4;
 }
 
 .menu-card__content {
@@ -4288,34 +3493,73 @@ html:has(.menu-surface--tray) {
   color: var(--text-primary);
 }
 
-/* Header row — title left, "N% left" right. Mirrors the macOS compact menu
-   layout where the remaining-percent label sits on the same baseline as the
-   metric title with the progress bar directly underneath. */
 .menu-metric__head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+  column-gap: 24px;
+  row-gap: 2px;
+  min-width: 0;
 }
 
-/* UsageProgressBar — Capsule track + Capsule fill, .frame(height: 6) */
-.menu-metric__bar {
+.menu-metric__head .menu-metric__title {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-metric__head .menu-metric__reset {
+  margin-left: auto;
+  max-width: 100%;
+}
+
+.menu-metric__progress {
+  display: block;
+  width: 100%;
   height: 6px;
-  border-radius: 3px;
-  background: var(--usage-bar-track);
   overflow: hidden;
 }
 
-.menu-metric__bar-fill {
-  height: 100%;
-  border-radius: 3px;
-  background: var(--provider-accent, var(--usage-bar-normal));
-  transition: width 0.3s ease;
+.menu-metric__progress-track {
+  fill: var(--usage-bar-track);
 }
 
-.menu-metric__bar-fill[data-level="high"] { background: var(--usage-bar-high); }
-.menu-metric__bar-fill[data-level="critical"] { background: var(--usage-bar-critical); }
-.menu-metric__bar-fill[data-level="exhausted"] { background: var(--usage-bar-exhausted); }
+.menu-metric__progress-fill {
+  fill: var(--provider-accent, var(--usage-bar-normal));
+}
+
+.menu-metric__progress-warning {
+  fill: color-mix(in srgb, var(--text-primary) 68%, transparent);
+}
+
+.menu-metric__progress-workday {
+  fill: color-mix(in srgb, var(--text-primary) 30%, transparent);
+}
+
+.menu-metric__progress-workday--high-contrast {
+  fill: color-mix(in srgb, var(--text-primary) 85%, transparent);
+}
+
+.menu-metric__progress-pace {
+  fill: var(--mac-pace-ok, #34c759);
+}
+
+.menu-metric__progress-pace[data-deficit="true"] {
+  fill: var(--mac-pace-bad, #ff3b30);
+}
+
+.menu-metric__meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  min-width: 0;
+  overflow-wrap: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
 /* HStack(.firstTextBaseline) percent label — reset countdown */
 .menu-metric__row {
@@ -4332,17 +3576,6 @@ html:has(.menu-surface--tray) {
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
   flex: 0 0 auto;
-}
-
-/* A live forecast is its own full-width row. Release the base percent label's
-   no-shrink rule so refreshed text is constrained by the row and tail-truncated
-   inside the fixed tray width instead of painting past it. */
-.menu-metric__forecast .menu-metric__pct {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* Detail-backed window description (for example spend amounts): its own
@@ -4387,52 +3620,6 @@ html:has(.menu-surface--tray) {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.menu-metric__reserve {
-  opacity: 0.7;
-  font-size: 10px;
-}
-
-.menu-metric__budget {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.menu-metric__budget-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 10px;
-  cursor: pointer;
-}
-
-.menu-metric__budget-header span:last-child {
-  color: var(--text-secondary);
-}
-
-.menu-metric__budget-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.menu-metric__budget-pill {
-  padding: 2px 6px;
-  border: 1px solid var(--usage-bar-track);
-  border-radius: 999px;
-  background: var(--surface-elevated);
-  color: var(--text-secondary);
-  font-size: 9px;
-  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -4506,83 +3693,7 @@ html:has(.menu-surface--tray) {
 
 /* ── Cost section (upstream `tokenUsage` block) ─────────────────────── */
 
-.menu-card__cost-line {
-  font-size: 11px; /* upstream: .font(.footnote) */
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-
-.menu-card__cost-line--muted {
-  color: var(--text-secondary);
-}
-
 /* ── Pace section (Tauri-only; sits below cost in the same card) ────── */
-
-.menu-card__pace {
-  gap: 4px;
-}
-
-.menu-card__pace-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.menu-card__pace-label {
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.menu-card__pace-label[data-pace="slow"] { color: var(--pace-slow-fg); }
-.menu-card__pace-label[data-pace="steady"] { color: var(--pace-steady-fg); }
-.menu-card__pace-label[data-pace="racing"] { color: var(--pace-racing-fg); }
-.menu-card__pace-label[data-pace="burning"] { color: var(--pace-burning-fg); }
-
-.menu-card__pace-bars {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.menu-card__pace-track {
-  height: 5px;
-  border-radius: 3px;
-  background: var(--usage-bar-track);
-  overflow: hidden;
-}
-
-.menu-card__pace-fill {
-  height: 100%;
-  border-radius: 3px;
-  background: var(--usage-bar-normal);
-  transition: width 0.3s ease;
-}
-
-.menu-card__pace-fill[data-pace="slow"] { background: var(--pace-slow-fg); }
-.menu-card__pace-fill[data-pace="steady"] { background: var(--pace-steady-fg); }
-.menu-card__pace-fill[data-pace="racing"] { background: var(--pace-racing-fg); }
-.menu-card__pace-fill[data-pace="burning"] { background: var(--pace-burning-fg); }
-
-.menu-card__pace-fill--expected {
-  background: var(--pace-track-expected-fg) !important;
-}
-
-.menu-card__pace-eta {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--pace-racing-fg);
-}
-
-.menu-card__pace-ok {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--pace-steady-fg);
-}
-
-.menu-card__charts {
-  gap: 10px;
-}
 
 /* ════════════════════════════════════════════════════════════════════
  * macOS PARITY OVERLAY  (last cascade — wins over earlier rules)
@@ -4625,46 +3736,6 @@ html:has(.menu-surface--tray) {
   scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
 
-/* ── Menu surface: rounded NSMenu-style panel matching macOS popover ── */
-.menu-surface {
-  width: 100%;
-  min-width: 260px;
-  background: var(--menu-popover-bg);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 0 1px rgba(0, 0, 0, 0.3);
-  font-size: var(--font-body);
-  line-height: var(--line-tight);
-}
-/* Re-assert tray overrides after the second .menu-surface rule (cascade order) */
-.menu-surface--tray {
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-  overflow: hidden;
-  /* #265: TrayPanel applies CSS `zoom` on this surface, so it lays out in
-     windowWidth/zoom local px; the 260px `min-width` floor from .menu-surface
-     would be multiplied by the zoom on render (→ 390px at 150%) and force a
-     horizontal scrollbar in the 328px tray window. The window's own 300px
-     minimum already covers the floor — let the zoomed surface wrap instead. */
-  min-width: 0;
-}
-.menu-surface--tray {
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-}
-[data-theme="light"] .menu-surface {
-  background: var(--menu-popover-bg);
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 0 1px rgba(0, 0, 0, 0.12);
-}
-[data-theme="light"] .menu-surface--tray {
-  border: none;
-  box-shadow: none;
-}
-
 .menu-surface__header {
   min-height: 20px;
   padding: 0;
@@ -4690,148 +3761,104 @@ html:has(.menu-surface--tray) {
   font-size: 13px;
 }
 
-/* Footer of native-style menu rows (Settings… / About / Quit).
-   Sits flush with the surface's 10/6 padding and reads like an NSMenu
-   item: full-width row, 18px icon column, subtle hover highlight. */
 .menu-surface__footer {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  padding: 8px 0 4px;
-  margin-top: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
   flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  border-top: none;
+}
+.menu-surface__footer-sep {
+  height: 1px;
+  margin: 5px 14px;
+  background: var(--mac-separator);
 }
 .menu-surface__footer-row {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--mac-row-icon-gap);
   width: 100%;
-  padding: 4px 6px;
+  min-height: var(--mac-menu-row-h);
+  padding: 0 var(--mac-row-pl);
   border: 0;
-  border-radius: 4px;
   background: transparent;
-  color: var(--text-primary);
-  font-size: var(--font-body);
-  font-weight: 400;
+  color: var(--mac-text);
+  font: var(--mac-text-menu);
   text-align: left;
   cursor: pointer;
-  transition: background 0.08s ease;
 }
-/* Footer rows without an SF Symbol icon (Settings / About / Quit on
-   macOS): indent by the same 18px the icon column would occupy so the
-   text aligns with iconified rows above. */
-.menu-surface__footer-row--no-icon {
-  padding-left: calc(6px + 18px + 8px);
+.menu-surface__footer-row--refresh {
+  min-height: var(--mac-row-h);
 }
-.menu-surface__footer-row:hover,
+.menu-surface__footer-row::before {
+  content: "";
+  position: absolute;
+  inset: var(--mac-sel-inset-y) var(--mac-sel-inset-x);
+  z-index: -1;
+  border-radius: var(--mac-sel-r);
+  background: transparent;
+  transition: background-color var(--mac-sel-fade) ease-out;
+}
+.menu-surface__footer-row--refresh::before {
+  inset: 0 5px;
+  border-radius: var(--mac-sel-r-refresh);
+}
+.menu-surface__footer-row:hover:not(:disabled),
 .menu-surface__footer-row:focus-visible {
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--text-primary);
+  color: var(--mac-selection-text);
   outline: none;
 }
-[data-theme="light"] .menu-surface__footer-row:hover,
-[data-theme="light"] .menu-surface__footer-row:focus-visible {
-  background: rgba(0, 0, 0, 0.06);
+.menu-surface__footer-row:hover:not(:disabled)::before,
+.menu-surface__footer-row:focus-visible::before {
+  background: var(--mac-selection-bg);
 }
-.menu-surface__footer-row .menu-surface__footer-icon {
-  width: 18px;
-  display: inline-flex;
-  justify-content: center;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.menu-surface__footer-row:hover .menu-surface__footer-icon,
-.menu-surface__footer-row:focus-visible .menu-surface__footer-icon {
-  color: var(--text-primary);
-}
-.menu-surface__footer-shortcut {
-  margin-left: auto;
-  font-size: var(--font-caption2);
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-.menu-surface__footer-row:hover .menu-surface__footer-shortcut,
-.menu-surface__footer-row:focus-visible .menu-surface__footer-shortcut {
-  color: var(--text-secondary);
-}
-
-/* Tray flyout zoom row — sits above Refresh in the footer. A plain `div`
-   (not a nav button), so it opts out of the button hover highlight and
-   instead hosts a Win11-volume-style slider with a fixed-width % readout
-   on the right (tabular nums + fixed width = no jitter while dragging). */
-.menu-surface__footer-zoom {
+.menu-surface__footer-row:disabled {
+  color: var(--mac-text-3);
   cursor: default;
 }
-.menu-surface__footer-zoom:hover,
-.menu-surface__footer-zoom:focus-visible {
-  background: transparent;
+.menu-surface__footer-note {
+  margin: 0;
+  padding: 2px var(--mac-row-pl);
+  color: var(--mac-text-2);
+  font: var(--mac-text-menu);
+  overflow-wrap: anywhere;
 }
-.menu-surface__footer-zoom-value {
-  width: 34px;
+.menu-surface__footer-icon {
+  display: inline-flex;
   flex-shrink: 0;
-  text-align: right;
-  font-size: var(--font-caption2);
-  color: var(--text-muted);
+  width: var(--mac-row-icon);
+  height: var(--mac-row-icon);
+}
+.menu-surface__footer-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.menu-surface__footer-shortcut {
+  min-width: var(--mac-shortcut-w);
+  margin-left: auto;
+  color: var(--mac-text-3);
+  font: var(--mac-text-shortcut);
   font-variant-numeric: tabular-nums;
+  text-align: right;
 }
-/* Win11-style range input: thin rounded 4px track, accent fill left of the
-   thumb (painted via the `--zoom-fill` custom property set inline from
-   React — WebKit has no ::fill pseudo), round accent thumb. WebView2 is
-   Chromium-only, so ::-webkit-* pseudos are sufficient. */
-.menu-surface__footer-zoom-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  flex: 1 1 auto;
-  min-width: 0;
-  height: 16px;
-  margin: 0 2px;
-  padding: 0;
+.menu-surface__footer-row:hover:not(:disabled) .menu-surface__footer-shortcut,
+.menu-surface__footer-row:focus-visible .menu-surface__footer-shortcut {
+  color: var(--mac-selection-text);
+}
+/* "Highlight menu cards on hover" off: only Refresh is a hosted menu card
+   upstream; the other footer rows stand in for native items, which always
+   highlight. Keyboard focus keeps its highlight. */
+.menu-surface--hover-highlight-off .menu-surface__footer-row--refresh:hover:not(:disabled):not(:focus-visible) {
+  color: var(--mac-text);
+}
+.menu-surface--hover-highlight-off .menu-surface__footer-row--refresh:hover:not(:disabled):not(:focus-visible)::before {
   background: transparent;
-  cursor: pointer;
 }
-.menu-surface__footer-zoom-slider::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 2px;
-  background: linear-gradient(
-    to right,
-    var(--accent, #0a84ff) 0%,
-    var(--accent, #0a84ff) var(--zoom-fill, 0%),
-    rgba(255, 255, 255, 0.2) var(--zoom-fill, 0%)
-  );
-}
-.menu-surface__footer-zoom-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 12px;
-  height: 12px;
-  margin-top: -4px; /* centres the 12px thumb on the 4px track */
-  border-radius: 50%;
-  background: var(--accent, #0a84ff);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.35),
-    0 1px 2px rgba(0, 0, 0, 0.4);
-}
-.menu-surface__footer-zoom-slider:focus-visible {
-  outline: none;
-}
-.menu-surface__footer-zoom-slider:focus-visible::-webkit-slider-thumb {
-  box-shadow:
-    0 0 0 2px var(--accent-muted, rgba(10, 132, 255, 0.25)),
-    0 0 0 1px rgba(255, 255, 255, 0.35);
-}
-[data-theme="light"]
-  .menu-surface__footer-zoom-slider::-webkit-slider-runnable-track {
-  background: linear-gradient(
-    to right,
-    var(--accent, #007aff) 0%,
-    var(--accent, #007aff) var(--zoom-fill, 0%),
-    rgba(0, 0, 0, 0.15) var(--zoom-fill, 0%)
-  );
-}
-[data-theme="light"] .menu-surface__footer-zoom-slider::-webkit-slider-thumb {
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.15),
-    0 1px 2px rgba(0, 0, 0, 0.2);
+.menu-surface--hover-highlight-off .menu-surface__footer-row--refresh:hover:not(:disabled):not(:focus-visible) .menu-surface__footer-shortcut {
+  color: var(--mac-text-3);
 }
 
 /* ── Provider icon grid ──────────────────────────────────────────────
@@ -5018,22 +4045,6 @@ html:has(.menu-surface--tray) {
   color: var(--text-primary);
 }
 
-/* ── Menu card / metric row tightening ────────────────────────────── */
-.menu-card__name {
-  font-size: var(--font-headline);
-  /* upstream .semibold (600) renders too heavy on Windows; 500 is visually closer */
-  font-weight: 500;
-  letter-spacing: -0.005em;
-}
-.menu-card__email,
-.menu-card__plan,
-.menu-card__subtitle {
-  font-size: var(--font-caption);
-  font-weight: 400;
-}
-.menu-card__email {
-  color: var(--text-secondary);
-}
 .menu-card__group-title,
 .menu-metric__title {
   font-size: var(--font-body);
@@ -5118,19 +4129,6 @@ html:has(.menu-surface--tray) {
   font-size: var(--font-caption);
   font-variant-numeric: tabular-nums;
 }
-.menu-metric__bar,
-.menu-card__pace-track {
-  height: var(--bar-height);
-  border-radius: var(--bar-radius);
-  background: var(--usage-bar-track);
-  overflow: hidden;
-}
-.menu-metric__bar-fill,
-.menu-card__pace-fill {
-  height: 100%;
-  border-radius: var(--bar-radius);
-  transition: width 0.3s ease;
-}
 
 /* Upstream UsageProgressBar uses the provider brand color (which the
    chart palette covers) but the menu defaults to a green-when-healthy
@@ -5152,12 +4150,6 @@ html:has(.menu-surface--tray) {
 .menu-metric__reset,
 .menu-metric__status,
 .menu-metric__detail {
-  font-size: var(--font-caption);
-}
-.menu-card__cost-line,
-.menu-card__pace-label,
-.menu-card__pace-eta,
-.menu-card__pace-ok {
   font-size: var(--font-caption);
 }
 
@@ -5254,85 +4246,6 @@ html:has(.menu-surface--tray) {
   background: #e81123;
   color: #fff;
 }
-.settings-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 6px 12px;
-  margin: 0 0 4px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0;
-  /* `safe`: when long translations overflow, start-align instead of pushing the
-     first tabs past the left edge where scrolling can't reach them. */
-  justify-content: safe center;
-  overflow-x: auto;
-  /* Only shows when the tabs still overflow (very narrow window). */
-  scrollbar-width: thin;
-}
-[data-theme="light"] .settings-tabs {
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0));
-}
-.settings-tab {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  /* Shrink before overflowing: multi-word labels wrap to two lines. */
-  flex: 0 1 auto;
-  min-width: 56px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  white-space: normal;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.65rem;
-  font-weight: 500;
-  line-height: 1;
-  letter-spacing: 0;
-  text-transform: none;
-  transition: background 0.12s ease, color 0.12s ease;
-  border: none;
-  cursor: pointer;
-}
-.settings-tab__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  font-size: 16px;
-  line-height: 1;
-  color: inherit;
-}
-.settings-tab__icon > svg {
-  width: 16px;
-  height: 16px;
-  display: block;
-}
-
-.settings-tab__label {
-  display: block;
-  line-height: 1.1;
-  text-align: center;
-}
-.settings-tab:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-primary);
-}
-[data-theme="light"] .settings-tab:hover {
-  background: rgba(0, 0, 0, 0.05);
-}
-.settings-tab--active {
-  background: rgba(10, 132, 255, 0.12);
-  color: var(--accent);
-  font-weight: 500;
-  box-shadow: none;
-}
-[data-theme="light"] .settings-tab--active {
-  background: rgba(10, 132, 255, 0.12);
-  color: var(--accent);
-}
 
 /* ── Settings body container: padded, centered, capped at 560px ─── */
 .settings-body {
@@ -5343,10 +4256,6 @@ html:has(.menu-surface--tray) {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
-}
-.settings-body--providers {
-  max-width: 100%;
-  overflow: clip;
 }
 .settings-status {
   max-width: 560px;
@@ -5547,40 +4456,6 @@ html:has(.menu-surface--tray) {
   outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
   border-color: var(--accent);
-}
-
-/* ── Provider sidebar (Preferences › Providers) ───────────────────── */
-/* provider-split consolidated above (line ~1765) */
-/* providers-sidebar overrides consolidated above (line ~1981) */
-.providers-sidebar::-webkit-scrollbar {
-  width: 10px;
-}
-.providers-sidebar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 5px;
-  margin: 4px 0;
-}
-.providers-sidebar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.45);
-  border-radius: 5px;
-}
-.providers-sidebar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.65);
-}
-[data-theme="light"] .providers-sidebar-shell {
-  background: rgba(0, 0, 0, 0.025);
-  border: 1px solid rgba(0, 0, 0, 0.10);
-}
-.providers-sidebar__row {
-  grid-template-columns: 12px var(--icon-sidebar) 1fr auto auto auto;
-  padding: 6px 8px;
-}
-.providers-sidebar__name {
-  font-size: var(--font-body);
-  font-weight: 500;
-}
-.providers-sidebar__subtitle {
-  font-size: var(--font-caption);
 }
 
 /* ── Provider detail pane ─────────────────────────────────────────── */
@@ -5819,17 +4694,7 @@ html:has(.menu-surface--tray) {
   text-align: center;
 }
 
-/* ── macOS parity: inline error subtitle, divider spacing, footer icon
-      opacity, and card bottom padding (final overlay) ─────────────────── */
-.menu-card__subtitle--error {
-  color: var(--provider-status-error);
-  line-height: 1.3;
-  white-space: normal;
-  overflow: hidden;
-  text-overflow: unset;
-  font-size: 11px;
-}
-
+/* ── macOS parity: divider spacing and card bottom padding (final overlay) ── */
 .menu-card__divider {
   margin: 4px 0;
 }
@@ -5838,47 +4703,7 @@ html:has(.menu-surface--tray) {
   padding-bottom: 6px;
 }
 
-.menu-surface__footer-icon {
-  opacity: 0.5;
-}
-.menu-surface__footer-row:hover .menu-surface__footer-icon,
-.menu-surface__footer-row:focus-visible .menu-surface__footer-icon {
-  opacity: 0.8;
-}
-
 /* ── Provider tab status dots removed (replaced by .provider-grid__dot) */
-
-/* ── Plan badge pill ────────────────────────────────────────────────── */
-.menu-card__plan-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--text-secondary);
-  white-space: nowrap;
-  flex-shrink: 0;
-  line-height: 1.4;
-}
-[data-theme="light"] .menu-card__plan-badge {
-  background: rgba(0, 0, 0, 0.08);
-}
-
-/* ── Card header: name + badge on same row ──────────────────────────── */
-.menu-card__title-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--menu-card-header-column-gap);
-}
-.menu-card__name-group {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
 
 /* ── Windows QA polish: stable provider grid and compact heights ─── */
 .provider-grid {
@@ -5954,6 +4779,33 @@ html:has(.menu-surface--tray) {
   margin-top: 2px;
 }
 
+/* Switcher rows "Weekly progress": no icons, so each button shows its title
+   above the weekly track, like the macOS progress switcher. Uniform columns
+   across the panel; long titles truncate. */
+.menu-surface--tray .provider-grid--no-icons {
+  grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
+  gap: 6px 6px;
+}
+
+.menu-surface--tray .provider-grid--no-icons .provider-grid__item {
+  width: auto;
+  min-width: 0;
+  min-height: 30px;
+  padding: 3px 4px;
+  gap: 2px;
+}
+
+.menu-surface--tray .provider-grid--no-icons .provider-grid__label {
+  display: block;
+  max-width: 100%;
+  font-size: 11px;
+}
+
+.menu-surface--tray .provider-grid--no-icons .provider-grid__weekly-track {
+  width: 100%;
+  max-width: 44px;
+}
+
 .provider-grid__item--more {
   color: var(--text-secondary);
 }
@@ -5965,43 +4817,13 @@ html:has(.menu-surface--tray) {
   width: 17px;
   height: 17px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.10);
+  background: rgba(var(--surface-tint-rgb), 0.1);
   font-size: 14px;
   font-weight: 600;
 }
 
 .provider-grid__item--more:hover .provider-grid__icon-overview {
-  background: rgba(255, 255, 255, 0.16);
-}
-
-
-.settings-tabs {
-  gap: 4px;
-  padding: 5px 12px;
-  background: rgba(255, 255, 255, 0.035);
-}
-
-.settings-tab {
-  border: 1px solid transparent;
-  min-height: 42px;
-  padding: 5px 12px 6px;
-}
-
-.settings-tab:hover:not(.settings-tab--active) {
-  background: rgba(255, 255, 255, 0.055);
-}
-
-.settings-tab--active,
-.settings-tab[aria-selected="true"] {
-  border-color: rgba(10, 132, 255, 0.48);
-  background: rgba(10, 132, 255, 0.18);
-  color: var(--text-primary);
-  box-shadow: inset 0 0 0 1px rgba(10, 132, 255, 0.12);
-}
-
-.settings-tab--active .settings-tab__icon,
-.settings-tab[aria-selected="true"] .settings-tab__icon {
-  color: var(--accent);
+  background: rgba(var(--surface-tint-rgb), 0.16);
 }
 
 .provider-detail-error {
@@ -6132,16 +4954,10 @@ html:has(.menu-surface--tray) {
   color: inherit;
 }
 
-/* ── Mistral monthly spend row (#2821, #2947) ──────────────────── */
-.menu-card__monthly-spend {
-  margin-top: 4px;
-  font-weight: 500;
-}
 /* Shared Windows typography and control sizing. */
 button, input, select, textarea {
   font-family: var(--font-ui);
 }
-
 
 .select, .number-input, .text-input {
   min-height: 28px;
@@ -6150,27 +4966,8 @@ button, input, select, textarea {
   max-width: 240px;
 }
 
-/* Account login actions follow each provider's account list. */
-.codex-menu-accounts__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-}
 .codex-menu-accounts__usage {
   flex-wrap: wrap;
   white-space: normal;
 }
 
-.codex-menu-accounts__action {
-  min-height: 28px;
-  padding: 3px 10px;
-  border: 1px solid var(--panel-border);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 11px;
-  cursor: pointer;
-}
-.codex-menu-accounts__action:disabled { opacity: 0.5; cursor: default; }

@@ -14,6 +14,7 @@ mod proof_harness;
 mod shell;
 mod shortcut_bridge;
 mod state;
+mod status_poller;
 mod stay_awake;
 mod surface;
 mod surface_target;
@@ -143,7 +144,9 @@ fn main() {
     let proof_config = proof_harness::ProofConfig::from_env();
     let is_proof_mode = proof_config.is_some();
     let force_start_visible = std::env::var_os("CODEXBAR_START_VISIBLE").is_some();
-    let settings = codexbar::settings::Settings::load();
+    let mut settings = codexbar::settings::Settings::load();
+    settings.apply_display_mode_fold_migration();
+    settings.apply_quota_warning_migration();
     let launch = launch_behavior(
         force_start_visible,
         settings.start_minimized,
@@ -154,9 +157,10 @@ fn main() {
     initial_state.proof_config = proof_config;
     // Validate the complete proof seed before installing any snapshots, so an
     // invalid multi-provider fixture cannot leave a partial cache behind.
-    if let Some(snapshots) =
-        proof_harness::seed_usage_snapshots_from_env(initial_state.proof_config.as_ref())
-    {
+    if let Some(snapshots) = proof_harness::seed_usage_snapshots_from_env(
+        initial_state.proof_config.as_ref(),
+        settings.weekly_progress_work_days,
+    ) {
         let seeded_at = std::time::Instant::now();
         for snapshot in &snapshots {
             tracing::info!(
@@ -198,12 +202,15 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::get_bootstrap_state,
             commands::get_provider_catalog,
+            status_poller::get_provider_statuses,
             commands::get_settings_snapshot,
             commands::get_currency_rates,
             stay_awake::get_stay_awake_status,
             commands::list_agent_sessions,
             commands::focus_agent_session,
             commands::update_settings,
+            commands::get_hooks_config,
+            commands::save_hooks_config,
             commands::set_surface_mode,
             commands::dismiss_tray_panel,
             commands::begin_flyout_gesture,
@@ -212,9 +219,6 @@ fn main() {
             commands::open_settings_window,
             commands::open_flyout_window,
             commands::close_settings_window,
-            commands::set_flyout_size,
-            commands::flyout_stored_size,
-            commands::reset_flyout_position,
             commands::get_current_surface_state,
             commands::refresh_providers,
             commands::refresh_providers_if_stale,
@@ -280,10 +284,14 @@ fn main() {
             commands::get_spend_contract,
             commands::get_codex_workspaces_snapshot,
             commands::reorder_providers,
+            commands::reorder_visible_providers,
+            commands::restore_default_provider_order,
             commands::set_provider_cookie_source,
             commands::set_provider_usage_source,
             commands::set_provider_auto_resume_after_quota_reset,
             commands::set_provider_optional_details,
+            commands::get_openai_live_usage,
+            commands::get_openai_org_rate_limits,
             commands::has_openrouter_management_api_key,
             commands::set_openrouter_management_api_key,
             commands::remove_openrouter_management_api_key,
@@ -304,6 +312,7 @@ fn main() {
             commands::register_global_shortcut,
             commands::unregister_global_shortcut,
             commands::get_work_area_rect,
+            commands::get_system_accent_color,
             commands::play_notification_sound,
             commands::open_external_url,
             commands::reanchor_tray_panel,
@@ -401,11 +410,6 @@ fn main() {
                     {
                         return;
                     }
-                    // Gesture guard: ignore blur while a resize-grip drag or
-                    // HTML5 drag-reorder is running its Win32/OLE modal loop.
-                    // Windows produces a spurious Focused(false) the instant
-                    // such a loop starts even though the user never left the
-                    // window; see AppState::begin_gesture_blur_guard.
                     if let Some(st) = window.app_handle().try_state::<Mutex<AppState>>()
                         && st
                             .lock()

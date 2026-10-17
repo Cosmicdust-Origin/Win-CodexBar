@@ -1,6 +1,9 @@
 import { type CSSProperties, useEffect, useState } from "react";
 import { getProviderChartData, getSettingsSnapshot } from "../../../../../lib/tauri";
-import { providerSupportsChartData } from "../../../../../lib/providerCharts";
+import {
+  providerShowsDailyApiUsage,
+  providerSupportsChartData,
+} from "../../../../../lib/providerCharts";
 import type {
   OpenAiApiUsageSnapshot,
   ProviderChartData,
@@ -12,6 +15,7 @@ import { CostHistoryChart } from "./CostHistoryChart";
 import { CreditsHistoryChart } from "./CreditsHistoryChart";
 import { TokensHistoryChart } from "./TokensHistoryChart";
 import { UsageBreakdownChart } from "./UsageBreakdownChart";
+import { QuotaWindowHistory } from "../../../../../components/QuotaWindowHistory";
 
 type T = ReturnType<typeof useLocale>["t"];
 
@@ -20,7 +24,7 @@ interface Props {
   accountEmail: string | null;
   /** Per-provider accent color override (hex); applied as CSS --provider-accent. */
   accentColor?: string;
-  /** Per-day OpenAI Admin API history (`openaiapi` only); drawn instead of the local-log tabs. */
+  /** Per-day API usage history (OpenAI Admin API, Groq console); drawn instead of the local-log tabs. */
   openAiApiUsage?: OpenAiApiUsageSnapshot | null;
   t: T;
 }
@@ -84,7 +88,7 @@ export function ChartsSection({
     };
   }, [providerId]);
 
-  if (providerId === "openaiapi") {
+  if (providerShowsDailyApiUsage(providerId)) {
     if (!openAiApiUsage || openAiApiUsage.daily.length === 0) return null;
     return (
       <section
@@ -105,7 +109,17 @@ export function ChartsSection({
   // Tokens mode needs at least one day with exact local token data.
   const hasTokens = data.tokensHistory.some((p) => p.tokens > 0);
 
-  if (!hasCost && !hasCredits && !hasUsage && !hasTokens) return null;
+  // Recent quota windows (moved from the tray card's "Usage details").
+  const history =
+    (data.quotaWindowHistory?.windows.length ?? 0) > 0 ? (
+      <QuotaWindowHistory history={data.quotaWindowHistory} t={t} />
+    ) : null;
+
+  if (!hasCost && !hasCredits && !hasUsage && !hasTokens) {
+    return history ? (
+      <section className="provider-detail-section provider-detail-charts">{history}</section>
+    ) : null;
+  }
 
   const available: TabKey[] = [];
   if (hasCost) available.push("cost");
@@ -193,6 +207,7 @@ export function ChartsSection({
           />
         )}
       </div>
+      {history}
     </section>
   );
 }

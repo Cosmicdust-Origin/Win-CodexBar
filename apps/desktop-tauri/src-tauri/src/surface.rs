@@ -53,11 +53,11 @@ impl SurfaceMode {
             Self::TrayPanel => WindowProperties {
                 visible: true,
                 decorations: false,
-                resizable: true,
-                width: 328.0,
+                resizable: false,
+                width: 310.0,
                 height: 776.0,
-                min_width: Some(300.0),
-                min_height: Some(360.0),
+                min_width: None,
+                min_height: None,
                 always_on_top: false,
                 blur_dismiss: true,
                 skip_taskbar: true,
@@ -84,10 +84,10 @@ impl SurfaceMode {
                 visible: true,
                 decorations: true,
                 resizable: true,
-                width: 496.0,
-                height: 580.0,
-                min_width: None,
-                min_height: None,
+                width: SETTINGS_WINDOW_WIDTH,
+                height: SETTINGS_WINDOW_HEIGHT,
+                min_width: Some(SETTINGS_WINDOW_MIN_WIDTH),
+                min_height: Some(SETTINGS_WINDOW_MIN_HEIGHT),
                 always_on_top: false,
                 blur_dismiss: false,
                 skip_taskbar: false,
@@ -95,6 +95,15 @@ impl SurfaceMode {
         }
     }
 }
+
+/// Settings window size (logical px): sidebar plus detail column, as the
+/// macOS 0.70 Settings window. Shared by the main-window Settings surface and
+/// the detached Settings window; the frontend `applySettingsWindowSize`
+/// mirrors these numbers.
+pub const SETTINGS_WINDOW_WIDTH: f64 = 880.0;
+pub const SETTINGS_WINDOW_HEIGHT: f64 = 620.0;
+pub const SETTINGS_WINDOW_MIN_WIDTH: f64 = 800.0;
+pub const SETTINGS_WINDOW_MIN_HEIGHT: f64 = 540.0;
 
 /// Describes what the window should look like in a given surface mode.
 #[derive(Debug, Clone)]
@@ -265,31 +274,73 @@ mod tests {
         assert_eq!(SurfaceMode::parse("bogus"), None);
     }
 
+    /// Reads `const NAME = <integer>;` from a TypeScript source.
+    fn ts_integer_const(source: &str, name: &str) -> u32 {
+        let prefix = format!("const {name} = ");
+        let line = source
+            .lines()
+            .find_map(|line| {
+                line.trim_start()
+                    .strip_prefix("export ")
+                    .unwrap_or(line.trim_start())
+                    .strip_prefix(&prefix)
+            })
+            .unwrap_or_else(|| panic!("{name} not found"));
+        line.trim_end_matches(';')
+            .trim()
+            .parse()
+            .unwrap_or_else(|_| panic!("{name} is not an integer: {line}"))
+    }
+
+    #[test]
+    fn tray_panel_width_matches_the_frontend_layout_base_width() {
+        let layout = include_str!("../../src/hooks/useTrayPanelLayout.ts");
+        let width = SurfaceMode::TrayPanel.window_properties().width;
+        assert_eq!(
+            f64::from(ts_integer_const(layout, "TRAY_BASE_WIDTH")),
+            width
+        );
+    }
+
+    #[test]
+    fn tray_scale_bounds_match_the_frontend_scale_bounds() {
+        let scale = include_str!("../../src/lib/trayScale.ts");
+        assert_eq!(
+            ts_integer_const(scale, "TRAY_SCALE_MIN"),
+            u32::from(codexbar::settings::TRAY_SCALE_PERCENT_MIN)
+        );
+        assert_eq!(
+            ts_integer_const(scale, "TRAY_SCALE_MAX"),
+            u32::from(codexbar::settings::TRAY_SCALE_PERCENT_MAX)
+        );
+    }
+
     #[test]
     fn tray_panel_properties() {
         let props = SurfaceMode::TrayPanel.window_properties();
-        assert_eq!(props.width, 328.0);
+        assert_eq!(props.width, 310.0);
         assert_eq!(props.height, 776.0);
     }
 
     #[test]
-    fn tray_panel_is_resizable_blur_dismiss_flyout() {
+    fn tray_panel_is_fixed_size_blur_dismiss_flyout() {
         let props = SurfaceMode::TrayPanel.window_properties();
-        // "Pop Out Dashboard" flyout: resizable, anchored, auto-hide, no taskbar.
-        assert!(props.resizable);
+        assert!(!props.resizable);
         assert!(props.blur_dismiss);
         assert!(!props.always_on_top);
         assert!(props.skip_taskbar);
         assert!(!props.decorations);
-        assert_eq!(props.min_width, Some(300.0));
-        assert_eq!(props.min_height, Some(360.0));
+        assert_eq!(props.min_width, None);
+        assert_eq!(props.min_height, None);
     }
 
     #[test]
     fn settings_properties() {
         let props = SurfaceMode::Settings.window_properties();
-        assert_eq!(props.width, 496.0);
-        assert_eq!(props.height, 580.0);
+        assert_eq!(props.width, 880.0);
+        assert_eq!(props.height, 620.0);
+        assert_eq!(props.min_width, Some(800.0));
+        assert_eq!(props.min_height, Some(540.0));
     }
 
     #[test]

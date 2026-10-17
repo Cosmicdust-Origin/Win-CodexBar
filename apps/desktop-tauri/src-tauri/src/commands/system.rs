@@ -7,6 +7,7 @@ pub fn get_app_info() -> AppInfoBridge {
         name: "CodexBar".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
         build_number: option_env!("BUILD_NUMBER").unwrap_or("dev").to_string(),
+        build_date: option_env!("CODEXBAR_BUILD_DATE").map(str::to_string),
         update_channel: update_channel_label(settings.update_channel).to_string(),
         tagline: "May your tokens never run out—keep agent limits in view.".to_string(),
     }
@@ -169,6 +170,39 @@ pub fn get_work_area_rect(app: tauri::AppHandle) -> Result<WorkAreaRect, String>
 }
 
 // ── Misc UX ────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn get_system_accent_color() -> Option<String> {
+    system_accent_abgr().map(abgr_to_hex)
+}
+
+#[cfg(windows)]
+fn system_accent_abgr() -> Option<u32> {
+    use winreg::RegKey;
+    use winreg::enums::HKEY_CURRENT_USER;
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    [
+        (
+            r"Software\Microsoft\Windows\CurrentVersion\Explorer\Accent",
+            "AccentColorMenu",
+        ),
+        (r"Software\Microsoft\Windows\DWM", "AccentColor"),
+    ]
+    .into_iter()
+    .find_map(|(path, name)| hkcu.open_subkey(path).ok()?.get_value::<u32, _>(name).ok())
+}
+
+#[cfg(not(windows))]
+fn system_accent_abgr() -> Option<u32> {
+    None
+}
+
+/// Windows stores accent colors as 0xAABBGGRR.
+fn abgr_to_hex(value: u32) -> String {
+    let [r, g, b, _] = value.to_le_bytes();
+    format!("#{r:02x}{g:02x}{b:02x}")
+}
 
 #[tauri::command]
 pub fn play_notification_sound(
@@ -424,6 +458,12 @@ fn copilot_label_matches_login(account: &TokenAccount, login: Option<&str>) -> b
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn accent_registry_dword_reads_as_abgr() {
+        assert_eq!(abgr_to_hex(0xffd4_7800), "#0078d4");
+        assert_eq!(abgr_to_hex(0xff00_b9ff), "#ffb900");
+    }
 
     #[test]
     fn dashboard_url_resolves_from_codex_provider_metadata() {

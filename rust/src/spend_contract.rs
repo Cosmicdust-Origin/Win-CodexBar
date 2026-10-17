@@ -226,6 +226,35 @@ pub struct SpendContract {
     pub imports: Vec<ImportedSpendSource>,
 }
 
+impl SpendContract {
+    /// A contract with no data for `period`, for when local cost tracking is
+    /// off and nothing is scanned.
+    pub fn empty(provider_id: &str, period: CostReportingPeriod) -> Self {
+        Self {
+            provider_id: provider_id.to_string(),
+            history_days: period.sidecar_days(Utc::now()),
+            reporting_period: period.raw(),
+            known_cost_usd: None,
+            known_zero: false,
+            provenance: CostProvenance::Unknown,
+            price_coverage: CostCoverageCounts::default(),
+            price_coverage_ratio: None,
+            history_coverage_established: false,
+            token_mix: SpendTokenMix::default(),
+            token_total: None,
+            conversation_count: 0,
+            models: Vec::new(),
+            projects: Vec::new(),
+            conversations: Vec::new(),
+            daily: Vec::new(),
+            hourly_activity: Vec::new(),
+            project_source_status: None,
+            custom_pricing_active: false,
+            imports: Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 struct CustomPricing {
     entries: HashMap<String, CustomRates>,

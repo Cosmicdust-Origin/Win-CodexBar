@@ -7,9 +7,9 @@ use codexbar::settings::Language;
 use serde::{Deserialize, Serialize};
 
 /// Presentation descriptor for one quota metric or provider-emitted extra
-/// usage row. This intentionally excludes inventory and transient detail
-/// sections: Windows only exposes the metric rows already present in the
-/// provider snapshot for this visibility lane.
+/// usage row, a provider detail section, or a provider-owned `section:` card
+/// block (Claude reset credits, Extra usage, plan dates). Other inventory
+/// rows have no visibility choice.
 ///
 /// Descriptor contract: every row the pane displays is either persisted in the
 /// provider's hidden-usage-item list or emitted by the current provider
@@ -22,14 +22,77 @@ pub struct ProviderUsageItemSnapshot {
     pub id: String,
     pub title: String,
     pub available: bool,
+    /// The row is also suppressed while Cost summary display is Hidden, so
+    /// the pane explains why checking it may show nothing.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub requires_cost_summary: bool,
 }
 
 pub(crate) fn usage_item_id(raw_id: &str) -> String {
     format!("{}{}", codexbar::settings::USAGE_ITEM_METRIC_PREFIX, raw_id)
 }
 
+/// Provider-specific by design (upstream 0.75.0 #4484): Claude's saved reset
+/// credits, Extra usage / prepaid balance and plan dates are card sections
+/// with their own visibility choice. Returns the title and whether the row is
+/// also gated by Cost summary display.
+fn claude_section_title(id: &str, lang: Language) -> Option<(String, bool)> {
+    use codexbar::settings::{
+        CLAUDE_EXTRA_USAGE_USAGE_ITEM_ID, CLAUDE_RESET_CREDITS_USAGE_ITEM_ID,
+        SUBSCRIPTION_USAGE_ITEM_ID,
+    };
+    let (key, requires_cost_summary) = match id {
+        SUBSCRIPTION_USAGE_ITEM_ID => (LocaleKey::UsageItemPlanRenewalExpiry, false),
+        CLAUDE_RESET_CREDITS_USAGE_ITEM_ID => (LocaleKey::ProviderLabelLimitResetCredits, false),
+        CLAUDE_EXTRA_USAGE_USAGE_ITEM_ID => (LocaleKey::ExtraUsage, true),
+        _ => return None,
+    };
+    Some((locale::get_text(lang, key), requires_cost_summary))
+}
+
+/// The Claude section IDs the current snapshot reports, in card order: plan
+/// dates sit under the quota rows, then saved resets, then Extra usage.
+fn claude_reported_sections(snapshot: &ProviderUsageSnapshot) -> Vec<&'static str> {
+    use codexbar::settings::{
+        CLAUDE_EXTRA_USAGE_USAGE_ITEM_ID, CLAUDE_RESET_CREDITS_USAGE_ITEM_ID,
+        SUBSCRIPTION_USAGE_ITEM_ID,
+    };
+    let mut ids = Vec::new();
+    if snapshot
+        .subscription
+        .as_ref()
+        .is_some_and(|s| s.renews_at.is_some() || s.expires_at.is_some())
+    {
+        ids.push(SUBSCRIPTION_USAGE_ITEM_ID);
+    }
+    if snapshot
+        .inventory
+        .iter()
+        .any(|item| item.id == CLAUDE_RESET_CREDITS_INVENTORY_ID)
+    {
+        ids.push(CLAUDE_RESET_CREDITS_USAGE_ITEM_ID);
+    }
+    if is_claude_extra_usage_cost(snapshot) {
+        ids.push(CLAUDE_EXTRA_USAGE_USAGE_ITEM_ID);
+    }
+    ids
+}
+
+/// Inventory ID the Claude provider assigns to saved limit resets.
+pub(crate) const CLAUDE_RESET_CREDITS_INVENTORY_ID: &str = "reset-credits";
+
+/// Claude's Extra usage / prepaid balance block. Admin API spend is a
+/// separate cost and keeps showing regardless of this choice.
+pub(crate) fn is_claude_extra_usage_cost(snapshot: &ProviderUsageSnapshot) -> bool {
+    snapshot
+        .cost
+        .as_ref()
+        .is_some_and(|cost| !cost.always_visible)
+        && snapshot.source_label != "admin-api"
+}
+
 fn redacted_usage_item_title(title: &str, settings: &Settings) -> String {
-    PersonalInfoRedactor::redact_emails_in_text(Some(title), settings.hide_personal_info)
+    PersonalInfoRedactor::hide_emails_in_text(Some(title), settings.hide_personal_info)
         .unwrap_or_default()
 }
 
@@ -92,7 +155,9 @@ pub(crate) fn usage_item_descriptors(
         let mut detail_titles = std::collections::HashSet::new();
         for detail in &snapshot.display_details {
             if detail_titles.insert(detail.title.clone()) {
-                let redacted = PersonalInfoRedactor::redact_emails_in_text(
+                // The ID keeps the "Hidden" marker it has always used, so
+                // sections hidden under Hide Personal Info stay hidden.
+                let id_title = PersonalInfoRedactor::redact_emails_in_text(
                     Some(&detail.title),
                     settings.hide_personal_info,
                 )
@@ -100,13 +165,14 @@ pub(crate) fn usage_item_descriptors(
                 let id = format!(
                     "{}{}",
                     codexbar::settings::USAGE_ITEM_DETAIL_SECTION_PREFIX,
-                    redacted
+                    id_title
                 );
                 if seen.insert(id.clone()) {
                     items.push(ProviderUsageItemSnapshot {
                         id,
-                        title: redacted,
+                        title: redacted_usage_item_title(&detail.title, settings),
                         available: true,
+                        requires_cost_summary: false,
                     });
                 }
             }
@@ -127,7 +193,30 @@ pub(crate) fn usage_item_descriptors(
                     settings,
                 ),
                 available: false,
+                requires_cost_summary: false,
             });
+        }
+    }
+
+    // A card-hidden window is never drawn as a row, so neither a live toggle
+    // nor a saved-ID placeholder for it would control anything. Marking it
+    // seen suppresses both; windows absent from the snapshot keep placeholders.
+    if let Some(snapshot) = snapshot {
+        let windows = [
+            ("primary", Some(&snapshot.primary)),
+            ("secondary", snapshot.secondary.as_ref()),
+            ("model-specific", snapshot.model_specific.as_ref()),
+            ("tertiary", snapshot.tertiary.as_ref()),
+        ];
+        for (raw_id, window) in windows {
+            if window.is_some_and(|w| w.hidden_on_card) {
+                seen.insert(usage_item_id(raw_id));
+            }
+        }
+        for extra in &snapshot.extra_rate_windows {
+            if extra.window.hidden_on_card {
+                seen.insert(usage_item_id(&format!("extra-{}", extra.id)));
+            }
         }
     }
 
@@ -143,6 +232,7 @@ pub(crate) fn usage_item_descriptors(
                 id,
                 title: item_title,
                 available,
+                requires_cost_summary: false,
             });
         }
     };
@@ -179,14 +269,45 @@ pub(crate) fn usage_item_descriptors(
         }
     }
 
-    for id in hidden {
-        if id.starts_with(codexbar::settings::USAGE_ITEM_DETAIL_SECTION_PREFIX) {
+    for id in &hidden {
+        if id.starts_with(codexbar::settings::USAGE_ITEM_DETAIL_SECTION_PREFIX)
+            || id.starts_with(codexbar::settings::USAGE_ITEM_SECTION_PREFIX)
+        {
             continue;
         }
         let raw_id = id
             .strip_prefix(codexbar::settings::USAGE_ITEM_METRIC_PREFIX)
             .unwrap_or(id.as_str());
         push(raw_id, "", false);
+    }
+
+    if provider_id == ProviderId::Claude {
+        let reported = snapshot.map(claude_reported_sections).unwrap_or_default();
+        let saved = hidden.iter().map(String::as_str).filter(|id| {
+            id.starts_with(codexbar::settings::USAGE_ITEM_SECTION_PREFIX) && !reported.contains(id)
+        });
+        let rows = reported
+            .iter()
+            .map(|id| (*id, true))
+            .chain(saved.map(|id| (id, false)))
+            .collect::<Vec<_>>();
+        for (id, available) in rows {
+            let Some((title, requires_cost_summary)) = claude_section_title(id, lang) else {
+                continue;
+            };
+            if seen.insert(id.to_string()) {
+                items.push(ProviderUsageItemSnapshot {
+                    id: id.to_string(),
+                    title: if available {
+                        title
+                    } else {
+                        locale::format_locale(lang, LocaleKey::UsageItemUnavailableTitle, &[&title])
+                    },
+                    available,
+                    requires_cost_summary,
+                });
+            }
+        }
     }
 
     items

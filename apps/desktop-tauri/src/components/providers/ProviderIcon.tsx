@@ -1,4 +1,4 @@
-import { getProviderIcon } from "./providerIcons";
+import { brandColorOnDark, getProviderIcon } from "./providerIcons";
 
 interface Props {
   providerId: string;
@@ -19,6 +19,13 @@ export function ProviderIcon({
   title,
 }: Props) {
   const entry = getProviderIcon(providerId);
+  const onDark = brandColorOnDark(entry.brandColor);
+  const tint = {
+    ["--provider-brand" as string]: entry.brandColor,
+    // Only near-black brands get a dark-surface tint; CSS picks it on dark
+    // surfaces and keeps the brand color on light ones.
+    ...(onDark ? { ["--provider-brand-dark" as string]: onDark } : {}),
+  };
   const dims = { width: size, height: size };
 
   if (entry.svgPath) {
@@ -27,7 +34,7 @@ export function ProviderIcon({
         className={`provider-icon provider-icon--svg${className ? " " + className : ""}`}
         style={{
           ...dims,
-          ["--provider-brand" as string]: entry.brandColor,
+          ...tint,
         }}
         title={title}
         aria-hidden={title ? undefined : true}
@@ -42,7 +49,7 @@ export function ProviderIcon({
       className={`provider-icon provider-icon--letter${className ? " " + className : ""}`}
       style={{
         ...dims,
-        ["--provider-brand" as string]: entry.brandColor,
+        ...tint,
       }}
       title={title}
       aria-hidden={title ? undefined : true}

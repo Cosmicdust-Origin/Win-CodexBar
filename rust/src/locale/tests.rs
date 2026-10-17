@@ -9,11 +9,11 @@ fn test_locale_key_english() {
     );
     assert_eq!(
         get_text(Language::English, LocaleKey::InterfaceLanguage),
-        "Interface Language"
+        "Language"
     );
     assert_eq!(
         get_text(Language::English, LocaleKey::StartAtLogin),
-        "Start at Login"
+        "Start at login"
     );
 }
 
@@ -145,7 +145,6 @@ fn test_japanese_tray_panel_locale_values_are_translated() {
         (LocaleKey::StateError, "エラー"),
         (LocaleKey::PanelAllProviders, "すべてのプロバイダー"),
         (LocaleKey::PanelAllProvidersShort, "すべて"),
-        (LocaleKey::PanelZoom, "ズーム"),
         (LocaleKey::PanelMenu, "メニュー"),
         (LocaleKey::PanelToday, "今日"),
         (LocaleKey::PanelLatestTokens, "最新トークン"),
@@ -157,11 +156,8 @@ fn test_japanese_tray_panel_locale_values_are_translated() {
         (LocaleKey::PanelOneHour, "1時間"),
         (LocaleKey::PanelFiveHours, "5時間"),
         (LocaleKey::PanelTodayBudget, "今日"),
-        (LocaleKey::PanelReserveSuffix, "予備"),
-        (
-            LocaleKey::PanelReserveLastsUntilReset,
-            "リセットまで持ちます",
-        ),
+        (LocaleKey::PaceOnPace, "想定ペース"),
+        (LocaleKey::PaceLastsUntilReset, "リセットまで持ちます"),
         (
             LocaleKey::PanelShowAllProviders,
             "すべてのプロバイダーを表示",
@@ -181,7 +177,6 @@ fn test_chinese_tray_panel_locale_values_are_translated() {
     let cases = [
         (LocaleKey::PanelAllProviders, "所有提供者"),
         (LocaleKey::PanelAllProvidersShort, "全部"),
-        (LocaleKey::PanelZoom, "缩放"),
         (LocaleKey::PanelMenu, "菜单"),
         (LocaleKey::PanelToday, "今日"),
         (LocaleKey::PanelLatestTokens, "最新令牌"),
@@ -193,8 +188,8 @@ fn test_chinese_tray_panel_locale_values_are_translated() {
         (LocaleKey::PanelOneHour, "1小时"),
         (LocaleKey::PanelFiveHours, "5小时"),
         (LocaleKey::PanelTodayBudget, "今日"),
-        (LocaleKey::PanelReserveSuffix, "储备"),
-        (LocaleKey::PanelReserveLastsUntilReset, "持续到重置"),
+        (LocaleKey::PaceOnPace, "节奏正常"),
+        (LocaleKey::PaceLastsUntilReset, "持续到重置"),
         (
             LocaleKey::PanelEstimatedFromLocalLogs,
             "根据本地日志估算；可能与账单不同",
@@ -215,7 +210,6 @@ fn test_korean_tray_panel_locale_values_are_translated() {
     let cases = [
         (LocaleKey::PanelAllProviders, "모든 제공자"),
         (LocaleKey::PanelAllProvidersShort, "전체"),
-        (LocaleKey::PanelZoom, "확대/축소"),
         (LocaleKey::PanelMenu, "메뉴"),
         (LocaleKey::PanelToday, "오늘"),
         (LocaleKey::PanelLatestTokens, "최신 토큰"),
@@ -227,8 +221,8 @@ fn test_korean_tray_panel_locale_values_are_translated() {
         (LocaleKey::PanelOneHour, "1시간"),
         (LocaleKey::PanelFiveHours, "5시간"),
         (LocaleKey::PanelTodayBudget, "오늘"),
-        (LocaleKey::PanelReserveSuffix, "예비"),
-        (LocaleKey::PanelReserveLastsUntilReset, "리셋까지 지속"),
+        (LocaleKey::PaceOnPace, "정상 속도"),
+        (LocaleKey::PaceLastsUntilReset, "리셋까지 지속"),
         (
             LocaleKey::PanelEstimatedFromLocalLogs,
             "로컬 로그에서 추정; 청구서와 다를 수 있음",
@@ -249,7 +243,6 @@ fn test_spanish_tray_panel_locale_values_are_translated() {
     let cases = [
         (LocaleKey::PanelAllProviders, "Todos los proveedores"),
         (LocaleKey::PanelAllProvidersShort, "Todos"),
-        (LocaleKey::PanelZoom, "Zoom"),
         (LocaleKey::PanelMenu, "Menú"),
         (LocaleKey::PanelToday, "Hoy"),
         (LocaleKey::PanelLatestTokens, "Últimos tokens"),
@@ -261,11 +254,8 @@ fn test_spanish_tray_panel_locale_values_are_translated() {
         (LocaleKey::PanelOneHour, "1h"),
         (LocaleKey::PanelFiveHours, "5h"),
         (LocaleKey::PanelTodayBudget, "hoy"),
-        (LocaleKey::PanelReserveSuffix, "en reserva"),
-        (
-            LocaleKey::PanelReserveLastsUntilReset,
-            "Dura hasta el reinicio",
-        ),
+        (LocaleKey::PaceOnPace, "Al ritmo previsto"),
+        (LocaleKey::PaceLastsUntilReset, "Dura hasta el reinicio"),
         (
             LocaleKey::PanelEstimatedFromLocalLogs,
             "Estimado desde logs locales; puede diferir de tu factura",
@@ -451,7 +441,13 @@ fn test_english_is_complete_and_other_languages_can_fallback() {
         .map(|(locale, resource)| (locale, resource_key_names(resource)))
         .collect();
     let locale_key_names: HashSet<&str> = LocaleKey::ALL.iter().map(|(_, name)| *name).collect();
-    let aixy_gateway_keys = ["AixyGatewayTitle", "AixyGatewayLabel", "AixyGatewayHelp"];
+    let aixy_gateway_keys = [
+        "AixyGatewayTitle",
+        "AixyGatewayLabel",
+        "AixyGatewayHelp",
+        "ClawRouterGatewayTitle",
+        "ClawRouterGatewayHelp",
+    ];
     let credential_expiry_keys = [
         "CredentialExpiryNotifications",
         "CredentialExpiryNotificationsHelper",
@@ -463,7 +459,7 @@ fn test_english_is_complete_and_other_languages_can_fallback() {
         for name in aixy_gateway_keys {
             assert!(
                 keys.contains(name),
-                "missing Aixy gateway Fluent key {name} in {locale}"
+                "missing gateway Fluent key {name} in {locale}"
             );
         }
         for name in keys {
@@ -638,4 +634,94 @@ fn resource_key_names(resource: &str) -> HashSet<&str> {
         .filter_map(|line| line.split_once('=').map(|(name, _)| name.trim()))
         .filter(|name| !name.is_empty())
         .collect()
+}
+
+/// The Claude keychain-prompt option has no Windows consumer yet, so its helper
+/// (Providers > Claude > Options) must say so instead of
+/// promising skipped credential reads or a macOS `/usr/bin/security` path.
+#[test]
+fn avoid_keychain_prompts_helper_says_it_is_not_enforced_on_windows() {
+    let expected = [
+        (
+            Language::English,
+            "Not enforced on Windows yet: Claude credentials are still read as usual. The choice is saved for when it ships.",
+        ),
+        (
+            Language::Spanish,
+            "Aún no se aplica en Windows: las credenciales de Claude se siguen leyendo como siempre. La opción se guarda para cuando esté disponible.",
+        ),
+        (
+            Language::Japanese,
+            "Windows ではまだ適用されません。Claude の資格情報は通常どおり読み取られます。この選択は機能の提供に備えて保存されます。",
+        ),
+        (
+            Language::Korean,
+            "아직 Windows에서 적용되지 않습니다. Claude 자격 증명은 평소처럼 읽습니다. 이 선택은 기능이 나올 때를 위해 저장됩니다.",
+        ),
+        (
+            Language::PortugueseBrazil,
+            "Ainda não é aplicado no Windows: as credenciais do Claude continuam sendo lidas normalmente. A escolha fica salva para quando o recurso chegar.",
+        ),
+        (
+            Language::Russian,
+            "Пока не применяется в Windows: учётные данные Claude по-прежнему читаются как обычно. Выбор сохраняется до появления функции.",
+        ),
+        (
+            Language::Turkish,
+            "Windows'ta henüz uygulanmıyor: Claude kimlik bilgileri her zamanki gibi okunur. Seçim, özellik geldiğinde kullanılmak üzere kaydedilir.",
+        ),
+        (
+            Language::Ukrainian,
+            "Поки не застосовується в Windows: облікові дані Claude і далі зчитуються як звичайно. Вибір зберігається до появи функції.",
+        ),
+        (
+            Language::Chinese,
+            "Windows 上尚未生效：仍会照常读取 Claude 凭据。此选项会保存，待该功能上线后使用。",
+        ),
+        (
+            Language::ChineseTraditional,
+            "Windows 上尚未生效：仍會照常讀取 Claude 憑據。此選項會儲存，待該功能上線後使用。",
+        ),
+    ];
+    assert_eq!(expected.len(), Language::all().len());
+    for (language, text) in expected {
+        assert_eq!(
+            get_text(language, LocaleKey::ProviderClaudeAvoidKeychainPromptsHelp),
+            text,
+            "{language:?} Providers > Claude"
+        );
+    }
+}
+
+#[test]
+fn clawrouter_cost_titles_stay_english_in_every_locale_as_on_the_mac() {
+    // Upstream `MenuCardView+Costs.swift` `.clawRouter` passes both titles as bare
+    // literals (no `L()`, no Localizable.strings entry), so every locale reads English.
+    assert_eq!(Language::all().len(), 10);
+    for &language in Language::all() {
+        assert_eq!(
+            get_text(language, LocaleKey::CostTitleClawRouterMonthlyBudget),
+            "Monthly budget",
+            "{language:?}"
+        );
+        assert_eq!(
+            get_text(language, LocaleKey::CostTitleClawRouterSpend),
+            "ClawRouter spend",
+            "{language:?}"
+        );
+    }
+}
+
+#[test]
+fn provider_service_status_help_stays_english_in_every_locale_as_on_the_mac() {
+    // Upstream `PreferencesSidebar.swift` passes "Provider service status: %@" through
+    // `L()`, but no Localizable.strings file has an entry, so every Mac locale reads English.
+    assert_eq!(Language::all().len(), 10);
+    for &language in Language::all() {
+        assert_eq!(
+            get_text(language, LocaleKey::ProviderServiceStatusHelp),
+            "Provider service status: {}",
+            "{language:?}"
+        );
+    }
 }

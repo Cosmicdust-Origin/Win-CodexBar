@@ -121,3 +121,27 @@ describe("PreferencesTransferSection", () => {
     );
   });
 });
+
+describe("PreferencesTransferSection grouped layout", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("is a titled group with the Mac footer", () => {
+    render(<PreferencesTransferSection />);
+    expect(
+      screen.getByRole("heading", { name: "SectionPreferencesTransfer" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("PreferencesTransferFooter")).toBeInTheDocument();
+  });
+
+  it("offers the switcher shortcuts button only when a handler is given", () => {
+    const { rerender } = render(<PreferencesTransferSection />);
+    expect(screen.queryByRole("button", { name: "SwitcherShortcutsOpenButton" })).toBeNull();
+
+    const onOpen = vi.fn();
+    rerender(<PreferencesTransferSection onOpenSwitcherShortcuts={onOpen} />);
+    fireEvent.click(screen.getByRole("button", { name: "SwitcherShortcutsOpenButton" }));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+});

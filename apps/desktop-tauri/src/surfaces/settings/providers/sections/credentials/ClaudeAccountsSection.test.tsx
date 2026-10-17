@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 const events = vi.hoisted(() => ({ listen: vi.fn<(event: string, listener: () => void) => Promise<() => void>>() }));
 vi.mock("../../../../../lib/tauri", () => mocks);
 vi.mock("@tauri-apps/api/event", () => events);
+vi.mock("../../../../../hooks/useLocale", () => ({ useLocale: () => ({ t: (key: string) => key }) }));
 import { ClaudeAccountsSection } from "./ClaudeAccountsSection";
 
 const t = (key: string) => key;
@@ -46,10 +47,7 @@ describe("ClaudeAccountsSection", () => {
       accounts: [],
       error: null,
     });
-    mocks.getSettingsSnapshot.mockResolvedValue({
-      claudeSwapEnabled: false,
-      claudeSwapExecutablePath: "",
-    });
+    mocks.getSettingsSnapshot.mockResolvedValue({});
   });
 
   it("offers to save the discovered account and switches only saved inactive accounts", async () => {
@@ -95,5 +93,57 @@ describe("ClaudeAccountsSection", () => {
     render(<ClaudeAccountsSection t={t} />);
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Could not read"));
     expect((screen.getByText("CodexAccountsAddButton") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("masks account emails, organizations and aria-labels under Hide Personal Info", async () => {
+    mocks.claudeAccountsList.mockResolvedValue([
+      { ...current, organization: "Acme Org" },
+      { ...other, organization: "Acme Org", needsAuthentication: true },
+    ]);
+    const { container } = render(<ClaudeAccountsSection t={t} hidePersonalInfo />);
+    await screen.findByText("Account 1");
+    expect(screen.getByText("Account 2")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "CodexAccountsReauthenticateButton: Account 2" }),
+    ).toBeInTheDocument();
+    expect(container.innerHTML).not.toContain("one@example.com");
+    expect(container.innerHTML).not.toContain("two@example.com");
+    expect(container.innerHTML).not.toContain("Acme Org");
+  });
+
+  it("shows emails and organizations when Hide Personal Info is off", async () => {
+    mocks.claudeAccountsList.mockResolvedValue([{ ...current, organization: "Acme Org" }]);
+    render(<ClaudeAccountsSection t={t} />);
+    await screen.findByText("one@example.com");
+    expect(screen.getByText("Acme Org · max")).toBeInTheDocument();
+  });
+
+  it("passes the saved show-as-used preference to per-account usage", async () => {
+    mocks.claudeAccountsList.mockResolvedValue([{
+      ...current,
+      usage: {
+        fiveHour: { usedPercent: 30, resetsAt: null },
+        sevenDay: null,
+        updatedAt: "2026-10-11T00:00:00Z",
+      },
+    }]);
+    const { rerender } = render(<ClaudeAccountsSection t={t} showAsUsed />);
+    await screen.findByText("70% PanelLeftSuffix");
+    expect(screen.getByText("30% PanelUsedSuffix")).toBeInTheDocument();
+    rerender(<ClaudeAccountsSection t={t} showAsUsed={false} />);
+    expect(screen.queryByText("30% PanelUsedSuffix")).toBeNull();
+  });
+
+  it("shows the claude-swap list only while claude-swap is on", async () => {
+    const { rerender } = render(<ClaudeAccountsSection t={t} />);
+    await screen.findByText(current.email);
+    expect(screen.queryByText("ClaudeSwapTitle")).toBeNull();
+    expect(mocks.claudeSwapAccountsList).not.toHaveBeenCalled();
+    mocks.claudeSwapAccountsList.mockResolvedValue({
+      enabled: true, executableConfigured: false, accounts: [], error: null,
+    });
+    rerender(<ClaudeAccountsSection t={t} claudeSwapEnabled claudeSwapExecutablePath="" />);
+    await screen.findByText("ClaudeSwapTitle");
+    expect(screen.getByText("ClaudeSwapStatusNoExecutable")).toBeTruthy();
   });
 });

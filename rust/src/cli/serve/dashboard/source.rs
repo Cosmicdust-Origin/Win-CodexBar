@@ -140,6 +140,7 @@ impl SnapshotProducer {
                 identity,
                 version: Some(self.version.clone()),
                 usage_bars_show_used: Some(settings.show_as_used),
+                weekly_work_days: settings.weekly_progress_work_days,
             }),
             sidecar: Some(metrics),
         })
@@ -185,6 +186,7 @@ fn provider_fetch_context() -> FetchContext {
         browser_cookie_import: false,
         requires_optional_usage_completeness: false,
         optional_details_enabled: false,
+        live_usage_enabled: false,
     }
 }
 
@@ -319,6 +321,7 @@ async fn collect_claude_accounts(
             browser_cookie_import: false,
             requires_optional_usage_completeness: false,
             optional_details_enabled: false,
+            live_usage_enabled: false,
         };
         populate_api_region_from_settings(ProviderId::Claude, settings, &mut ctx);
         set.spawn(async move {

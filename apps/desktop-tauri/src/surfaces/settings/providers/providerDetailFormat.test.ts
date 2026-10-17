@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProviderDetail } from "../../../types/bridge";
 import type { LocaleKey } from "../../../i18n/keys";
 
-import { buildSubtitle, relativeAgo } from "./providerDetailFormat";
+import { buildSubtitle, providerSourceHintShort, relativeAgo } from "./providerDetailFormat";
 
 /** Identity translator — returns the key verbatim so assertions are stable. */
 const t = (k: LocaleKey) => k as string;
@@ -66,7 +66,7 @@ describe("buildSubtitle", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-31T00:00:00Z"));
     try {
-      expect(buildSubtitle(detail, t)).toBe("oauth · DetailUpdatedPrefix 30d");
+      expect(buildSubtitle(detail, t)).toBe("oauth • DetailUpdatedPrefix 30d");
     } finally {
       vi.useRealTimers();
     }
@@ -120,5 +120,27 @@ describe("relativeAgo", () => {
   it("is symmetric for future timestamps (uses absolute diff)", () => {
     // 90s in the future
     expect(relativeAgo(new Date("2026-07-31T12:01:30Z").toISOString())).toBe("2m");
+  });
+});
+
+describe("providerSourceHintShort", () => {
+  it.each([
+    ["synthetic", "ProviderSourceApiShort"],
+    ["clawrouter", "ProviderSourceApiShort"],
+    ["ibmbob", "ProviderSourceApiShort"],
+    ["langdock", "ProviderSourceWebShort"],
+    ["lithosai", "ProviderSourceWebShort"],
+    ["museai", "ProviderSourceWebShort"],
+    ["workbuddy", "ProviderSourceWebShort"],
+  ])("labels %s by the source its fetcher reports", (id, key) => {
+    expect(providerSourceHintShort(id, t)).toBe(key);
+  });
+
+  it("keeps the older hints and falls back to Auto", () => {
+    expect(providerSourceHintShort("cursor", t)).toBe("ProviderSourceWebShort");
+    expect(providerSourceHintShort("gemini", t)).toBe("ProviderSourceCliShort");
+    expect(providerSourceHintShort("copilot", t)).toBe("ProviderSourceOauthShort");
+    expect(providerSourceHintShort("kiro", t)).toBe("ProviderSourceKiroEnvShort");
+    expect(providerSourceHintShort("codex", t)).toBe("ProviderSourceAutoShort");
   });
 });

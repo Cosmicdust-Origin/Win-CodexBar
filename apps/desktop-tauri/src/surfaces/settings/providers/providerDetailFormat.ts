@@ -13,7 +13,78 @@ export function buildSubtitle(
   } else if (!detail.hasSnapshot) {
     parts.push(t("ProviderUsageNotFetchedYet"));
   }
-  return parts.join(" · ");
+  return parts.join(" • ");
+}
+
+/** Source shown before a provider's first fetch (macOS `UsageStore.sourceLabel(for:)` fallback). */
+export function providerSourceHintShort(
+  providerId: string,
+  t: (k: LocaleKey) => string,
+): string {
+  switch (providerId.toLowerCase()) {
+    case "cursor":
+    case "factory":
+    case "droid":
+    case "kimi":
+    case "kimik2":
+    case "augment":
+    case "opencode":
+    case "amp":
+    case "ollama":
+    case "alibaba":
+    case "infini":
+    case "manus":
+    case "mimo":
+    case "zoommate":
+    case "notion":
+    case "t3chat":
+    case "commandcode":
+    case "raycast":
+    case "langdock":
+    case "lithosai":
+    case "museai":
+    case "workbuddy":
+      return t("ProviderSourceWebShort");
+    case "gemini":
+    case "antigravity":
+    case "jetbrains":
+      return t("ProviderSourceCliShort");
+    case "copilot":
+      return t("ProviderSourceOauthShort");
+    case "zai":
+    case "vertexai":
+    case "openrouter":
+    case "bedrock":
+    case "nanogpt":
+    case "warp":
+    case "deepinfra":
+    case "aiand":
+    case "zenmux":
+    case "clinepass":
+    case "neuralwatt":
+    case "devpass":
+    case "xkiro":
+    case "doubao":
+    case "stepfun":
+    case "venice":
+    case "openaiapi":
+    case "elevenlabs":
+    case "deepgram":
+    case "groq":
+    case "llmproxy":
+    case "xai":
+    case "fireworks":
+    case "meta":
+    case "vercel":
+    case "synthetic":
+    case "clawrouter":
+    case "ibmbob":
+      return t("ProviderSourceApiShort");
+    case "kiro":
+      return t("ProviderSourceKiroEnvShort");
+    default:
+      return t("ProviderSourceAutoShort");
+  }
 }
 
 export function relativeAgo(iso: string): string | null {

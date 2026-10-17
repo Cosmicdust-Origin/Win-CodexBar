@@ -11,6 +11,33 @@ pub(crate) fn number(value: f64, max_fraction_digits: usize) -> String {
     format_number(value, 0, max_fraction_digits)
 }
 
+/// Upstream `UsageFormatter.tokenCountString`: "950", "1K", "1.5M", "12B".
+/// A unit is promoted where whole lower units would round to 1000.
+pub(crate) fn token_count(tokens: u64) -> String {
+    const UNITS: [(u64, f64, &str); 3] = [
+        (999_500_000, 1_000_000_000.0, "B"),
+        (999_500, 1_000_000.0, "M"),
+        (1_000, 1_000.0, "K"),
+    ];
+    for (threshold, divisor, suffix) in UNITS {
+        if tokens >= threshold {
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "display rounding to at most two significant digits"
+            )]
+            let scaled = tokens as f64 / divisor;
+            let formatted = if scaled >= 10.0 {
+                format!("{scaled:.0}")
+            } else {
+                let one = format!("{scaled:.1}");
+                one.strip_suffix(".0").unwrap_or(&one).to_string()
+            };
+            return format!("{formatted}{suffix}");
+        }
+    }
+    tokens.to_string()
+}
+
 /// `ctx.format.usd(value)`: a dollar amount with exactly two fractional
 /// digits, grouped, and the sign before the dollar sign.
 pub(crate) fn usd(value: f64) -> String {

@@ -57,6 +57,13 @@ const POLICIES: Readonly<Record<string, UsageSourcePolicy>> = {
       { value: "oauth", label: "API", description: "Uses the configured Charm Hyper API key only." },
     ],
   },
+  groq: {
+    options: [
+      { value: "auto", label: "Auto", description: "Tries the console.groq.com browser session, then Enterprise Prometheus metrics with the API key." },
+      { value: "web", label: "Browser session", description: "Uses the console.groq.com browser session or manual cookie header only." },
+      { value: "oauth", label: "API", description: "Uses the configured API key for Enterprise Prometheus metrics only." },
+    ],
+  },
   zed: {
     options: [
       {
@@ -124,6 +131,26 @@ const POLICIES: Readonly<Record<string, UsageSourcePolicy>> = {
         description: "Reads Venice subscription credits from the selected browser session or manual cookie header.",
       },
     ],
+  },
+  commandcode: {
+    options: [
+      {
+        value: "auto",
+        label: "Auto",
+        description: "Uses the configured Command Code API key, then falls back to browser cookies.",
+      },
+      {
+        value: "oauth",
+        label: "API",
+        description: "Uses the configured Command Code API key only; browser cookies are never read.",
+      },
+      {
+        value: "web",
+        label: "Browser cookies",
+        description: "Uses the commandcode.ai browser session or manual cookie header only.",
+      },
+    ],
+    hideCookieSourceValues: ["oauth"],
   },
 };
 

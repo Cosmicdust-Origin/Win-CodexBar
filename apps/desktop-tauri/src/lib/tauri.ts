@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  HooksConfigSave,
+  HooksConfigSnapshot,
   ClaudeAccount,
   ClaudeReconciliationSnapshot,
   GrokAccount,
@@ -16,6 +18,7 @@ import type {
   LocaleStrings,
   NotificationSoundEvent,
   ProviderCatalogEntry,
+  ProviderStatusEntry,
   ProviderChartData,
   ProviderDetail,
   ProviderLocalUsageSummary,
@@ -46,6 +49,8 @@ import type {
   CodexSwitchResult,
   DeepSeekPricingStatus,
   CurrencyRatesSnapshot,
+  OrgRateLimitsSnapshot,
+  ProviderThroughputSnapshot,
 } from "../types/bridge";
 
 export const claudeAccountsList = () => invoke<ClaudeAccount[]>("get_claude_accounts_state");
@@ -82,8 +87,22 @@ export function getProviderCatalog(): Promise<ProviderCatalogEntry[]> {
   return invoke<ProviderCatalogEntry[]>("get_provider_catalog");
 }
 
+export function getProviderStatuses(): Promise<ProviderStatusEntry[]> {
+  return invoke<ProviderStatusEntry[]>("get_provider_statuses");
+}
+
 export function reorderProviders(ids: string[]): Promise<ProviderSummary[]> {
   return invoke<ProviderSummary[]>("reorder_providers", { ids });
+}
+
+/** Settings sidebar reorder: `ids` is the full listed order; hidden providers keep their slots. */
+export function reorderVisibleProviders(ids: string[]): Promise<ProviderSummary[]> {
+  return invoke<ProviderSummary[]>("reorder_visible_providers", { ids });
+}
+
+/** Restore the built-in order for the providers the Settings sidebar lists. */
+export function restoreDefaultProviderOrder(): Promise<ProviderSummary[]> {
+  return invoke<ProviderSummary[]>("restore_default_provider_order");
 }
 
 export function getSettingsSnapshot(): Promise<SettingsSnapshot> {
@@ -96,6 +115,14 @@ export function getCurrencyRates(preferredCurrencyCode: string): Promise<Currenc
 
 export function getStayAwakeStatus(): Promise<boolean> {
   return invoke<boolean>("get_stay_awake_status");
+}
+
+export function getHooksConfig(): Promise<HooksConfigSnapshot> {
+  return invoke<HooksConfigSnapshot>("get_hooks_config");
+}
+
+export function saveHooksConfig(request: HooksConfigSave): Promise<HooksConfigSnapshot> {
+  return invoke<HooksConfigSnapshot>("save_hooks_config", { request });
 }
 
 export function updateSettings(
@@ -443,6 +470,16 @@ export function setProviderOptionalDetails(
   return invoke<void>("set_provider_optional_details", { providerId, enabled });
 }
 
+/** On-demand Tokens/min window for OpenAI API Live Usage; 15, 60 or 360 minutes. */
+export function getOpenAiLiveUsage(windowMinutes: 15 | 60 | 360): Promise<ProviderThroughputSnapshot> {
+  return invoke<ProviderThroughputSnapshot>("get_openai_live_usage", { windowMinutes });
+}
+
+/** Organization project caps; the caller skips this when a project scope is saved. */
+export function getOpenAiOrgRateLimits(): Promise<OrgRateLimitsSnapshot> {
+  return invoke<OrgRateLimitsSnapshot>("get_openai_org_rate_limits");
+}
+
 export function setProviderAutoResumeAfterQuotaReset(
   providerId: string,
   enabled: boolean,
@@ -550,19 +587,8 @@ export function revealTrayPanelWindow(): Promise<void> {
   return invoke<void>("reveal_tray_panel_window");
 }
 
-/** Persist the user's manually-chosen flyout (Pop Out Dashboard) size. */
-export function setFlyoutSize(width: number, height: number): Promise<void> {
-  return invoke<void>("set_flyout_size", { width, height });
-}
-
-/** Forget where the user dragged the flyout and anchor it to the tray again. */
-export function resetFlyoutPosition(): Promise<void> {
-  return invoke<void>("reset_flyout_position");
-}
-
-/** The remembered flyout size ([w, h]) if the user has resized it, else null. */
-export function flyoutStoredSize(): Promise<[number, number] | null> {
-  return invoke<[number, number] | null>("flyout_stored_size");
+export function getSystemAccentColor(): Promise<string | null> {
+  return invoke<string | null>("get_system_accent_color");
 }
 
 export function quitApp(): Promise<void> {

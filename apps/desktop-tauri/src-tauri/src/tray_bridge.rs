@@ -388,8 +388,8 @@ pub(crate) fn refresh_tray_presentation(app: &AppHandle) {
 /// Update the tray icon pixels and tooltip text to reflect current provider usage.
 ///
 /// Behaviour mirrors egui's `choose_tray_update_plan` (rust/src/native_ui/app.rs):
-/// - If `menu_bar_shows_highest_usage` is on OR `menu_bar_display_mode == "minimal"`,
-///   render the bar from the healthy provider with the highest session usage.
+/// - If `menu_bar_shows_highest_usage` is on (legacy Display mode "minimal" is
+///   folded into it on load), render the bar from the healthy provider with the highest session usage.
 /// - Otherwise render from the first enabled healthy provider (catalog order).
 /// - When any provider exposes a weekly/secondary window, the icon shows both
 ///   bars from the same picked provider.
@@ -413,7 +413,8 @@ pub fn update_tray_icon_and_tooltip(
     let icon = Image::new_owned(rgba, w, h);
     let _ = tray.set_icon(Some(icon));
 
-    let tooltip = build_tooltip(snapshots, settings.ui_language);
+    let tooltip = build_tooltip(snapshots, settings.ui_language, settings.hide_personal_info);
+    let tooltip = crate::status_poller::with_incident_lines(app, &settings, tooltip);
     let _ = tray.set_tooltip(Some(tooltip));
 }
 
@@ -421,6 +422,7 @@ pub fn update_tray_icon_and_tooltip(
 fn build_tooltip(
     snapshots: &[crate::commands::ProviderUsageSnapshot],
     lang: codexbar::settings::Language,
+    hide_personal_info: bool,
 ) -> String {
     use codexbar::locale::{LocaleKey, get_text};
 
@@ -432,7 +434,13 @@ fn build_tooltip(
     let mut lines = Vec::with_capacity(snapshots.len() + 1);
     for s in snapshots {
         let status = if let Some(ref err) = s.error {
-            let short = truncate_tooltip_text(err, 36);
+            // Provider errors can quote the signed-in email.
+            let err = codexbar::core::PersonalInfoRedactor::hide_emails_in_text(
+                Some(err),
+                hide_personal_info,
+            )
+            .unwrap_or_default();
+            let short = truncate_tooltip_text(&err, 36);
             format!("{}: {} ({})", s.display_name, error_label, short)
         } else {
             let label = crate::commands::compact_tray_status_label(headline_window(s), lang);
@@ -548,11 +556,13 @@ mod tests {
                 id: "codex".into(),
                 display_name: "Codex".into(),
                 cookie_domain: None,
+                cli_aliases: Vec::new(),
             },
             ProviderCatalogEntry {
                 id: "claude".into(),
                 display_name: "Claude".into(),
                 cookie_domain: None,
+                cli_aliases: Vec::new(),
             },
         ]
     }
@@ -599,11 +609,8 @@ mod tests {
         let action = resolve_menu_action("pop_out").expect("pop_out action");
         assert!(matches!(action, MenuAction::OpenFlyout));
 
-        // SurfaceMode::TrayPanel is retained purely as a data key (geometry
-        // key / window_properties source / panel-size reference) for the
-        // flyout window's builder — the properties themselves are unchanged.
         let props = SurfaceMode::TrayPanel.window_properties();
-        assert!(props.resizable && props.blur_dismiss && props.skip_taskbar);
+        assert!(!props.resizable && props.blur_dismiss && props.skip_taskbar);
     }
 
     #[test]
@@ -696,8 +703,11 @@ mod tests {
                 reserve_description: None,
                 reserve_will_last_to_reset: false,
                 reserve_eta_seconds: None,
+                pace: None,
                 monthly_limit_block: None,
                 description_is_detail: false,
+                reset_regenerates: false,
+                hidden_on_card: false,
             },
             primary_label: None,
             secondary: secondary_percent.map(|pct| crate::commands::RateWindowSnapshot {
@@ -712,10 +722,14 @@ mod tests {
                 reserve_description: None,
                 reserve_will_last_to_reset: false,
                 reserve_eta_seconds: None,
+                pace: None,
                 monthly_limit_block: None,
                 description_is_detail: false,
+                reset_regenerates: false,
+                hidden_on_card: false,
             }),
             secondary_label: None,
+            secondary_label_key: None,
             model_specific: None,
             tertiary: tertiary_percent.map(|pct| crate::commands::RateWindowSnapshot {
                 used_percent: pct,
@@ -729,8 +743,11 @@ mod tests {
                 reserve_description: None,
                 reserve_will_last_to_reset: false,
                 reserve_eta_seconds: None,
+                pace: None,
                 monthly_limit_block: None,
                 description_is_detail: false,
+                reset_regenerates: false,
+                hidden_on_card: false,
             }),
             tertiary_label: None,
             extra_rate_windows: Vec::new(),
@@ -752,9 +769,12 @@ mod tests {
                 account_id: None,
                 daily: Vec::new(),
                 always_visible: false,
+                folded_into_primary: false,
+                title_key: None,
             }),
             plan_name: None,
             account_email: None,
+            account_label: None,
             subscription: None,
             source_label: String::new(),
             has_successful_claude_cli_quota: false,
@@ -762,12 +782,14 @@ mod tests {
             error: None,
             error_state: codexbar::core::ProviderStateKind::Ready,
             pace: None,
+            pace_authoritative: true,
             account_organization: None,
             tray_status_label: None,
             fetch_duration_ms: None,
             wayfinder_usage: None,
             quota_burndown: None,
             open_ai_api_usage: None,
+            throughput: None,
             session_equivalent_forecast: None,
         }
     }
@@ -778,6 +800,13 @@ mod tests {
         used_percent: f64,
     ) -> crate::commands::ProviderUsageSnapshot {
         fake_snapshot_with(id, display, used_percent, None, None, None)
+    }
+
+    fn used_view_settings() -> Settings {
+        Settings {
+            show_as_used: true,
+            ..Settings::default()
+        }
     }
 
     fn fake_extra_window(percent: f64) -> crate::commands::NamedRateWindowSnapshot {
@@ -798,7 +827,10 @@ mod tests {
                 reserve_description: None,
                 reserve_will_last_to_reset: false,
                 reserve_eta_seconds: None,
+                pace: None,
                 description_is_detail: false,
+                reset_regenerates: false,
+                hidden_on_card: false,
                 monthly_limit_block: None,
             },
         }
@@ -835,7 +867,11 @@ mod tests {
         let mut codex = fake_snapshot("codex", "Codex", 8.0);
         codex.primary.reset_description = Some("4h 10m".to_string());
 
-        let tooltip = build_tooltip(&[claude, codex], codexbar::settings::Language::English);
+        let tooltip = build_tooltip(
+            &[claude, codex],
+            codexbar::settings::Language::English,
+            false,
+        );
 
         assert_eq!(
             tooltip,
@@ -853,7 +889,7 @@ mod tests {
         codex.primary.reset_description = Some("No active 5h session".to_string());
         codex.secondary.as_mut().unwrap().reset_description = Some("3d 17h".to_string());
 
-        let tooltip = build_tooltip(&[codex], codexbar::settings::Language::English);
+        let tooltip = build_tooltip(&[codex], codexbar::settings::Language::English, false);
 
         assert_eq!(tooltip, "CodexBar\nCodex: 16% • Resets in 3d 17h");
     }
@@ -864,7 +900,7 @@ mod tests {
         claude.primary.reset_description =
             Some("resets in Jun 10 at 3:00PM with extra noisy suffix".to_string());
 
-        let tooltip = build_tooltip(&[claude], codexbar::settings::Language::English);
+        let tooltip = build_tooltip(&[claude], codexbar::settings::Language::English, false);
 
         let line = tooltip.lines().nth(1).expect("provider tooltip line");
         assert!(line.starts_with("Claude: 13% • Resets in Jun 10 at 3:00PM"));
@@ -873,11 +909,29 @@ mod tests {
     }
 
     #[test]
+    fn hidden_personal_info_removes_emails_from_tooltip_errors() {
+        let mut codex = fake_snapshot("codex", "Codex", 13.0);
+        codex.error = Some("proof@example.com: session expired".to_string());
+
+        let shown = build_tooltip(
+            &[codex.clone()],
+            codexbar::settings::Language::English,
+            false,
+        );
+        assert!(shown.contains("proof@example.com"), "{shown}");
+
+        let hidden = build_tooltip(&[codex], codexbar::settings::Language::English, true);
+        assert!(hidden.contains("session expired"), "{hidden}");
+        assert!(!hidden.contains('@'), "{hidden}");
+        assert!(!hidden.contains("example.com"), "{hidden}");
+    }
+
+    #[test]
     fn japanese_tooltip_localizes_error_status() {
         let mut claude = fake_snapshot("claude", "Claude", 13.0);
         claude.error = Some("network timeout".to_string());
 
-        let tooltip = build_tooltip(&[claude], codexbar::settings::Language::Japanese);
+        let tooltip = build_tooltip(&[claude], codexbar::settings::Language::Japanese, false);
 
         assert!(tooltip.contains("エラー"), "{tooltip}");
         assert!(!tooltip.contains(": error ("), "{tooltip}");
@@ -889,10 +943,16 @@ mod tests {
         claude.primary.resets_at =
             Some((chrono::Utc::now() + chrono::Duration::hours(2)).to_rfc3339());
 
-        let english_tooltip =
-            build_tooltip(&[claude.clone()], codexbar::settings::Language::English);
-        let japanese_tooltip =
-            build_tooltip(&[claude.clone()], codexbar::settings::Language::Japanese);
+        let english_tooltip = build_tooltip(
+            &[claude.clone()],
+            codexbar::settings::Language::English,
+            false,
+        );
+        let japanese_tooltip = build_tooltip(
+            &[claude.clone()],
+            codexbar::settings::Language::Japanese,
+            false,
+        );
 
         assert!(english_tooltip.contains("Resets in"), "{english_tooltip}");
         assert!(
@@ -919,7 +979,7 @@ mod tests {
     }
     #[test]
     fn selected_tray_percent_uses_cursor_extra_usage_cost() {
-        let mut settings = Settings::default();
+        let mut settings = used_view_settings();
         settings.set_provider_metric(ProviderId::Cursor, MetricPreference::ExtraUsage);
         let snapshot = fake_snapshot_with(
             "cursor",
@@ -935,7 +995,7 @@ mod tests {
     }
     #[test]
     fn selected_tray_percent_tracks_extra_rate_window() {
-        let mut settings = Settings::default();
+        let mut settings = used_view_settings();
         settings.set_provider_metric(ProviderId::Copilot, MetricPreference::ExtraUsage);
         let mut snapshot = fake_snapshot("copilot", "Copilot", 20.0);
         snapshot.extra_rate_windows.push(fake_extra_window(42.0));
@@ -945,7 +1005,7 @@ mod tests {
     }
     #[test]
     fn copilot_automatic_tracks_highest_extra_rate_window() {
-        let settings = Settings::default();
+        let settings = used_view_settings();
         let mut snapshot = fake_snapshot("copilot", "Copilot", 20.0);
         snapshot.extra_rate_windows.push(fake_extra_window(42.0));
         let (primary, _) = selected_tray_percents(&snapshot, &settings);
@@ -1033,7 +1093,7 @@ mod tests {
     }
     #[test]
     fn selected_tray_percent_falls_back_when_extra_usage_missing() {
-        let mut settings = Settings::default();
+        let mut settings = used_view_settings();
         settings.set_provider_metric(ProviderId::Cursor, MetricPreference::ExtraUsage);
         let snapshot = fake_snapshot_with("cursor", "Cursor", 10.0, Some(72.0), None, None);
         let (primary, _) = selected_tray_percents(&snapshot, &settings);
@@ -1041,7 +1101,7 @@ mod tests {
     }
     #[test]
     fn single_meaningful_secondary_quota_uses_full_single_meter() {
-        let settings = Settings::default();
+        let settings = used_view_settings();
         let mut snapshot = fake_snapshot_with("claude", "Claude", 0.0, Some(42.0), None, None);
         snapshot.primary.is_informational = true;
         let (primary, secondary) = selected_tray_percents(&snapshot, &settings);
@@ -1050,7 +1110,7 @@ mod tests {
     }
     #[test]
     fn selected_secondary_quota_is_not_duplicated_when_tertiary_is_meaningful() {
-        let settings = Settings::default();
+        let settings = used_view_settings();
         let mut snapshot =
             fake_snapshot_with("claude", "Claude", 0.0, Some(42.0), Some(30.0), None);
         snapshot.primary.is_informational = true;
@@ -1060,7 +1120,7 @@ mod tests {
     }
     #[test]
     fn two_meaningful_quotas_keep_two_meter_layout() {
-        let mut settings = Settings::default();
+        let mut settings = used_view_settings();
         settings.set_provider_metric(ProviderId::Cursor, MetricPreference::Session);
         let snapshot = fake_snapshot_with("cursor", "Cursor", 15.0, Some(40.0), None, None);
         let (primary, secondary) = selected_tray_percents(&snapshot, &settings);
@@ -1069,7 +1129,7 @@ mod tests {
     }
     #[test]
     fn informational_primary_skips_session_and_automatic_phantom_zero() {
-        let mut settings = Settings::default();
+        let mut settings = used_view_settings();
         settings.set_provider_metric(ProviderId::Claude, MetricPreference::Session);
         let mut snapshot = fake_snapshot_with("claude", "Claude", 0.0, Some(42.0), None, None);
         snapshot.primary.is_informational = true;
@@ -1085,7 +1145,7 @@ mod tests {
     }
     #[test]
     fn claude_automatic_prefers_weekly_when_model_exhausted() {
-        let settings = Settings::default();
+        let settings = used_view_settings();
         let mut snapshot = fake_snapshot_with("claude", "Claude", 40.0, Some(22.0), None, None);
         snapshot.model_specific = Some(crate::commands::RateWindowSnapshot {
             used_percent: 100.0,
@@ -1099,7 +1159,10 @@ mod tests {
             reserve_description: None,
             reserve_will_last_to_reset: false,
             reserve_eta_seconds: None,
+            pace: None,
             description_is_detail: false,
+            reset_regenerates: false,
+            hidden_on_card: false,
             monthly_limit_block: None,
         });
         let (primary, _) = selected_tray_percents(&snapshot, &settings);
@@ -1112,7 +1175,7 @@ mod tests {
     }
     #[test]
     fn automatic_prefers_exhausted_weekly_over_low_session() {
-        let settings = Settings::default();
+        let settings = used_view_settings();
         let snapshot = fake_snapshot_with("codex", "Codex", 20.0, Some(100.0), None, None);
         let (primary, _) = selected_tray_percents(&snapshot, &settings);
         assert_eq!(primary, 100.0);
@@ -1124,7 +1187,7 @@ mod tests {
     }
     #[test]
     fn automatic_picks_highest_among_model_and_extra_windows() {
-        let settings = Settings::default();
+        let settings = used_view_settings();
         let mut snapshot =
             fake_snapshot_with("gemini", "Gemini", 10.0, Some(30.0), Some(40.0), None);
         snapshot.model_specific = Some(crate::commands::RateWindowSnapshot {
@@ -1139,7 +1202,10 @@ mod tests {
             reserve_description: None,
             reserve_will_last_to_reset: false,
             reserve_eta_seconds: None,
+            pace: None,
             description_is_detail: false,
+            reset_regenerates: false,
+            hidden_on_card: false,
             monthly_limit_block: None,
         });
         snapshot.extra_rate_windows.push(fake_extra_window(90.0));

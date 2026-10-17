@@ -21,8 +21,8 @@ use std::time::Duration;
 use std::os::windows::process::CommandExt;
 
 use crate::core::{
-    FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderInventoryItem,
-    ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
+    CostSnapshot, FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId,
+    ProviderInventoryItem, ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
 };
 
 use self::accounts::{GrokAuthKind, ParsedGrokAuthFile};
@@ -36,6 +36,13 @@ const REMAINING_RESETS_ENDPOINT: &str =
 const CLI_SETTINGS_ENDPOINT: &str = "https://cli-chat-proxy.grok.com/v1/settings";
 const RESET_CREDITS_TIMEOUT: Duration = Duration::from_secs(2);
 const RESET_CREDITS_JOIN_GRACE: Duration = Duration::from_millis(250);
+
+/// Reset-window pace (upstream `GrokProviderDescriptor.pace`, v0.70.0): weekly
+/// windows inside their length, see [`reset_window_pace_matches`].
+pub(crate) const PACE_CAPABILITY: crate::core::ProviderPaceCapability =
+    crate::core::ProviderPaceCapability::reset_window(crate::core::PaceWindowRule::Custom(
+        reset_window_pace_matches,
+    ));
 
 pub struct GrokProvider {
     metadata: ProviderMetadata,
@@ -155,6 +162,7 @@ impl GrokProvider {
         let BearerBilling {
             billing,
             subscription_tier,
+            prepaid_balance_usd,
         } = match self.fetch_bearer_billing(credentials).await {
             Ok(bearer) => bearer,
             Err(error) => {
@@ -172,16 +180,19 @@ impl GrokProvider {
         let reset_credits = reset_lookup
             .join(ctx.requires_optional_usage_completeness)
             .await;
-        let result = result_from_billing(
-            billing,
-            if kind == GrokAuthKind::Cli {
-                "grok-cli"
-            } else {
-                "grok-oauth"
-            },
-            credentials.email.clone(),
-            credentials.team_id.clone(),
-            plan,
+        let result = attach_prepaid_balance(
+            result_from_billing(
+                billing,
+                if kind == GrokAuthKind::Cli {
+                    "grok-cli"
+                } else {
+                    "grok-oauth"
+                },
+                credentials.email.clone(),
+                credentials.team_id.clone(),
+                plan,
+            ),
+            prepaid_balance_usd,
         );
         Ok(match reset_credits {
             Some(credits) => result.with_inventory_item(credits),
@@ -756,6 +767,63 @@ fn primary_label_for_cycle_minutes(minutes: u32) -> Option<&'static str> {
         Some("Monthly")
     } else {
         None
+    }
+}
+
+/// Upstream `GrokProviderDescriptor.primaryLabel(window:now:)`: the label of
+/// the window's duration, or of the distance to its reset when the duration
+/// is unknown.
+fn primary_label_for_window(window: &RateWindow, now: DateTime<Utc>) -> Option<&'static str> {
+    if let Some(minutes) = window.window_minutes {
+        return primary_label_for_cycle_minutes(minutes);
+    }
+    let resets_at = window.resets_at?;
+    let seconds = (resets_at - now).num_milliseconds() as f64 / 1_000.0;
+    if seconds <= 3_600.0 {
+        return None;
+    }
+    let days = (seconds / 86_400.0).round();
+    if (4.0..=12.0).contains(&days) {
+        Some("Weekly")
+    } else if (20.0..=45.0).contains(&days) {
+        Some("Monthly")
+    } else {
+        None
+    }
+}
+
+/// Upstream Grok `ProviderPaceCapability.resetWindowPace`: a window labelled
+/// "Weekly" whose reset falls inside its length (7 days when unknown).
+pub(crate) fn reset_window_pace_matches(window: &RateWindow, now: DateTime<Utc>) -> bool {
+    if primary_label_for_window(window, now) != Some("Weekly") {
+        return false;
+    }
+    let Some(resets_at) = window.resets_at else {
+        return false;
+    };
+    let window_minutes = window.window_minutes.unwrap_or(7 * 24 * 60);
+    let until_reset = resets_at - now;
+    window_minutes > 0
+        && until_reset > chrono::Duration::zero()
+        && until_reset <= chrono::Duration::minutes(i64::from(window_minutes))
+}
+
+/// Period label for the purchased-credit cost. It ends in "balance", so the
+/// shared card treats the cost as balance-only.
+const PREPAID_BALANCE_PERIOD: &str = "Prepaid balance";
+
+/// Attach the purchased-credit wallet as a balance-only cost (upstream
+/// `GrokUsageSnapshot.toUsageSnapshot`). Quota meters are left untouched. No
+/// `limit` is set: a zero limit would read as a full meter, and the balance-only
+/// settings view keys on an absent limit.
+fn attach_prepaid_balance(
+    result: ProviderFetchResult,
+    balance_usd: Option<f64>,
+) -> ProviderFetchResult {
+    match balance_usd {
+        Some(balance) => result
+            .with_cost(CostSnapshot::new(0.0, "USD", PREPAID_BALANCE_PERIOD).with_balance(balance)),
+        None => result,
     }
 }
 

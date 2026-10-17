@@ -1,0 +1,585 @@
+/*
+ * Tray card anatomy, after upstream 0.70.0 `UsageMenuCardView` (spec 3.1-3.8, 5).
+ * Imported last so it wins over the older layered tray rules. Every rule is
+ * scoped to the tray panel; Settings and the float bar keep their own styles.
+ */
+
+/* ── Card frame: 20 px sides, 6 px top and bottom, blocks stacked by margins ── */
+.menu-surface--tray .menu-card {
+  gap: 0;
+  padding: var(--mac-pad-header-y) var(--mac-pad-x);
+}
+
+.menu-surface--tray .menu-card--with-details {
+  padding: var(--mac-section-pt) var(--mac-pad-x) var(--mac-section-pb);
+}
+
+/* Divider under the header: 6 above, 16 below (`postHeaderDividerContentSpacing`). */
+.menu-surface--tray .menu-card__divider {
+  flex: none;
+  height: 1px;
+  background: var(--mac-divider);
+  margin: var(--mac-gap-header) 0 var(--mac-after-divider);
+}
+
+.menu-surface--tray .menu-card__content,
+.menu-surface--tray .menu-card__metrics {
+  gap: var(--mac-metric-gap);
+  padding-bottom: 0;
+}
+
+/* Separator before the extra usage block. */
+.menu-surface--tray .menu-card__separator {
+  flex: none;
+  height: 1px;
+  background: var(--mac-separator);
+}
+
+/* ── Header: name and email, then subtitle (or error) and plan ── */
+.menu-surface--tray .card-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-header-line-gap);
+  min-width: 0;
+}
+
+.menu-surface--tray .card-header__line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--mac-header-col-gap);
+  min-width: 0;
+}
+
+.menu-surface--tray .card-header__line--error {
+  align-items: flex-start;
+}
+
+.menu-surface--tray .card-header__name {
+  flex: 0 1 auto;
+  min-width: 0;
+  font: var(--mac-text-headline);
+  color: var(--mac-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Middle truncation: the head shrinks with an ellipsis, the tail stays whole. */
+.menu-surface--tray .card-header__email {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  font: var(--mac-text-subheadline);
+  color: var(--mac-text-2);
+  white-space: nowrap;
+}
+
+.menu-surface--tray .card-header__email-head {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-surface--tray .card-header__email-tail {
+  flex: none;
+}
+
+.menu-surface--tray .card-header__subtitle {
+  flex: 0 1 auto;
+  min-width: 0;
+  font: var(--mac-text-footnote);
+  color: var(--mac-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Plain footnote text: no badge fill or border. */
+.menu-surface--tray .card-header__plan {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  font: var(--mac-text-footnote);
+  color: var(--mac-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-surface--tray .card-header__error {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: var(--mac-text-footnote);
+  color: var(--mac-error);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Upstream `CopyIconButton`: pressed fill 0.18, scale 0.94, ease-out 0.12 s. */
+.menu-surface--tray .menu-card__copy-btn {
+  border-radius: var(--mac-icon-btn-r);
+  color: var(--mac-text-2);
+  transition:
+    transform 120ms ease-out,
+    background 120ms ease-out;
+}
+
+.menu-surface--tray .menu-card__copy-btn:active {
+  background: rgba(var(--surface-tint-rgb), 0.18);
+  transform: scale(0.94);
+}
+
+/* ── Rate-window rows (`MenuCardMetricRow`) ── */
+.menu-surface--tray .menu-metric {
+  gap: var(--mac-metric-inner);
+}
+
+.menu-surface--tray .menu-metric__title {
+  min-width: 0;
+  font: var(--mac-text-body-medium);
+  color: var(--mac-text);
+  text-align: left;
+  text-align-last: auto;
+}
+
+.menu-surface--tray .menu-metric__head {
+  column-gap: 8px;
+}
+
+.menu-surface--tray .menu-metric__reset,
+.menu-surface--tray .menu-metric__meta,
+.menu-surface--tray .menu-metric__status,
+.menu-surface--tray .menu-metric__detail,
+.menu-surface--tray .menu-metric__pct {
+  font: var(--mac-text-footnote);
+  color: var(--mac-text-2);
+}
+
+.menu-surface--tray .menu-metric__pct {
+  color: var(--mac-text);
+}
+
+.menu-surface--tray .menu-metric__exhausted {
+  font: var(--mac-text-footnote);
+  font-weight: 600;
+  color: var(--mac-error);
+}
+
+/* ── Key-value sections (`ProviderDetailSectionsContent`) ── */
+.menu-surface--tray .card-kv {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-kv-gap);
+  min-width: 0;
+}
+
+.menu-surface--tray .card-kv__divider {
+  height: 1px;
+  background: var(--mac-divider);
+}
+
+.menu-surface--tray .card-kv__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-kv-section);
+  min-width: 0;
+}
+
+.menu-surface--tray .card-kv__title {
+  font: var(--mac-text-section);
+  color: var(--mac-text-2);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-surface--tray .card-kv__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-kv-row);
+  min-width: 0;
+}
+
+.menu-surface--tray .card-kv__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font: var(--mac-text-caption);
+}
+
+.menu-surface--tray .card-kv__label {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--mac-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-surface--tray .card-kv__values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--mac-kv-value);
+  flex: 0 1 auto;
+  min-width: 0;
+  text-align: right;
+}
+
+.menu-surface--tray .card-kv__value {
+  max-width: 100%;
+  color: var(--mac-text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-surface--tray .card-kv__secondary {
+  max-width: 100%;
+  font: var(--mac-text-caption2);
+  color: var(--mac-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-surface--tray .card-kv__track,
+.menu-surface--tray .card-extra__track {
+  height: var(--mac-bar-h);
+  border-radius: var(--mac-bar-r);
+  background: var(--mac-track);
+  overflow: hidden;
+}
+
+.menu-surface--tray .card-kv__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--provider-accent);
+}
+
+/* ── Inline usage dashboard (`InlineUsageDashboardContent`) ── */
+.menu-surface--tray .card-dash {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-dash-gap);
+  min-width: 0;
+}
+
+.menu-surface--tray .card-dash__kpis {
+  display: grid;
+  grid-template-columns: minmax(118px, 1fr) minmax(100px, 1fr);
+  gap: var(--mac-kpi-gap);
+}
+
+.menu-surface--tray .card-dash__kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.menu-surface--tray .card-dash__kpi-title {
+  font: var(--mac-text-caption2);
+  color: var(--mac-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-surface--tray .card-dash__kpi-value {
+  font: var(--mac-text-subheadline);
+  font-weight: 600;
+  color: var(--mac-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-surface--tray .card-dash__kpi-value--emphasis {
+  font: var(--mac-text-headline);
+}
+
+/* 58 px frame: the scale line, a 2 px gap, then the bars. */
+.menu-surface--tray .card-dash__chart {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: var(--mac-chart-h);
+  min-width: 0;
+}
+
+.menu-surface--tray .card-dash__scale {
+  flex: none;
+  font: var(--mac-text-caption2);
+  color: var(--mac-text-2);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-surface--tray .card-dash__scale--hover {
+  text-align: left;
+}
+
+.menu-surface--tray .card-dash__bars {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-end;
+  gap: min(2px, calc(100% / var(--bar-count, 30) / 4));
+  min-height: 0;
+}
+
+/* 1 px baseline at secondary 0.22. */
+.menu-surface--tray .card-dash__bars::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--mac-text-2);
+  opacity: 0.22;
+  pointer-events: none;
+}
+
+.menu-surface--tray .card-dash__bar {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: var(--mac-chart-bar-r);
+  background: var(--provider-accent);
+}
+
+.menu-surface--tray .card-dash__bar--selected {
+  box-shadow: inset 0 0 0 1px var(--mac-text);
+}
+
+.menu-surface--tray .card-dash__windows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.menu-surface--tray .card-dash__caption {
+  font: var(--mac-text-caption2);
+  color: var(--mac-text-2);
+}
+
+.menu-surface--tray .card-dash__window {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.menu-surface--tray .card-dash__window-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.menu-surface--tray .card-dash__window-title {
+  min-width: 0;
+  font: var(--mac-text-caption);
+  color: var(--mac-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-surface--tray .card-dash__window-value {
+  flex: none;
+  font: var(--mac-text-caption);
+  font-weight: 600;
+  color: var(--mac-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.menu-surface--tray .card-dash__window-range {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-surface--tray .card-dash__details {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.menu-surface--tray .card-dash__detail {
+  font: var(--mac-text-caption);
+  color: var(--mac-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Extra usage and cost (`MenuCardView+Costs`) ── */
+.menu-surface--tray .card-extra {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-metric-inner);
+  min-width: 0;
+}
+
+.menu-surface--tray .card-extra__title {
+  font: var(--mac-text-body-medium);
+  color: var(--mac-text);
+}
+
+.menu-surface--tray .card-extra__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--provider-accent);
+}
+
+.menu-surface--tray .card-extra__line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.menu-surface--tray .card-extra__spend {
+  min-width: 0;
+  font: var(--mac-text-caption);
+  color: var(--mac-text);
+  overflow-wrap: anywhere;
+}
+
+.menu-surface--tray .card-extra__inline-value {
+  min-width: 0;
+  font: var(--mac-text-caption);
+  color: var(--mac-text);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.menu-surface--tray .card-extra__caption {
+  font: var(--mac-text-caption);
+  color: var(--mac-text-2);
+  overflow-wrap: anywhere;
+}
+
+/* Plan renewal / expiry line under the quota rows (upstream UsageNotesContent). */
+.menu-surface--tray .card-notes {
+  margin: 0;
+  font: var(--mac-text-caption);
+  color: var(--mac-text-2);
+  overflow-wrap: anywhere;
+}
+
+/* The percent stays whole on the right while a long spend line wraps. */
+.menu-surface--tray .card-extra__line > .card-extra__caption {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* ── Provider switcher (spec 3.1): radius 6, accent selection, instant hover ── */
+.menu-surface--tray .provider-grid__item {
+  position: relative;
+  min-height: 30px;
+  border-radius: 6px;
+  transition: none;
+}
+
+.menu-surface--tray .provider-grid__item:hover {
+  background: rgba(0, 0, 0, 0.095);
+}
+
+.menu-surface--tray .provider-grid__item--active {
+  background: var(--mac-selection-bg);
+  box-shadow: none;
+  color: var(--mac-selection-text);
+}
+
+.menu-surface--tray .provider-grid__item--active:hover {
+  background: var(--mac-selection-bg);
+}
+
+.menu-surface--tray .provider-grid__item--active .provider-icon {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+}
+
+.menu-surface--tray .provider-grid__item--active .provider-grid__icon-overview {
+  color: var(--mac-selection-text);
+}
+
+/* Quota indicator: 2 px line, 2 px off the bottom; icon-only segments are
+   24 px wide, so the side inset is 3 px instead of the labelled 8. */
+.menu-surface--tray .provider-grid__weekly-track {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 2px;
+  width: auto;
+  height: 2px;
+  margin: 0;
+  border-radius: 1px;
+  background: var(--mac-track);
+}
+
+.menu-surface--tray .provider-grid--compact .provider-grid__weekly-track {
+  width: auto;
+  height: 2px;
+  margin: 0;
+}
+
+.menu-surface--tray .provider-grid__weekly-track::after {
+  border-radius: 1px;
+}
+
+/* ── Overview spend summary (spec 3.2) ── */
+.menu-surface--tray .overview-spend {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 20px;
+  min-width: 0;
+}
+
+.menu-surface--tray .overview-spend__headline {
+  font: var(--mac-text-headline);
+  color: var(--mac-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-surface--tray .overview-spend__range {
+  color: var(--mac-text-2);
+}
+
+.menu-surface--tray .overview-spend__total {
+  font-family: var(--mac-font);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--mac-text);
+}
+
+.menu-surface--tray .overview-spend__caption {
+  font: var(--mac-text-caption);
+  color: var(--mac-text-2);
+}

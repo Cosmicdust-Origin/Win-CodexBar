@@ -1,11 +1,13 @@
 import type { ProviderCatalogEntry, ProviderUsageSnapshot } from "../types/bridge";
 
-export function orderProviderSnapshots(
-  providers: ProviderUsageSnapshot[],
+export function orderProviderSnapshots<
+  T extends Pick<ProviderUsageSnapshot, "providerId" | "displayName">,
+>(
+  providers: T[],
   catalog: ProviderCatalogEntry[],
   enabledProviderIds: string[],
   providerOrder: string[] = [],
-): ProviderUsageSnapshot[] {
+): T[] {
   const order = new Map<string, number>();
   const orderedIds = providerOrder.length > 0
     ? providerOrder

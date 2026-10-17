@@ -1,108 +1,38 @@
-import { useCallback, useEffect, useState, type ReactElement, type ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getCurrentWindow, LogicalPosition, LogicalSize } from "@tauri-apps/api/window";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type {
   BootstrapState,
+  SettingsSurfaceTarget,
   SettingsTabId,
   SettingsUpdate,
 } from "../types/bridge";
 import { useSettings } from "../hooks/useSettings";
 import { useSurfaceTarget } from "../hooks/useSurfaceMode";
 import { useLocale } from "../hooks/useLocale";
+import { useProviders } from "../hooks/useProviders";
 import { closeSettingsWindow, getWorkAreaRect, setSurfaceMode } from "../lib/tauri";
-import { TAB_META, isSettingsTab } from "./settings/settingsTabs";
+import {
+  TAB_META,
+  filterProvidersByQuery,
+  parseSettingsTabRequest,
+  providersTabRequest,
+  type SettingsTabRequest,
+} from "./settings/settingsTabs";
+import { SettingsSidebar } from "./settings/SettingsSidebar";
 import GeneralTab from "./settings/tabs/GeneralTab";
-import DisplayTab from "./settings/tabs/DisplayTab";
+import MenuBarTab from "./settings/tabs/MenuBarTab";
+import MenuTab from "./settings/tabs/MenuTab";
 import AdvancedTab from "./settings/tabs/AdvancedTab";
+import HooksTab from "./settings/tabs/HooksTab";
 import AboutTab from "./settings/tabs/AboutTab";
 import ProvidersTab from "./settings/tabs/ProvidersTab";
 import UsageSpendTab from "./settings/tabs/UsageSpendTab";
 
-// Inline monochrome SVG icons stand in for the upstream macOS SF Symbols
-// (gearshape / square.grid.2x2 / eye / slider.horizontal.3 / info.circle).
-// They render in `currentColor` so they pick up the same secondary/accent
-// text color as the tab label.
-const ICON_SIZE = 16;
-
-function Svg({ children }: { children: ReactNode }) {
-  return (
-    <svg
-      width={ICON_SIZE}
-      height={ICON_SIZE}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.4}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      {children}
-    </svg>
-  );
-}
-
-const TabIcons: Record<SettingsTabId, ReactElement> = {
-  general: (
-    <Svg>
-      <circle cx="8" cy="8" r="2" />
-      <path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" />
-    </Svg>
-  ),
-  providers: (
-    <Svg>
-      <circle cx="4" cy="4" r="1.5" />
-      <circle cx="12" cy="4" r="1.5" />
-      <circle cx="8" cy="12" r="1.5" />
-      <path d="M5.3 4.8 7.2 10M10.7 4.8 8.8 10M5.5 4h5" />
-    </Svg>
-  ),
-  notifications: (
-    <Svg>
-      <path d="M3.5 11.5h9l-1.2-1.8V7a3.3 3.3 0 0 0-6.6 0v2.7Z" />
-      <path d="M6.5 13a1.7 1.7 0 0 0 3 0" />
-    </Svg>
-  ),
-  menuBar: (
-    <Svg>
-      <path d="M1.5 8c1.6-3 4-4.5 6.5-4.5S13 5 14.5 8c-1.5 3-4 4.5-6.5 4.5S3.1 11 1.5 8Z" />
-      <circle cx="8" cy="8" r="2" />
-    </Svg>
-  ),
-  menu: (
-    <Svg>
-      <rect x="2" y="2" width="5" height="5" rx="1" />
-      <rect x="9" y="2" width="5" height="5" rx="1" />
-      <rect x="2" y="9" width="5" height="5" rx="1" />
-      <rect x="9" y="9" width="5" height="5" rx="1" />
-    </Svg>
-  ),
-  usageSpend: (
-    <Svg>
-      <path d="M2 12.5V4.5h12v8" />
-      <path d="M4.5 10V8M7.5 10V6.5M10.5 10V7.2M13 10V5.5" />
-    </Svg>
-  ),
-  advanced: (
-    <Svg>
-      <path d="M2 4h8M2 8h5M2 12h10" />
-      <circle cx="11.5" cy="4" r="1.4" />
-      <circle cx="8.5" cy="8" r="1.4" />
-      <circle cx="13" cy="12" r="1.4" />
-    </Svg>
-  ),
-  about: (
-    <Svg>
-      <circle cx="8" cy="8" r="6.25" />
-      <path d="M8 7v4" />
-      <circle cx="8" cy="5" r="0.6" fill="currentColor" stroke="none" />
-    </Svg>
-  ),
-};
-
-
-const SETTINGS_WINDOW_HEIGHT = 580;
-const SETTINGS_WINDOW_WIDTH = 600;
+// Mirrors `SETTINGS_WINDOW_WIDTH` / `SETTINGS_WINDOW_HEIGHT` in src-tauri `surface.rs`
+// (macOS `PreferencesView` 880x620).
+const SETTINGS_WINDOW_HEIGHT = 620;
+const SETTINGS_WINDOW_WIDTH = 880;
 
 async function applySettingsWindowSize() {
   const workArea = await getWorkAreaRect().catch(() => null);
@@ -136,35 +66,59 @@ async function applySettingsWindowSize() {
     .catch(() => {});
 }
 
-export default function Settings({ state, initialTab: propTab }: { state: BootstrapState; initialTab?: string }) {
+export default function Settings({
+  state,
+  initialTab: propTab,
+  tabRequestId = 0,
+}: {
+  state: BootstrapState;
+  /** Raw tab request: a tab id, or `providers:<id>` to select a provider. */
+  initialTab?: string;
+  /** Changes on every window request, so a repeated deep link applies again. */
+  tabRequestId?: number;
+}) {
   const { settings, saving, error, update } = useSettings(state.settings);
+  const { providers: snapshots } = useProviders();
   const { t } = useLocale();
   const shellTarget = useSurfaceTarget("settings");
-  const initialTab: SettingsTabId =
-    propTab && isSettingsTab(propTab)
-      ? propTab
-      : shellTarget?.kind === "settings" && isSettingsTab(shellTarget.tab)
-        ? shellTarget.tab
-        : "general";
-  const [activeTab, setActiveTab] = useState<SettingsTabId>(initialTab);
-  const shellTab: SettingsTabId | null =
-    shellTarget?.kind === "settings" && isSettingsTab(shellTarget.tab)
-      ? shellTarget.tab
-      : null;
-  const [prevPropTab, setPrevPropTab] = useState(propTab);
-  const [prevShellTab, setPrevShellTab] = useState(shellTab);
+  const propRequest = parseSettingsTabRequest(propTab);
+  // Proof mode and the main-window surface carry the same raw tab string.
+  const rawShellTab = shellTarget?.kind === "settings" ? shellTarget.tab : null;
+  const shellRequest = parseSettingsTabRequest(rawShellTab);
+  const firstRequest: SettingsTabRequest | null = propRequest ?? shellRequest;
+  const [activeTab, setActiveTab] = useState<SettingsTabId>(firstRequest?.tab ?? "general");
+  // Last provider picked; a bare `providers` request keeps it.
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
+    firstRequest?.providerId ?? null,
+  );
+  const [searchText, setSearchText] = useState("");
+  const [prevPropRequest, setPrevPropRequest] = useState({ tab: propTab, id: tabRequestId });
+  const [prevShellTab, setPrevShellTab] = useState(rawShellTab);
 
-  // Adjust local tab during render when external drivers change (no effect sync).
-  if (propTab !== prevPropTab) {
-    setPrevPropTab(propTab);
-    if (propTab && isSettingsTab(propTab)) {
-      setActiveTab(propTab);
+  // Adjust local state during render when external drivers change (no effect sync).
+  if (propTab !== prevPropRequest.tab || tabRequestId !== prevPropRequest.id) {
+    setPrevPropRequest({ tab: propTab, id: tabRequestId });
+    if (propRequest) {
+      setActiveTab(propRequest.tab);
+      if (propRequest.providerId) {
+        setSelectedProviderId(propRequest.providerId);
+        // A deep link must not land on a provider the search hides.
+        setSearchText("");
+      }
     }
   }
-  if (shellTab !== prevShellTab) {
-    setPrevShellTab(shellTab);
-    if (shellTab) {
-      setActiveTab(shellTab);
+  if (rawShellTab !== prevShellTab) {
+    setPrevShellTab(rawShellTab);
+    if (shellRequest) {
+      setActiveTab(shellRequest.tab);
+      const id = shellRequest.providerId;
+      if (id) {
+        setSelectedProviderId(id);
+        // Clear a search that hides the target. The main window's echo of the
+        // user's own row click names a visible row, so that search is kept.
+        const target = state.providers.filter((p) => p.id === id);
+        if (filterProvidersByQuery(target, searchText).length === 0) setSearchText("");
+      }
     }
   }
 
@@ -172,22 +126,49 @@ export default function Settings({ state, initialTab: propTab }: { state: Bootst
     void applySettingsWindowSize();
   }, []);
 
+  const catalog = state.providers;
+  const providerId =
+    selectedProviderId && catalog.some((p) => p.id === selectedProviderId)
+      ? selectedProviderId
+      : (catalog[0]?.id ?? null);
+  const providerName = catalog.find((p) => p.id === providerId)?.displayName ?? null;
+  const paneLabelKey = TAB_META.find((tab) => tab.id === activeTab)?.labelKey ?? "TabGeneral";
+  const title = activeTab === "providers" && providerName ? providerName : t(paneLabelKey);
+
   const set = (patch: SettingsUpdate) => void update(patch);
-  const handleTabClick = useCallback((tab: SettingsTabId) => {
-    setActiveTab(tab);
-    // Only transition the main window if we're NOT in the detached settings window
+  const showInMainWindow = useCallback((tab: SettingsSurfaceTarget["tab"]) => {
+    // Only drive the main window's surface when this is not the detached window.
     if (getCurrentWebviewWindow().label !== "settings") {
       void setSurfaceMode("settings", { kind: "settings", tab });
     }
   }, []);
+  const handleSelectPane = useCallback(
+    (tab: SettingsTabId) => {
+      setActiveTab(tab);
+      showInMainWindow(tab);
+    },
+    [showInMainWindow],
+  );
+  const handleSelectProvider = useCallback(
+    (id: string) => {
+      setActiveTab("providers");
+      setSelectedProviderId(id);
+      showInMainWindow(providersTabRequest(id));
+    },
+    [showInMainWindow],
+  );
 
   return (
-    <div
-      className={`settings${activeTab === "providers" ? " settings--providers-active" : ""}`}
-    >
+    <div className="settings settings--sidebar">
       {/* custom title bar (decorations disabled for guaranteed dark theme) */}
       <div className="settings-titlebar" data-tauri-drag-region>
-        <span className="settings-titlebar__title" data-tauri-drag-region>{t("SettingsWindowTitle")}</span>
+        <span
+          className="settings-titlebar__title"
+          data-tauri-drag-region
+          data-testid="settings-title"
+        >
+          {title}
+        </span>
         <div className="settings-titlebar__controls">
           <button
             type="button"
@@ -210,74 +191,78 @@ export default function Settings({ state, initialTab: propTab }: { state: Bootst
         </div>
       </div>
 
-      {/* tab bar */}
-      <nav className="settings-tabs" role="tablist">
-        {TAB_META.map((tab) => (
-          <button
-            type="button"
-            key={tab.id}
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            className={`settings-tab ${activeTab === tab.id ? "settings-tab--active" : ""}`}
-            onClick={() => handleTabClick(tab.id)}
-          >
-            <span className="settings-tab__icon">{TabIcons[tab.id]}</span>
-            <span className="settings-tab__label">{t(tab.labelKey)}</span>
-          </button>
-        ))}
-      </nav>
+      <div className="settings-shell">
+        <SettingsSidebar
+          settings={settings}
+          providers={catalog}
+          snapshots={snapshots}
+          set={set}
+          saving={saving}
+          activeTab={activeTab}
+          selectedProviderId={providerId}
+          searchText={searchText}
+          onSearchTextChange={setSearchText}
+          onSelectPane={handleSelectPane}
+          onSelectProvider={handleSelectProvider}
+        />
 
-      {/* status bar – the transient "Saving…" note overlays the tab body so it
-          never shifts the layout; an error stays in flow so it hides nothing */}
-      <div className="settings-status-slot">
-        {(saving || error) && (
+        <section className="settings-detail" aria-label={title}>
           <div
-            className={`settings-status ${saving ? "settings-status--floating" : "settings-status--error"}`}
+            className={`settings-body${activeTab === "providers" ? " settings-body--provider" : ""}`}
           >
-            {saving ? t("SettingsStatusSaving") : error}
+            {activeTab === "general" && (
+              <GeneralTab mode="general" settings={settings} set={set} saving={saving} />
+            )}
+            {activeTab === "providers" && (
+              <ProvidersTab
+                settings={settings}
+                providers={catalog}
+                set={set}
+                saving={saving}
+                providerId={providerId}
+                snapshots={snapshots}
+              />
+            )}
+            {activeTab === "notifications" && (
+              <GeneralTab mode="notifications" settings={settings} set={set} saving={saving} />
+            )}
+            {activeTab === "menuBar" && (
+              <MenuBarTab
+                settings={settings}
+                providers={catalog}
+                set={set}
+                saving={saving}
+              />
+            )}
+            {activeTab === "menu" && (
+              <MenuTab settings={settings} set={set} saving={saving} />
+            )}
+            {activeTab === "usageSpend" && (
+              <UsageSpendTab settings={settings} set={set} saving={saving} />
+            )}
+            {activeTab === "advanced" && (
+              <AdvancedTab settings={settings} set={set} saving={saving} />
+            )}
+            {activeTab === "hooks" && <HooksTab providers={catalog} />}
+            {activeTab === "about" && (
+              <AboutTab settings={settings} set={set} saving={saving} />
+            )}
           </div>
-        )}
-      </div>
 
-      {/* tab panels */}
-      <div className={`settings-body${activeTab === "providers" ? " settings-body--providers" : ""}`}>
-        {activeTab === "general" && (
-          <GeneralTab mode="general" settings={settings} set={set} saving={saving} />
-        )}
-        {activeTab === "providers" && (
-          <ProvidersTab
-            settings={settings}
-            providers={state.providers}
-            set={set}
-            saving={saving}
-          />
-        )}
-        {activeTab === "notifications" && (
-          <GeneralTab mode="notifications" settings={settings} set={set} saving={saving} />
-        )}
-        {activeTab === "menuBar" && (
-          <DisplayTab
-            mode="menuBar"
-            settings={settings}
-            providers={state.providers}
-            set={set}
-            saving={saving}
-          />
-        )}
-        {activeTab === "menu" && (
-          <DisplayTab mode="menu" settings={settings} set={set} saving={saving} />
-        )}
-        {activeTab === "usageSpend" && (
-          <UsageSpendTab settings={settings} set={set} saving={saving} />
-        )}
-        {activeTab === "advanced" && (
-          <AdvancedTab settings={settings} set={set} saving={saving} />
-        )}
-        {activeTab === "about" && (
-          <AboutTab settings={settings} set={set} saving={saving} />
-        )}
+          {/* Save status at the foot of the detail column. "Saving" floats over
+              the pane so it never shifts the layout; an error stays in flow. */}
+          <div className="settings-status-slot">
+            {(saving || error) && (
+              <div
+                role="status"
+                className={`settings-status ${saving ? "settings-status--floating" : "settings-status--error"}`}
+              >
+                {saving ? t("SettingsStatusSaving") : error}
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
 }
-

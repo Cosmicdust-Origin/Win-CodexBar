@@ -42,8 +42,11 @@ mod tests {
             reserve_description: None,
             reserve_will_last_to_reset: false,
             reserve_eta_seconds: None,
+            pace: None,
             monthly_limit_block: None,
             description_is_detail: false,
+            reset_regenerates: false,
+            hidden_on_card: false,
         }
     }
 

@@ -23,7 +23,7 @@ import { LocaleProvider } from "../i18n/LocaleProvider";
 import { buildBundle } from "../test/localeHarness";
 import type { OpenAiApiUsageSnapshot, ProviderUsageSnapshot } from "../types/bridge";
 import MenuCard from "./MenuCard";
-import { describeCard } from "./MenuCardDetails";
+import { describeCard } from "./card/describeCard";
 
 const START = 1_788_220_800;
 
@@ -106,7 +106,7 @@ function renderCard(
   );
 }
 
-describe("MenuCard OpenAI daily usage section", () => {
+describe("MenuCard OpenAI daily usage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     tauriMocks.claudeAccountsList.mockResolvedValue([]);
@@ -122,66 +122,120 @@ describe("MenuCard OpenAI daily usage section", () => {
     eventMocks.listen.mockResolvedValue(() => {});
   });
 
-  it("renders a collapsed Daily usage section for openaiapi", async () => {
+  // The per-day API chart lives in Settings > Providers (ChartsSection); the
+  // card keeps the upstream anatomy only.
+  it("keeps the per-day API chart out of the card", async () => {
     const { container } = renderCard(snapshot("openaiapi", usage()));
-    await waitFor(() => {
-      expect(container.querySelector(".menu-card__daily-usage")).not.toBeNull();
-    });
-    const section = container.querySelector(".menu-card__daily-usage") as HTMLDetailsElement;
-    expect(section.tagName).toBe("DETAILS");
-    expect(section.open).toBe(false);
-    expect(section.querySelector("summary")).toHaveTextContent("OpenAIChartTitle");
-    expect(section.querySelectorAll('[role="option"]')).toHaveLength(2);
-  });
-
-  it("does not show another provider's OpenAI payload (provider siloing)", async () => {
-    const { container } = renderCard(snapshot("claude", usage()));
-    await waitFor(() => {
-      expect(tauriMocks.getProviderChartData).toHaveBeenCalled();
-    });
+    await waitFor(() => expect(container.querySelector(".card-header__name")).not.toBeNull());
     expect(container.querySelector(".menu-card__daily-usage")).toBeNull();
     expect(container.querySelector('[role="option"]')).toBeNull();
+    expect(container).not.toHaveTextContent("OpenAIChartTitle");
+  });
+
+  it("renders the Tokens/min grid in the full card", async () => {
+    const { container } = renderCard(withThroughput(snapshot("openaiapi", null)));
+    await waitFor(() => expect(container.querySelector(".card-header__name")).not.toBeNull());
+    expect(container.querySelector(".openai-tpm")).not.toBeNull();
   });
 
   it("masks the Admin project id in the card identity when privacy is enabled", async () => {
     const provider = snapshot("openaiapi", usage());
     provider.planName = "Admin API: proj-private";
     const { container } = renderCard(provider, false, true);
-    await waitFor(() => expect(container.querySelector(".menu-card__plan-badge")).not.toBeNull());
-    expect(container.querySelector(".menu-card__plan-badge")).toHaveTextContent("Admin API: ••••");
+    await waitFor(() => expect(container.querySelector(".card-header__plan")).not.toBeNull());
+    expect(container.querySelector(".card-header__plan")).toHaveTextContent("Admin API: ••••");
     expect(container).not.toHaveTextContent("proj-private");
-  });
-
-  it("hides the section on error, in compact overview and with an empty window", async () => {
-    const errored = renderCard(snapshot("openaiapi", usage(), "boom"));
-    await waitFor(() => expect(tauriMocks.getLocaleStrings).toHaveBeenCalled());
-    expect(errored.container.querySelector(".menu-card__daily-usage")).toBeNull();
-    errored.unmount();
-
-    const compact = renderCard(snapshot("openaiapi", usage()), true);
-    expect(compact.container.querySelector(".menu-card__daily-usage")).toBeNull();
-    compact.unmount();
-
-    const empty = renderCard(snapshot("openaiapi", usage(0)));
-    expect(empty.container.querySelector(".menu-card__daily-usage")).toBeNull();
   });
 });
 
-describe("describeCard OpenAI usage presence", () => {
-  it("is present only for openaiapi with days and no error", () => {
-    expect(describeCard(snapshot("openaiapi", usage()), null, []).openAiApiUsage).not.toBeNull();
-    expect(describeCard(snapshot("claude", usage()), null, []).openAiApiUsage).toBeNull();
-    expect(describeCard(snapshot("openaiapi", usage(0)), null, []).openAiApiUsage).toBeNull();
-    expect(describeCard(snapshot("openaiapi", null), null, []).openAiApiUsage).toBeNull();
-    expect(describeCard(snapshot("openaiapi", usage(), "boom"), null, []).openAiApiUsage).toBeNull();
+function withThroughput(snap: ProviderUsageSnapshot): ProviderUsageSnapshot {
+  snap.throughput = {
+    minutes: [{ start: START, totalTokens: 1_000, requests: 1, isPending: false }],
+    frontier: START,
+    latestTokensPerMinute: 1_000,
+    peakTokensPerMinute: 1_000,
+    peakAt: START,
+    fiveMinuteAverageTokensPerMinute: 1_000,
+    models: [],
+    windowMinutes: 60,
+    fetchedAt: START,
+    projectId: null,
+  };
+  return snap;
+}
+
+describe("describeCard OpenAI Tokens/min grid", () => {
+  it("surfaces the grid as full-card content for the OpenAI API", () => {
+    const presence = describeCard(withThroughput(snapshot("openaiapi", null)), null, []);
+    expect(presence.openAiThroughput).not.toBeNull();
+    expect(presence.hasDetails).toBe(true);
   });
 
-  it("makes a card that only has daily usage count as having details", () => {
-    expect(describeCard(snapshot("openaiapi", usage()), null, []).hasDetails).toBe(true);
-    expect(describeCard(snapshot("openaiapi", usage(0)), null, []).hasDetails).toBe(false);
+  it("keeps the grid out of the compact Overview", () => {
+    const presence = describeCard(withThroughput(snapshot("openaiapi", null)), null, [], "detailed", true);
+    expect(presence.openAiThroughput).toBeNull();
   });
 
-  it("keeps compact overview header-only when daily usage is the only content", () => {
-    expect(describeCard(snapshot("openaiapi", usage()), null, [], "detailed", true, true).hasDetails).toBe(false);
+  it("keeps the grid out of other providers and errored cards", () => {
+    expect(describeCard(withThroughput(snapshot("codex", null)), null, []).openAiThroughput).toBeNull();
+    expect(
+      describeCard(withThroughput(snapshot("openaiapi", null, "boom")), null, []).openAiThroughput,
+    ).toBeNull();
+  });
+});
+
+describe("describeCard", () => {
+  it("does not count the per-day API history as card content", () => {
+    const presence = describeCard(snapshot("openaiapi", usage()), null, []);
+    expect(presence.hasDetails).toBe(false);
+  });
+
+  it("drops every section on error", () => {
+    const errored = snapshot("openaiapi", usage(), "boom");
+    errored.cost = {
+      used: 1,
+      limit: null,
+      remaining: null,
+      currencyCode: "USD",
+      currencySymbol: "$",
+      period: "30 days",
+      resetsAt: null,
+      formattedUsed: "$1.00",
+      formattedLimit: null,
+      balance: null,
+      formattedBalance: null,
+      daily: [],
+      alwaysVisible: true,
+    };
+    const presence = describeCard(errored, null, [
+      { id: "primary", label: "Session", snap: errored.primary, lane: "primary" },
+    ]);
+    expect(presence).toMatchObject({
+      hasMetrics: false,
+      hasDetailSections: false,
+      hasCost: false,
+      localUsage: null,
+      wayfinderUsage: null,
+      hasDetails: false,
+    });
+  });
+
+  // Upstream `showsOverviewSupplementalContent(compact:)` is `!compact || metrics.isEmpty`
+  // (MenuCardView+ModelHelpers.swift:378-380).
+  it("keeps compact Overview to quota rows, or details when there are none", () => {
+    const snap = snapshot("openaiapi", usage());
+    snap.displayDetails = [
+      { id: "d", sectionTitle: null, title: "Plan", value: "Pro", secondaryValue: null, progress: null },
+    ];
+    const metrics = [{ id: "primary", label: "Session", snap: snap.primary, lane: "primary" as const }];
+    expect(describeCard(snap, null, metrics, "detailed", false).showsDetailSections).toBe(true);
+    expect(describeCard(snap, null, metrics, "detailed", true)).toMatchObject({
+      hasDetails: true,
+      showsDetailSections: false,
+    });
+    expect(describeCard(snap, null, [], "detailed", true)).toMatchObject({
+      hasDetails: true,
+      showsDetailSections: true,
+    });
   });
 });

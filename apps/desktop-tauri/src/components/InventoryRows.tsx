@@ -6,8 +6,8 @@ import { localizeProviderLabel } from "../lib/windowLabels";
 /**
  * One discrete-inventory line: "{title}: {count} available [expiry]".
  *
- * Shared by the tray menu card (`MenuCardDetails`) and the settings provider
- * detail (`UsageSection`); each surface passes its own layout classes.
+ * Used by the settings provider detail (`UsageSection`); the tray card renders
+ * the same data as key-value rows in `card/DetailSections`.
  */
 export function InventoryItemRow({
   item,

@@ -20,6 +20,7 @@ const settings: SettingsSnapshot = {
   refreshIntervalSecs: 300,
   adaptiveRefresh: false,
   refreshAllProvidersOnMenuOpen: false,
+  statusChecksEnabled: true,
   lowPowerMode: false,
   startAtLogin: false,
   startMinimized: false,
@@ -34,7 +35,14 @@ const settings: SettingsSnapshot = {
   switcherShowsIcons: true,
   menuBarShowsHighestUsage: true,
   menuBarShowsPercent: true,
+  menuBarIconStyle: "percent",
+  mergedOverviewSelectedProviders: [],
+  quotaWarningMarkersVisible: true,
+  workdayTickStyle: "subtle",
   menuBarColorPace: false,
+  menuBarColorByProvider: false,
+  menuBarPaceReservePositive: false,
+  providersSortedAlphabetically: false,
   showAsUsed: false,
   showAllTokenAccountsInMenu: true,
   enableAnimations: true,
@@ -57,8 +65,10 @@ const settings: SettingsSnapshot = {
   globalShortcut: "",
   switcherShortcuts: {},
   codexCustomSessionsDirs: [],
+  antigravityAdditionalProfileHomes: [],
   updateChannel: "stable",
   uiLanguage: "english",
+  uiLanguageFollowsSystem: false,
   theme: "dark",
   windowScalePercent: 125,
   trayScalePercent: 100,
@@ -169,43 +179,66 @@ describe("AdvancedTab", () => {
     });
   });
 
-  it("keeps the Windows Hooks settings surface to one master label and toggle", () => {
+  it("leaves Hooks to Settings > Hooks", () => {
     render(<AdvancedTab settings={settings} set={vi.fn()} saving={false} />);
-
-    const hooksSection = screen
-      .getByRole("heading", { name: "HooksTitle" })
-      .closest("section");
-
-    expect(hooksSection).not.toBeNull();
-    expect(hooksSection?.querySelectorAll(".settings-field__label")).toHaveLength(1);
-    expect(hooksSection?.querySelectorAll('input[type="checkbox"]')).toHaveLength(1);
-    expect(
-      hooksSection?.querySelectorAll(
-        'input[type="text"], input[type="number"], textarea',
-      ),
-    ).toHaveLength(0);
-    expect(screen.getAllByText("HooksEnableLabel")).toHaveLength(1);
+    expect(screen.queryByText("HooksEnableLabel")).toBeNull();
   });
 
-  it("toggles Stay Awake independently of agent session discovery", () => {
+  it("leaves Agent sessions to Settings > Menu", () => {
+    render(<AdvancedTab settings={settings} set={vi.fn()} saving={false} />);
+    expect(screen.queryByText("AgentSessionsTitle")).toBeNull();
+    expect(screen.queryByText("AgentSessionsStayAwakeLabel")).toBeNull();
+    expect(screen.queryByText("AgentSessionsSshHostsLabel")).toBeNull();
+  });
+});
+
+describe("AdvancedTab Mac grouped layout", () => {
+  it("orders the groups with Privacy first and no keyboard or portable preferences", () => {
+    const { container } = render(
+      <AdvancedTab settings={settings} set={vi.fn()} saving={false} />,
+    );
+    const titles = Array.from(
+      container.querySelectorAll(".settings-group__title"),
+      (node) => node.textContent,
+    );
+    expect(titles).toEqual([
+      "PrivacyTitle",
+      "CodexLocalLogsTitle",
+      "SectionLocalIntegrations",
+      "NetworkProxyTitle",
+      "DiagnosticsSectionHeading",
+    ]);
+    expect(screen.queryByText("SectionKeyboard")).toBeNull();
+    expect(screen.queryByText("SectionPreferencesTransfer")).toBeNull();
+    expect(screen.queryByText("KEYCHAIN ACCESS")).toBeNull();
+  });
+
+  it("draws every toggle as a switch", () => {
+    render(<AdvancedTab settings={settings} set={vi.fn()} saving={false} />);
+    for (const toggle of screen.getAllByRole("checkbox")) {
+      expect(toggle).toHaveClass("toggle--switch");
+    }
+  });
+
+  it("shows the credential-access footer while Credential Manager access is off", () => {
     const set = vi.fn();
-    render(
+    const { rerender } = render(
+      <AdvancedTab settings={settings} set={set} saving={false} />,
+    );
+    // The Claude keychain-prompt option lives in Providers > Claude > Options (Mac parity).
+    expect(screen.queryByRole("checkbox", { name: "AvoidKeychainPromptsLabel" })).toBeNull();
+    expect(screen.queryByText("CredentialAccessFooter")).toBeNull();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "DisableAllKeychainLabel" }));
+    expect(set).toHaveBeenCalledWith({ disableKeychainAccess: true });
+
+    rerender(
       <AdvancedTab
-        settings={{ ...settings, agentSessionsEnabled: false, stayAwakeEnabled: false }}
+        settings={{ ...settings, disableKeychainAccess: true }}
         set={set}
         saving={false}
       />,
     );
-
-    const toggle = screen
-      .getByText("AgentSessionsStayAwakeLabel")
-      .closest(".settings-field")
-      ?.querySelector('input[type="checkbox"]');
-    expect(toggle).not.toBeNull();
-    expect(toggle).not.toBeDisabled();
-    expect(toggle).not.toBeChecked();
-
-    fireEvent.click(toggle as Element);
-    expect(set).toHaveBeenCalledWith({ stayAwakeEnabled: true });
+    expect(screen.getByText("CredentialAccessFooter")).toBeInTheDocument();
   });
 });

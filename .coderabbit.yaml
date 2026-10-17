@@ -34,7 +34,7 @@ reviews:
     - path: "apps/desktop-tauri/src-tauri/src/surface_target.rs"
       instructions: >-
         The settings tab whitelist must stay exactly: general, providers,
-        notifications, menuBar, menu, usageSpend, advanced, about. It must
+        notifications, menuBar, menu, usageSpend, advanced, hooks, about. It must
         mirror the frontend SettingsTabId and TAB_META.
     - path: "apps/desktop-tauri/src-tauri/src/floatbar/**"
       instructions: >-

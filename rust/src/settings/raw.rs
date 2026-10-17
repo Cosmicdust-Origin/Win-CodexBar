@@ -15,6 +15,28 @@ fn canonicalize_provider_id_list(ids: impl IntoIterator<Item = String>) -> Vec<S
         .collect()
 }
 
+/// Legacy files have no `menu_bar_icon_style`; they keep what
+/// `menu_bar_shows_percent` drew. A present but unknown value falls back the same way.
+fn resolve_menu_bar_icon_style(
+    stored: Option<&str>,
+    legacy_shows_percent: bool,
+) -> MenuBarIconStyle {
+    stored
+        .and_then(MenuBarIconStyle::parse)
+        .unwrap_or(if legacy_shows_percent {
+            MenuBarIconStyle::Percent
+        } else {
+            MenuBarIconStyle::Bars
+        })
+}
+
+/// Canonical ids, deduplicated, capped at [`MERGED_OVERVIEW_PROVIDER_LIMIT`].
+pub(crate) fn normalize_merged_overview_selection(ids: Vec<String>) -> Vec<String> {
+    let mut ids = canonicalize_provider_id_list(ids);
+    ids.truncate(MERGED_OVERVIEW_PROVIDER_LIMIT);
+    ids
+}
+
 fn canonicalize_provider_metrics(
     metrics: HashMap<String, MetricPreference>,
 ) -> HashMap<String, MetricPreference> {
@@ -103,6 +125,8 @@ pub(super) struct RawSettings {
     #[serde(default)]
     adaptive_refresh: bool,
     refresh_all_providers_on_menu_open: bool,
+    #[serde(default = "default_true")]
+    status_checks_enabled: bool,
     #[serde(default)]
     low_power_mode: bool,
     #[serde(default)]
@@ -125,14 +149,38 @@ pub(super) struct RawSettings {
     switcher_shows_icons: bool,
     menu_bar_shows_highest_usage: bool,
     menu_bar_shows_percent: bool,
+    /// `None` when the file predates the key; it then follows `menu_bar_shows_percent`.
+    /// Kept as a string so an unknown value never fails the whole file.
+    #[serde(default)]
+    menu_bar_icon_style: Option<String>,
+    #[serde(default)]
+    merged_overview_selected_providers: Vec<String>,
+    #[serde(default = "default_true")]
+    quota_warning_markers_visible: bool,
+    #[serde(default = "default_true")]
+    highlight_menu_cards_on_hover: bool,
+    #[serde(default)]
+    workday_tick_style: Option<String>,
     #[serde(default)]
     menu_bar_color_pace: bool,
+    #[serde(default)]
+    menu_bar_color_by_provider: bool,
+    #[serde(default)]
+    menu_bar_pace_reserve_positive: bool,
+    #[serde(default)]
+    providers_sorted_alphabetically: bool,
+    #[serde(default)]
+    providers_enabled_only: bool,
     show_as_used: bool,
     enable_animations: bool,
     reset_time_relative: bool,
     show_reset_when_exhausted: bool,
     predictive_pace_warning_enabled: bool,
+    limit_reset_notifications_enabled: bool,
     credential_expiry_notifications_enabled: bool,
+    /// `None` when the file predates the key; it then inherits `show_notifications`.
+    #[serde(default)]
+    session_quota_notifications_enabled: Option<bool>,
     #[serde(default = "default_true")]
     show_pace: bool,
     menu_bar_display_mode: String,
@@ -211,6 +259,8 @@ pub(super) struct RawSettings {
     global_shortcut: String,
     switcher_shortcuts: BTreeMap<String, String>,
     codex_custom_sessions_dirs: Vec<String>,
+    #[serde(default)]
+    antigravity_additional_profile_homes: Vec<String>,
     agent_sessions_enabled: bool,
     #[serde(default)]
     stay_awake_enabled: bool,
@@ -228,6 +278,10 @@ pub(super) struct RawSettings {
     auto_download_updates: bool,
     install_updates_on_quit: bool,
     ui_language: Language,
+    /// Field-level default: a file without the key predates "System" and
+    /// keeps its chosen language (new installs get true from `Settings::default`).
+    #[serde(default)]
+    ui_language_follows_system: bool,
     theme: ThemePreference,
     #[serde(default = "default_window_scale_percent")]
     window_scale_percent: u16,
@@ -280,6 +334,13 @@ pub(super) struct RawSettings {
     cost_reporting_period: CostReportingPeriod,
     #[serde(default)]
     cost_usage_bucket_time_zone: String,
+    #[serde(default = "default_true")]
+    cost_usage_enabled: bool,
+    /// `None` when the key is missing, so the value copies `cost_reporting_period`.
+    #[serde(default)]
+    spend_dashboard_period: Option<CostReportingPeriod>,
+    #[serde(default)]
+    spend_dashboard_hidden_source_ids: Vec<String>,
 }
 
 impl Default for RawSettings {
@@ -291,6 +352,7 @@ impl Default for RawSettings {
             refresh_interval_secs: s.refresh_interval_secs,
             adaptive_refresh: s.adaptive_refresh,
             refresh_all_providers_on_menu_open: s.refresh_all_providers_on_menu_open,
+            status_checks_enabled: s.status_checks_enabled,
             low_power_mode: s.low_power_mode_preference == LowPowerModePreference::On,
             low_power_mode_preference: Some(s.low_power_mode_preference),
             start_minimized: s.start_minimized,
@@ -309,13 +371,24 @@ impl Default for RawSettings {
             switcher_shows_icons: s.switcher_shows_icons,
             menu_bar_shows_highest_usage: s.menu_bar_shows_highest_usage,
             menu_bar_shows_percent: s.menu_bar_shows_percent,
+            menu_bar_icon_style: Some(s.menu_bar_icon_style.as_str().to_string()),
+            merged_overview_selected_providers: s.merged_overview_selected_providers,
+            quota_warning_markers_visible: s.quota_warning_markers_visible,
+            highlight_menu_cards_on_hover: s.highlight_menu_cards_on_hover,
+            workday_tick_style: Some(s.workday_tick_style.as_str().to_string()),
             menu_bar_color_pace: s.menu_bar_color_pace,
+            menu_bar_color_by_provider: s.menu_bar_color_by_provider,
+            menu_bar_pace_reserve_positive: s.menu_bar_pace_reserve_positive,
+            providers_sorted_alphabetically: s.providers_sorted_alphabetically,
+            providers_enabled_only: s.providers_enabled_only,
             show_as_used: s.show_as_used,
             enable_animations: s.enable_animations,
             reset_time_relative: s.reset_time_relative,
             show_reset_when_exhausted: s.show_reset_when_exhausted,
             predictive_pace_warning_enabled: s.predictive_pace_warning_enabled,
+            limit_reset_notifications_enabled: s.limit_reset_notifications_enabled,
             credential_expiry_notifications_enabled: s.credential_expiry_notifications_enabled,
+            session_quota_notifications_enabled: Some(s.session_quota_notifications_enabled),
             show_pace: s.show_pace,
             menu_bar_display_mode: s.menu_bar_display_mode,
             overview_layout: s.overview_layout,
@@ -357,6 +430,7 @@ impl Default for RawSettings {
             global_shortcut: s.global_shortcut,
             switcher_shortcuts: s.switcher_shortcuts,
             codex_custom_sessions_dirs: s.codex_custom_sessions_dirs,
+            antigravity_additional_profile_homes: s.antigravity_additional_profile_homes,
             agent_sessions_enabled: s.agent_sessions_enabled,
             stay_awake_enabled: s.stay_awake_enabled,
             agent_session_ssh_hosts: s.agent_session_ssh_hosts,
@@ -368,6 +442,7 @@ impl Default for RawSettings {
             auto_download_updates: s.auto_download_updates,
             install_updates_on_quit: s.install_updates_on_quit,
             ui_language: s.ui_language,
+            ui_language_follows_system: s.ui_language_follows_system,
             theme: s.theme,
             window_scale_percent: s.window_scale_percent,
             tray_scale_percent: s.tray_scale_percent,
@@ -396,6 +471,10 @@ impl Default for RawSettings {
                 .hide_native_codex_cost_when_open_codex_present,
             cost_reporting_period: s.cost_reporting_period,
             cost_usage_bucket_time_zone: s.cost_usage_bucket_time_zone,
+            cost_usage_enabled: s.cost_usage_enabled,
+            // Missing means "copy cost_reporting_period" (legacy files).
+            spend_dashboard_period: None,
+            spend_dashboard_hidden_source_ids: s.spend_dashboard_hidden_source_ids,
         }
     }
 }
@@ -611,6 +690,17 @@ impl From<RawSettings> for Settings {
                 .avoid_keychain_prompts = true;
         }
 
+        for config in provider_configs.values_mut() {
+            config.quota_warnings = config.quota_warnings.normalized();
+        }
+        // Migration #5: legacy per-provider threshold overrides move into
+        // `provider_configs.<id>.quota_warnings`; only the new key is saved.
+        let legacy_usage_thresholds_pending = !raw.provider_usage_thresholds.is_empty();
+        super::types::migrate_legacy_usage_thresholds(
+            &mut provider_configs,
+            raw.provider_usage_thresholds,
+        );
+
         let low_power_mode_preference = match raw.low_power_mode_preference {
             // A legacy writer may know only the boolean and leave the new field
             // at its serialized default. Preserve the previously enabled state.
@@ -632,6 +722,7 @@ impl From<RawSettings> for Settings {
             refresh_interval_secs: raw.refresh_interval_secs,
             adaptive_refresh: raw.adaptive_refresh,
             refresh_all_providers_on_menu_open: raw.refresh_all_providers_on_menu_open,
+            status_checks_enabled: raw.status_checks_enabled,
             low_power_mode_preference,
             start_minimized: raw.start_minimized,
             start_at_login: raw.start_at_login,
@@ -641,9 +732,6 @@ impl From<RawSettings> for Settings {
             notification_sound_theme: raw.notification_sound_theme,
             high_usage_threshold: raw.high_usage_threshold,
             critical_usage_threshold: raw.critical_usage_threshold,
-            provider_usage_thresholds: normalize_usage_threshold_overrides(
-                raw.provider_usage_thresholds,
-            ),
             merge_tray_icons: raw.merge_tray_icons,
             tray_icon_mode: raw.tray_icon_mode,
             stacked_tray_top_provider: raw
@@ -655,13 +743,35 @@ impl From<RawSettings> for Settings {
             switcher_shows_icons: raw.switcher_shows_icons,
             menu_bar_shows_highest_usage: raw.menu_bar_shows_highest_usage,
             menu_bar_shows_percent: raw.menu_bar_shows_percent,
+            menu_bar_icon_style: resolve_menu_bar_icon_style(
+                raw.menu_bar_icon_style.as_deref(),
+                raw.menu_bar_shows_percent,
+            ),
+            merged_overview_selected_providers: normalize_merged_overview_selection(
+                raw.merged_overview_selected_providers,
+            ),
+            quota_warning_markers_visible: raw.quota_warning_markers_visible,
+            highlight_menu_cards_on_hover: raw.highlight_menu_cards_on_hover,
+            workday_tick_style: raw
+                .workday_tick_style
+                .as_deref()
+                .and_then(WorkdayTickStyle::parse)
+                .unwrap_or_default(),
             menu_bar_color_pace: raw.menu_bar_color_pace,
+            menu_bar_color_by_provider: raw.menu_bar_color_by_provider,
+            menu_bar_pace_reserve_positive: raw.menu_bar_pace_reserve_positive,
+            providers_sorted_alphabetically: raw.providers_sorted_alphabetically,
+            providers_enabled_only: raw.providers_enabled_only,
             show_as_used: raw.show_as_used,
             enable_animations: raw.enable_animations,
             reset_time_relative: raw.reset_time_relative,
             show_reset_when_exhausted: raw.show_reset_when_exhausted,
             predictive_pace_warning_enabled: raw.predictive_pace_warning_enabled,
+            limit_reset_notifications_enabled: raw.limit_reset_notifications_enabled,
             credential_expiry_notifications_enabled: raw.credential_expiry_notifications_enabled,
+            session_quota_notifications_enabled: raw
+                .session_quota_notifications_enabled
+                .unwrap_or(raw.show_notifications),
             show_pace: raw.show_pace,
             menu_bar_display_mode: raw.menu_bar_display_mode,
             overview_layout: normalize_overview_layout(&raw.overview_layout),
@@ -679,6 +789,7 @@ impl From<RawSettings> for Settings {
             global_shortcut: raw.global_shortcut,
             switcher_shortcuts: sanitize_switcher_shortcuts(raw.switcher_shortcuts),
             codex_custom_sessions_dirs: raw.codex_custom_sessions_dirs,
+            antigravity_additional_profile_homes: raw.antigravity_additional_profile_homes,
             agent_sessions_enabled: raw.agent_sessions_enabled,
             stay_awake_enabled: raw.stay_awake_enabled,
             agent_session_ssh_hosts: raw.agent_session_ssh_hosts,
@@ -690,6 +801,7 @@ impl From<RawSettings> for Settings {
             auto_download_updates: raw.auto_download_updates,
             install_updates_on_quit: raw.install_updates_on_quit,
             ui_language: raw.ui_language,
+            ui_language_follows_system: raw.ui_language_follows_system,
             theme: raw.theme,
             window_scale_percent: clamp_window_scale_percent(raw.window_scale_percent),
             tray_scale_percent: clamp_tray_scale_percent(raw.tray_scale_percent),
@@ -709,7 +821,9 @@ impl From<RawSettings> for Settings {
             claude_daily_routines_usage_visible: raw.claude_daily_routines_usage_visible,
             claude_allow_reading_claude_code_credentials: raw
                 .claude_allow_reading_claude_code_credentials,
-            weekly_progress_work_days: raw.weekly_progress_work_days,
+            weekly_progress_work_days: normalize_weekly_progress_work_days(
+                raw.weekly_progress_work_days,
+            ),
             alibaba_token_plan_region: {
                 let trimmed = raw.alibaba_token_plan_region.trim();
                 if trimmed.is_empty() {
@@ -723,9 +837,17 @@ impl From<RawSettings> for Settings {
             hide_native_codex_cost_when_open_codex_present: raw
                 .hide_native_codex_cost_when_open_codex_present,
             codex_external_oauth_sources_allowed: raw.codex_external_oauth_sources_allowed,
+            legacy_usage_thresholds_pending,
             cost_reporting_period: raw.cost_reporting_period,
             cost_usage_bucket_time_zone: super::normalize_cost_usage_bucket_time_zone(
                 &raw.cost_usage_bucket_time_zone,
+            ),
+            cost_usage_enabled: raw.cost_usage_enabled,
+            spend_dashboard_period: raw
+                .spend_dashboard_period
+                .unwrap_or(raw.cost_reporting_period),
+            spend_dashboard_hidden_source_ids: super::normalize_spend_dashboard_hidden_source_ids(
+                raw.spend_dashboard_hidden_source_ids,
             ),
         }
     }

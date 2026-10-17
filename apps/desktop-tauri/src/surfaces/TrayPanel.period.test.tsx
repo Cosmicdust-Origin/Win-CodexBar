@@ -22,10 +22,18 @@ const tauriMocks = vi.hoisted(() => ({
   getWorkAreaRect: vi.fn(),
   reanchorTrayPanel: vi.fn(),
   revealTrayPanelWindow: vi.fn(),
-  flyoutStoredSize: vi.fn().mockResolvedValue(null),
-  setFlyoutSize: vi.fn().mockResolvedValue(undefined),
+  getAppInfo: vi.fn().mockResolvedValue({
+    name: "CodexBar",
+    version: "0.70.0",
+    buildNumber: "1",
+    updateChannel: "stable",
+    tagline: "",
+  }),
+  getSystemAccentColor: vi.fn().mockResolvedValue(null),
+  getProviderDetail: vi.fn().mockResolvedValue({ dashboardUrl: null, statusPageUrl: null }),
   openProviderDashboard: vi.fn(),
   openProviderStatusPage: vi.fn(),
+  getProviderStatuses: vi.fn().mockResolvedValue([]),
   getProviderChartData: vi.fn(),
   getCurrentSurfaceState: vi.fn(),
   getLocaleStrings: vi.fn(),
@@ -43,9 +51,7 @@ const windowMocks = vi.hoisted(() => ({
   getCurrentWindow: vi.fn(() => ({
     setSize: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
-    scaleFactor: vi.fn().mockResolvedValue(1),
-    onResized: vi.fn().mockResolvedValue(() => {}),
-    innerSize: vi.fn().mockResolvedValue({ width: 328, height: 200 }),
+    innerSize: vi.fn().mockResolvedValue({ width: 310, height: 200 }),
   })),
   LogicalSize: vi.fn((width: number, height: number) => ({ width, height })),
   PhysicalSize: vi.fn((width: number, height: number) => ({ width, height })),
@@ -55,7 +61,7 @@ vi.mock("../lib/tauri", () => tauriMocks);
 vi.mock("@tauri-apps/api/event", () => eventMocks);
 vi.mock("@tauri-apps/api/window", () => windowMocks);
 
-import TrayPanel from "./TrayPanel";
+import TrayPanel, { splitSpendTitle } from "./TrayPanel";
 import { LocaleProvider } from "../i18n/LocaleProvider";
 import { buildBundle } from "../test/localeHarness";
 import type { ProviderUsageSnapshot, SettingsSnapshot } from "../types/bridge";
@@ -101,6 +107,7 @@ const settings = {
   refreshIntervalSecs: 300,
   adaptiveRefresh: false,
   refreshAllProvidersOnMenuOpen: false,
+  statusChecksEnabled: true,
   lowPowerMode: false,
   highUsageThreshold: 70,
   criticalUsageThreshold: 90,
@@ -111,6 +118,7 @@ const settings = {
   overviewLayout: "detailed",
   hidePersonalInfo: false,
   uiLanguage: "english",
+  uiLanguageFollowsSystem: false,
   theme: "dark",
   windowScalePercent: 125,
   trayScalePercent: 100,
@@ -184,10 +192,29 @@ describe("TrayPanel History window", () => {
       </LocaleProvider>,
     );
 
-    expect(await screen.findByText("OverviewSpendPeriodTitle")).toBeInTheDocument();
-    expect(screen.getByText("$9.00")).toBeInTheDocument();
+    expect(await screen.findByText("OverviewSpendPeriodTitle")).toHaveClass(
+      "overview-spend__heading",
+    );
+    expect(screen.getByText("$9.00")).toHaveClass("overview-spend__total");
     expect(screen.queryByText("$2.00")).not.toBeInTheDocument();
     // The scan carries no explicit window: the backend resolves the saved one.
     expect(tauriMocks.getUsageSpendSummary).toHaveBeenCalledWith();
+  });
+});
+
+describe("splitSpendTitle", () => {
+  it("separates the heading from the secondary range tail", () => {
+    expect(splitSpendTitle("Usage & Spend · {}", "30d")).toEqual({
+      heading: "Usage & Spend",
+      detail: "· 30d",
+    });
+    expect(splitSpendTitle("{} の使用量", "30d")).toEqual({
+      heading: "30d の使用量",
+      detail: null,
+    });
+    expect(splitSpendTitle("OverviewSpendPeriodTitle", "30d")).toEqual({
+      heading: "OverviewSpendPeriodTitle",
+      detail: null,
+    });
   });
 });

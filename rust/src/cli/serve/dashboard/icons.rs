@@ -4,7 +4,7 @@
 //! route as static brand art — no account data, so no auth; immutable per
 //! binary, so aggressively cacheable (`Cache-Control: public, max-age=86400,
 //! immutable`, upstream's exact policy). Assets are the pinned upstream SVGs
-//! (`upstream v0.48.0: Sources/CodexBar/Resources/ProviderIcon-*.svg`), embedded
+//! (`upstream v0.48.0+: Sources/CodexBar/Resources/ProviderIcon-*.svg`), embedded
 //! with `include_bytes!` so the CLI ships as a standalone binary, mirroring
 //! upstream's reason for embedding (`CLIServeProviderIcons`).
 //! Upstream regenerates its table with `Scripts/generate_serve_provider_icons.py`;
@@ -98,6 +98,10 @@ static ICONS: &[(&str, &[u8])] = &[
         include_bytes!("icons/ProviderIcon-claude.svg"),
     ),
     (
+        "ProviderIcon-clawrouter",
+        include_bytes!("icons/ProviderIcon-clawrouter.svg"),
+    ),
+    (
         "ProviderIcon-clinepass",
         include_bytes!("icons/ProviderIcon-clinepass.svg"),
     ),
@@ -174,6 +178,10 @@ static ICONS: &[(&str, &[u8])] = &[
         include_bytes!("icons/ProviderIcon-huggingface.svg"),
     ),
     (
+        "ProviderIcon-ibmbob",
+        include_bytes!("icons/ProviderIcon-ibmbob.svg"),
+    ),
+    (
         "ProviderIcon-jetbrains",
         include_bytes!("icons/ProviderIcon-jetbrains.svg"),
     ),
@@ -190,8 +198,16 @@ static ICONS: &[(&str, &[u8])] = &[
         include_bytes!("icons/ProviderIcon-kiro.svg"),
     ),
     (
+        "ProviderIcon-langdock",
+        include_bytes!("icons/ProviderIcon-langdock.svg"),
+    ),
+    (
         "ProviderIcon-litellm",
         include_bytes!("icons/ProviderIcon-litellm.svg"),
+    ),
+    (
+        "ProviderIcon-lithosai",
+        include_bytes!("icons/ProviderIcon-lithosai.svg"),
     ),
     (
         "ProviderIcon-llmman",
@@ -224,6 +240,10 @@ static ICONS: &[(&str, &[u8])] = &[
     (
         "ProviderIcon-muse",
         include_bytes!("icons/ProviderIcon-muse.svg"),
+    ),
+    (
+        "ProviderIcon-museai",
+        include_bytes!("icons/ProviderIcon-museai.svg"),
     ),
     (
         "ProviderIcon-neuralwatt",
@@ -290,6 +310,10 @@ static ICONS: &[(&str, &[u8])] = &[
         include_bytes!("icons/ProviderIcon-sub2api.svg"),
     ),
     (
+        "ProviderIcon-synthetic",
+        include_bytes!("icons/ProviderIcon-synthetic.svg"),
+    ),
+    (
         "ProviderIcon-t3chat",
         include_bytes!("icons/ProviderIcon-t3chat.svg"),
     ),
@@ -312,6 +336,10 @@ static ICONS: &[(&str, &[u8])] = &[
     (
         "ProviderIcon-windsurf",
         include_bytes!("icons/ProviderIcon-windsurf.svg"),
+    ),
+    (
+        "ProviderIcon-workbuddy",
+        include_bytes!("icons/ProviderIcon-workbuddy.svg"),
     ),
     (
         "ProviderIcon-xai",
@@ -386,8 +414,21 @@ mod tests {
             "/icons/ProviderIcon-qwencloud.svg"
         );
         assert!(obj.get("openaiapi").is_none(), "no asset -> no entry");
-        assert!(obj.get("clawrouter").is_none(), "no such local provider");
-        assert!(obj.get("synthetic").is_none(), "no such local provider");
+        for id in [
+            "clawrouter",
+            "ibmbob",
+            "langdock",
+            "lithosai",
+            "museai",
+            "synthetic",
+            "workbuddy",
+        ] {
+            assert_eq!(
+                obj.get(id).unwrap(),
+                &format!("/icons/ProviderIcon-{id}.svg"),
+                "{id}"
+            );
+        }
         let keys: Vec<&String> = obj.keys().collect();
         let mut sorted = keys.clone();
         sorted.sort();
@@ -408,7 +449,11 @@ mod tests {
             Some("ProviderIcon-qwencloud")
         );
         assert_eq!(icon_resource_for("codex"), Some("ProviderIcon-codex"));
-        assert!(icon_resource_for("clawrouter").is_none());
+        assert_eq!(
+            icon_resource_for("clawrouter"),
+            Some("ProviderIcon-clawrouter")
+        );
+        assert!(icon_resource_for("openaiapi").is_none());
         assert!(icon_resource_for("../etc").is_none());
     }
 }

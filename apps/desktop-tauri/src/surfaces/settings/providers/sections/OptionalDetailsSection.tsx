@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { LocaleKey } from "../../../../i18n/keys";
 import { setProviderOptionalDetails } from "../../../../lib/tauri";
+import { Field, Toggle } from "../../../../components/FormControls";
 
 interface Props {
   providerId: string;
@@ -28,7 +29,10 @@ const OPTIONAL_DETAILS_COPY: Record<string, Copy> = {
   },
 };
 
-/** Opt-in for a provider's extra breakdown (LiteLLM model activity, Claude workspace spend). */
+/**
+ * Opt-in for a provider's extra breakdown (LiteLLM model activity, Claude
+ * workspace spend); renders as a row of the provider's Options group.
+ */
 export function OptionalDetailsSection({
   providerId,
   enabled,
@@ -58,21 +62,16 @@ export function OptionalDetailsSection({
   };
 
   return (
-    <section className="provider-detail-section">
-      <h4>{t("ProviderOptionalDetailsTitle")}</h4>
-      <label className="provider-detail-toggle">
-        <input
-          type="checkbox"
+    <>
+      <Field label={t(copy.label)} description={t(copy.helper)}>
+        <Toggle
+          variant="switch"
           checked={enabled}
           disabled={disabled || busy}
-          onChange={(event) => void handleChange(event.target.checked)}
+          onChange={(next) => void handleChange(next)}
         />
-        <span>
-          <span className="provider-detail-toggle__label">{t(copy.label)}</span>
-          <span className="provider-detail-toggle__helper">{t(copy.helper)}</span>
-        </span>
-      </label>
-      {error && <div className="provider-detail-error">{error}</div>}
-    </section>
+      </Field>
+      {error && <p className="provider-option-error">{error}</p>}
+    </>
   );
 }

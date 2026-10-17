@@ -22,6 +22,13 @@ pub struct SubscriptionMetadata {
     pub expires_at: Option<DateTime<Utc>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub renews_at: Option<DateTime<Utc>>,
+    /// The provider sent a calendar date (`YYYY-MM-DD`) for `renews_at`,
+    /// stored as UTC midnight; display it in UTC so it stays on that day.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub renews_at_is_date_only: bool,
+    /// Calendar-date precision for `expires_at`, as for `renews_at`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub expires_at_is_date_only: bool,
 }
 
 impl SubscriptionMetadata {
@@ -34,7 +41,17 @@ impl SubscriptionMetadata {
             starts_at,
             expires_at,
             renews_at,
+            renews_at_is_date_only: false,
+            expires_at_is_date_only: false,
         }
+    }
+
+    /// Mark which of the dates carry calendar-day precision only.
+    #[must_use]
+    pub const fn with_date_only(mut self, renews_at: bool, expires_at: bool) -> Self {
+        self.renews_at_is_date_only = renews_at;
+        self.expires_at_is_date_only = expires_at;
+        self
     }
 
     pub const fn is_empty(&self) -> bool {
@@ -43,7 +60,11 @@ impl SubscriptionMetadata {
 }
 
 /// Provider-specific operational data reported by a Wayfinder gateway.
+///
+/// Serialized as camelCase because the frontend bridge (`WayfinderUsageSnapshot`
+/// in `bridge.ts`) reads it that way.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WayfinderUsageSnapshot {
     pub gateway_status: String,
     pub offline: bool,
@@ -62,10 +83,15 @@ pub struct WayfinderUsageSnapshot {
     pub unit: String,
     pub priced: bool,
     pub routes: Vec<WayfinderRouteSummary>,
+    /// Mean router decision latency from `/metrics`, in milliseconds. `None`
+    /// when the gateway exposes no latency histogram or has routed nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avg_decision_ms: Option<f64>,
 }
 
 /// Per-route savings data reported by Wayfinder.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WayfinderRouteSummary {
     pub name: String,
     pub requests: u64,
@@ -239,6 +265,12 @@ pub struct UsageSnapshot {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secondary_label: Option<String>,
 
+    /// Locale key for the secondary label, when the provider names its lane
+    /// with an app string rather than a raw window label. Surfaces that
+    /// localize at render time show this key instead of `secondary_label`.
+    #[serde(skip)]
+    pub secondary_label_key: Option<crate::locale::LocaleKey>,
+
     /// Model-specific rate window (e.g., Opus quota for Claude)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_specific: Option<RateWindow>,
@@ -285,6 +317,7 @@ impl UsageSnapshot {
             primary_label: None,
             secondary: None,
             secondary_label: None,
+            secondary_label_key: None,
             model_specific: None,
             model_specific_is_code_review: false,
             tertiary: None,
@@ -312,6 +345,12 @@ impl UsageSnapshot {
     /// Builder pattern: override the secondary window label for this snapshot.
     pub fn with_secondary_label(mut self, label: impl Into<String>) -> Self {
         self.secondary_label = Some(label.into());
+        self
+    }
+
+    /// Builder pattern: name the secondary window with a locale key.
+    pub fn with_secondary_label_key(mut self, key: crate::locale::LocaleKey) -> Self {
+        self.secondary_label_key = Some(key);
         self
     }
 
@@ -509,6 +548,18 @@ pub struct CostSnapshot {
     /// rendering only; not serialized.
     #[serde(skip)]
     pub provenance: Option<CostProvenance>,
+
+    /// Provider-owned title for the card's cost block (upstream
+    /// `ProviderCostMenuCardStyle`, for example ClawRouter's "Monthly budget").
+    /// `None` keeps the shared title. Presentation only; not serialized.
+    #[serde(skip)]
+    pub card_title_key: Option<crate::locale::LocaleKey>,
+
+    /// Provider-owned presentation hint: the primary meter already shows this
+    /// cap, so the card keeps the spend and balance as a caption without a
+    /// second bar. Presentation only; not serialized.
+    #[serde(skip)]
+    pub folded_into_primary: bool,
 }
 
 impl CostSnapshot {
@@ -529,7 +580,15 @@ impl CostSnapshot {
             always_visible: false,
             history_tokens: None,
             provenance: None,
+            card_title_key: None,
+            folded_into_primary: false,
         }
+    }
+
+    /// Builder pattern: the provider's own title for the card's cost block.
+    pub fn with_card_title(mut self, key: crate::locale::LocaleKey) -> Self {
+        self.card_title_key = Some(key);
+        self
     }
 
     /// Builder pattern: set limit
@@ -735,6 +794,11 @@ pub struct ProviderFetchResult {
     #[serde(skip)]
     pub open_ai_api_usage: Option<OpenAiApiUsageHistory>,
 
+    /// Last-hour tokens-per-minute grid (OpenAI Admin API 1-minute buckets). Transient
+    /// like [`Self::open_ai_api_usage`]: projected through the bridge, never serialized.
+    #[serde(skip)]
+    pub throughput: Option<super::ProviderThroughput>,
+
     /// Transient non-quota inventory for provider-specific display.
     ///
     /// The field is intentionally skipped by serde: it belongs to the current
@@ -788,6 +852,7 @@ impl ProviderFetchResult {
             cost: None,
             wayfinder_usage: None,
             open_ai_api_usage: None,
+            throughput: None,
             inventory: Vec::new(),
             reset_credits: None,
             display_details: Vec::new(),
@@ -841,6 +906,12 @@ impl ProviderFetchResult {
     /// Attach the per-day OpenAI Admin API history.
     pub fn with_open_ai_api_usage(mut self, history: OpenAiApiUsageHistory) -> Self {
         self.open_ai_api_usage = Some(history);
+        self
+    }
+
+    /// Attach the per-minute token throughput.
+    pub fn with_throughput(mut self, throughput: super::ProviderThroughput) -> Self {
+        self.throughput = Some(throughput);
         self
     }
 
@@ -933,6 +1004,32 @@ mod tests {
 
         let decoded: ProviderFetchResult = serde_json::from_value(encoded).unwrap();
         assert!(decoded.open_ai_api_usage.is_none());
+    }
+
+    #[test]
+    fn throughput_is_transient_and_not_serialized() {
+        let usage = UsageSnapshot::new(RateWindow::new(25.0));
+        let result = ProviderFetchResult::new(usage, "admin-api").with_throughput(
+            super::super::ProviderThroughput {
+                minutes: Vec::new(),
+                frontier: None,
+                latest_tokens_per_minute: None,
+                peak_tokens_per_minute: 0,
+                peak_at: None,
+                five_minute_average_tokens_per_minute: 0.0,
+                models: Vec::new(),
+                window_minutes: 60,
+                fetched_at: 1_700_000_000,
+                project_id: None,
+            },
+        );
+
+        assert!(result.throughput.is_some());
+        let encoded = serde_json::to_value(&result).unwrap();
+        assert!(encoded.get("throughput").is_none());
+
+        let decoded: ProviderFetchResult = serde_json::from_value(encoded).unwrap();
+        assert!(decoded.throughput.is_none());
     }
 
     #[test]
@@ -1059,5 +1156,49 @@ mod tests {
         assert_eq!(decoded.balance, Some(0.0));
         assert_eq!(decoded.balance_updated_at, Some(observed_at));
         assert_eq!(decoded.account_id.as_deref(), Some("account-1"));
+    }
+
+    /// Proof seeds (`CODEXBAR_SEED_USAGE_JSON`) hand this snapshot back in the
+    /// bridge's camelCase shape; it must decode and re-encode unchanged.
+    #[test]
+    fn wayfinder_snapshot_round_trips_bridge_camel_case_json() {
+        let bridge = serde_json::json!({
+            "gatewayStatus": "degraded",
+            "offline": false,
+            "dryRun": true,
+            "missingKeys": ["RIG_CLOUD_KEY"],
+            "modelCount": 1,
+            "models": ["cheap-local"],
+            "requests": 12,
+            "estimatedRequests": 2,
+            "tokens": 3400,
+            "realized": 0.5,
+            "baseline": 1.5,
+            "saved": 1.0,
+            "savedPercent": 66.7,
+            "periodDays": 30,
+            "unit": "USD",
+            "priced": true,
+            "routes": [{
+                "name": "cheap",
+                "requests": 12,
+                "tokens": 3400,
+                "realized": 0.5,
+                "baseline": 1.5,
+                "saved": 1.0
+            }]
+        });
+
+        let decoded: WayfinderUsageSnapshot = serde_json::from_value(bridge.clone()).unwrap();
+        assert_eq!(decoded.gateway_status, "degraded");
+        assert!(decoded.dry_run);
+        assert_eq!(decoded.missing_keys, ["RIG_CLOUD_KEY"]);
+        assert_eq!(decoded.model_count, 1);
+        assert_eq!(decoded.estimated_requests, 2);
+        assert_eq!(decoded.saved_percent, 66.7);
+        assert_eq!(decoded.period_days, 30);
+        assert_eq!(decoded.routes[0].name, "cheap");
+
+        assert_eq!(serde_json::to_value(&decoded).unwrap(), bridge);
     }
 }

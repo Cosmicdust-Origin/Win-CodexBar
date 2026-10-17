@@ -23,6 +23,7 @@ pub const SETTINGS_CHANGED: &str = "settings-changed";
 pub const STAY_AWAKE_CHANGED: &str = "stay-awake-changed";
 pub const CODEX_ACCOUNTS_UPDATED: &str = "codex-accounts-updated";
 pub const LOGIN_PHASE: &str = "login-phase";
+pub const PROVIDER_STATUSES_UPDATED: &str = "provider-statuses-updated";
 
 // ── Payloads ─────────────────────────────────────────────────────────
 

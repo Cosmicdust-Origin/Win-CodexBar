@@ -75,9 +75,11 @@ pub fn set_ui_language(app: tauri::AppHandle, language: String) -> Result<(), St
     let lang =
         parse_locale_language(&language).ok_or_else(|| format!("unknown language: {language}"))?;
     let mut settings = Settings::load();
-    if settings.ui_language == lang {
+    if settings.ui_language == lang && !settings.ui_language_follows_system {
         return Ok(());
     }
+    // Picking a language explicitly stops following the system language.
+    settings.ui_language_follows_system = false;
     settings.ui_language = lang;
     settings.save().map_err(|e| e.to_string())?;
     let _ = app.emit(events::LOCALE_CHANGED, language_label(lang));
@@ -103,7 +105,7 @@ mod locale_tests {
                 .entries
                 .get("ProviderSidebarSearch")
                 .map(String::as_str),
-            Some("Search"),
+            Some("Search providers"),
             "ProviderSidebarSearch should resolve instead of leaking the key"
         );
         assert_eq!(bundle.entries.len(), locale::LocaleKey::ALL.len());

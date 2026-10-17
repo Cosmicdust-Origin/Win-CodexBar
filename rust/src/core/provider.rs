@@ -66,6 +66,7 @@ pub enum ProviderId {
     HuggingFace,
     Helmcode,
     V0,
+    TinyApi,
     TypeSafe,
     LLMProxy,
     Chutes,
@@ -77,6 +78,7 @@ pub enum ProviderId {
     Qoder,
     CodeBuddy,
     Sakana,
+    Sofya,
     Sub2Api,
     Wayfinder,
     ZenMux,
@@ -87,6 +89,7 @@ pub enum ProviderId {
     QwenCloud,
     Notion,
     Xai,
+    Xapi,
     Fireworks,
     AtlasCloud,
     #[serde(alias = "metaspark")]
@@ -103,6 +106,22 @@ pub enum ProviderId {
     XKiro,
     Raycast,
     Vercel,
+    Synthetic,
+    ClawRouter,
+    IBMBob,
+    Langdock,
+    LithosAI,
+    Linkup,
+    MuseAI,
+    WorkBuddy,
+    SailResearch,
+    Tavily,
+    Exa,
+    Cosmic,
+    Aerostack,
+    Parallel,
+    Fal,
+    Flora,
 }
 
 impl ProviderId {
@@ -162,6 +181,7 @@ impl ProviderId {
             ProviderId::HuggingFace,
             ProviderId::Helmcode,
             ProviderId::V0,
+            ProviderId::TinyApi,
             ProviderId::TypeSafe,
             ProviderId::LLMProxy,
             ProviderId::Chutes,
@@ -173,6 +193,7 @@ impl ProviderId {
             ProviderId::Qoder,
             ProviderId::CodeBuddy,
             ProviderId::Sakana,
+            ProviderId::Sofya,
             ProviderId::Sub2Api,
             ProviderId::Wayfinder,
             ProviderId::ZenMux,
@@ -183,6 +204,7 @@ impl ProviderId {
             ProviderId::QwenCloud,
             ProviderId::Notion,
             ProviderId::Xai,
+            ProviderId::Xapi,
             ProviderId::Fireworks,
             ProviderId::AtlasCloud,
             ProviderId::Meta,
@@ -198,6 +220,22 @@ impl ProviderId {
             ProviderId::XKiro,
             ProviderId::Raycast,
             ProviderId::Vercel,
+            ProviderId::Synthetic,
+            ProviderId::ClawRouter,
+            ProviderId::IBMBob,
+            ProviderId::Langdock,
+            ProviderId::LithosAI,
+            ProviderId::Linkup,
+            ProviderId::MuseAI,
+            ProviderId::WorkBuddy,
+            ProviderId::SailResearch,
+            ProviderId::Tavily,
+            ProviderId::Exa,
+            ProviderId::Cosmic,
+            ProviderId::Aerostack,
+            ProviderId::Parallel,
+            ProviderId::Fal,
+            ProviderId::Flora,
         ]
     }
 
@@ -254,6 +292,16 @@ impl ProviderId {
             ProviderId::XKiro => "xkiro",
             ProviderId::Raycast => "raycast",
             ProviderId::Vercel => "vercel",
+            ProviderId::Synthetic => "synthetic",
+            ProviderId::ClawRouter => "clawrouter",
+            ProviderId::IBMBob => "ibmbob",
+            ProviderId::Langdock => "langdock",
+            ProviderId::LithosAI => "lithosai",
+            ProviderId::Linkup => "linkup",
+            ProviderId::MuseAI => "museai",
+            ProviderId::WorkBuddy => "workbuddy",
+            ProviderId::SailResearch => "sailresearch",
+            ProviderId::Tavily => "tavily",
             ProviderId::AiAnd => "aiand",
             ProviderId::Windsurf => "windsurf",
             ProviderId::Manus => "manus",
@@ -270,6 +318,7 @@ impl ProviderId {
             ProviderId::HuggingFace => "huggingface",
             ProviderId::Helmcode => "helmcode",
             ProviderId::V0 => "v0",
+            ProviderId::TinyApi => "tinyapi",
             ProviderId::TypeSafe => "typesafe",
             ProviderId::LLMProxy => "llmproxy",
             ProviderId::Chutes => "chutes",
@@ -281,6 +330,7 @@ impl ProviderId {
             ProviderId::Qoder => "qoder",
             ProviderId::CodeBuddy => "codebuddy",
             ProviderId::Sakana => "sakana",
+            ProviderId::Sofya => "sofya",
             ProviderId::Sub2Api => "sub2api",
             ProviderId::Wayfinder => "wayfinder",
             ProviderId::ZenMux => "zenmux",
@@ -291,8 +341,15 @@ impl ProviderId {
             ProviderId::QwenCloud => "qwen-cloud",
             ProviderId::Notion => "notion",
             ProviderId::Xai => "xai",
+            ProviderId::Xapi => "xapi",
             ProviderId::Replicate => "replicate",
             ProviderId::AtlasCloud => "atlascloud",
+            ProviderId::Exa => "exa",
+            ProviderId::Cosmic => "cosmic",
+            ProviderId::Aerostack => "aerostack",
+            ProviderId::Parallel => "parallel",
+            ProviderId::Fal => "fal",
+            ProviderId::Flora => "flora",
         }
     }
 
@@ -350,6 +407,16 @@ impl ProviderId {
             ProviderId::XKiro => "xKiro",
             ProviderId::Raycast => "Raycast",
             ProviderId::Vercel => "Vercel AI Gateway",
+            ProviderId::Synthetic => "Synthetic",
+            ProviderId::ClawRouter => "ClawRouter",
+            ProviderId::IBMBob => "IBM Bob",
+            ProviderId::Langdock => "Langdock",
+            ProviderId::LithosAI => "LithosAI",
+            ProviderId::Linkup => "Linkup",
+            ProviderId::MuseAI => "Muse (muse.ai)",
+            ProviderId::WorkBuddy => "WorkBuddy",
+            ProviderId::SailResearch => "Sail Research",
+            ProviderId::Tavily => "Tavily",
             ProviderId::AiAnd => "ai&",
             ProviderId::Windsurf => "Windsurf",
             ProviderId::Manus => "Manus",
@@ -366,6 +433,7 @@ impl ProviderId {
             ProviderId::HuggingFace => "Hugging Face",
             ProviderId::Helmcode => "Helmcode",
             ProviderId::V0 => "v0",
+            ProviderId::TinyApi => "TinyApi",
             ProviderId::TypeSafe => "TypeSafe",
             ProviderId::LLMProxy => "LLM Proxy",
             ProviderId::Chutes => "Chutes",
@@ -378,6 +446,7 @@ impl ProviderId {
             ProviderId::Qoder => "Qoder",
             ProviderId::CodeBuddy => "CodeBuddy",
             ProviderId::Sakana => "Sakana AI",
+            ProviderId::Sofya => "Sofya",
             ProviderId::Sub2Api => "sub2api",
             ProviderId::Wayfinder => "Wayfinder",
             ProviderId::ZenMux => "ZenMux",
@@ -388,8 +457,15 @@ impl ProviderId {
             ProviderId::QwenCloud => "Qwen Cloud",
             ProviderId::Notion => "Notion AI",
             ProviderId::Xai => "xAI",
+            ProviderId::Xapi => "X API",
             ProviderId::Replicate => "Replicate",
             ProviderId::AtlasCloud => "Atlas Cloud",
+            ProviderId::Exa => "Exa",
+            ProviderId::Cosmic => "Cosmic AI",
+            ProviderId::Aerostack => "Aerostack",
+            ProviderId::Parallel => "Parallel",
+            ProviderId::Fal => "fal",
+            ProviderId::Flora => "FLORA",
         }
     }
 
@@ -430,6 +506,7 @@ impl ProviderId {
             ProviderId::Qoder => Some("qoder.com"),
             ProviderId::CodeBuddy => Some("codebuddy.cn"),
             ProviderId::Sakana => Some("console.sakana.ai"),
+            ProviderId::Sofya => None,
             ProviderId::LongCat => Some("longcat.chat"),
             ProviderId::Replicate => Some("replicate.com"),
             ProviderId::AtlasCloud => None,
@@ -462,6 +539,16 @@ impl ProviderId {
             ProviderId::DevPass => None,
             ProviderId::XKiro => None,
             ProviderId::Vercel => None,
+            ProviderId::Synthetic => None,
+            ProviderId::ClawRouter => None,
+            ProviderId::IBMBob => None,
+            ProviderId::Langdock => Some("langdock.com"),
+            ProviderId::LithosAI => Some("console.lithosai.cloud"),
+            ProviderId::Linkup => None,
+            ProviderId::MuseAI => Some("muse.ai"),
+            ProviderId::WorkBuddy => Some("workbuddy.cn"),
+            ProviderId::SailResearch => None,
+            ProviderId::Tavily => None,
             ProviderId::AiAnd => None,
             ProviderId::Windsurf => None,
             ProviderId::Doubao => None,
@@ -469,9 +556,12 @@ impl ProviderId {
             ProviderId::OpenAIApi => None,
             ProviderId::ElevenLabs => None,
             ProviderId::Deepgram => None,
-            ProviderId::Groq => None,
+            // The console session cookies live on `.groq.com` and
+            // `console.groq.com`; the parent domain matches both.
+            ProviderId::Groq => Some("groq.com"),
             ProviderId::HuggingFace => None,
             ProviderId::Helmcode => Some("helmcode.com"),
+            ProviderId::TinyApi => Some("tinyapi.rest"),
             ProviderId::TypeSafe => Some("typesafe.ai"),
             ProviderId::V0 => None,
             ProviderId::LLMProxy => None,
@@ -489,7 +579,14 @@ impl ProviderId {
             ProviderId::ZoomMate => Some("zoommate.zoom.us"),
             ProviderId::QwenCloud => Some("qwencloud.com"),
             ProviderId::Notion => Some("app.notion.com"),
+            ProviderId::Xapi => Some("x.com"),
             ProviderId::Xai => None,
+            ProviderId::Exa => None,
+            ProviderId::Cosmic => None,
+            ProviderId::Aerostack => None,
+            ProviderId::Parallel => Some("platform.parallel.ai"),
+            ProviderId::Fal => None,
+            ProviderId::Flora => None,
         }
     }
 
@@ -500,6 +597,19 @@ impl ProviderId {
             ProviderId::Kimi => Some(crate::providers::kimi::MONTHLY_WINDOW_ID),
             _ => None,
         }
+    }
+
+    /// Reset-window pace rule (upstream `ProviderDescriptor.pace`, v0.70.0).
+    /// Each provider declares its rule in its own module; the dispatch lives
+    /// in `provider_factory::pace_capability`.
+    pub fn pace_capability(&self) -> super::ProviderPaceCapability {
+        super::provider_factory::pace_capability(*self)
+    }
+
+    /// Limit reset detector rule. Each provider declares its rule in its own
+    /// module; the dispatch lives in `provider_factory::limit_reset_policy`.
+    pub fn limit_reset_policy(&self) -> super::ProviderLimitResetPolicy {
+        super::provider_factory::limit_reset_policy(*self)
     }
 
     /// Parse from CLI name string
@@ -577,12 +687,14 @@ impl ProviderId {
             }
             "grok" | "supergrok" | "super-grok" => Some(ProviderId::Grok),
             "xai" | "x.ai" | "x-ai" => Some(ProviderId::Xai),
+            "xapi" | "x-api" | "x api" => Some(ProviderId::Xapi),
             "elevenlabs" | "eleven-labs" | "11labs" => Some(ProviderId::ElevenLabs),
             "deepgram" | "dg" => Some(ProviderId::Deepgram),
             "groq" | "groqcloud" | "groq-cloud" | "groq cloud" => Some(ProviderId::Groq),
             "huggingface" | "hugging-face" | "hugging face" | "hf" => Some(ProviderId::HuggingFace),
             "helmcode" | "nan-builders" | "nan builders" => Some(ProviderId::Helmcode),
             "v0" | "v0-dev" | "v0.dev" => Some(ProviderId::V0),
+            "tinyapi" | "tiny-api" => Some(ProviderId::TinyApi),
             "typesafe" | "type-safe" | "type safe" => Some(ProviderId::TypeSafe),
             "llmproxy" | "llm-proxy" | "llm proxy" => Some(ProviderId::LLMProxy),
             "chutes" | "chutes-ai" | "chutes ai" => Some(ProviderId::Chutes),
@@ -598,6 +710,7 @@ impl ProviderId {
                 Some(ProviderId::CodeBuddy)
             }
             "sakana" | "sakana-ai" | "sakana ai" => Some(ProviderId::Sakana),
+            "sofya" => Some(ProviderId::Sofya),
             "sub2api" | "sub-2-api" | "sub 2 api" => Some(ProviderId::Sub2Api),
             "wayfinder" => Some(ProviderId::Wayfinder),
             "zenmux" | "zen-mux" => Some(ProviderId::ZenMux),
@@ -612,7 +725,157 @@ impl ProviderId {
             "replicate" | "r8" => Some(ProviderId::Replicate),
             "atlascloud" | "atlas-cloud" | "atlas cloud" => Some(ProviderId::AtlasCloud),
             "raycast" | "raycast-ai" => Some(ProviderId::Raycast),
+            "synthetic" | "synthetic.new" => Some(ProviderId::Synthetic),
+            "clawrouter" | "claw-router" => Some(ProviderId::ClawRouter),
+            "ibmbob" | "ibm-bob" | "ibm bob" | "bob" | "bobshell" => Some(ProviderId::IBMBob),
+            "langdock" => Some(ProviderId::Langdock),
+            "lithosai" => Some(ProviderId::LithosAI),
+            "linkup" => Some(ProviderId::Linkup),
+            "museai" | "muse (muse.ai)" => Some(ProviderId::MuseAI),
+            "workbuddy" => Some(ProviderId::WorkBuddy),
+            "sailresearch" | "sail research" => Some(ProviderId::SailResearch),
+            "tavily" => Some(ProviderId::Tavily),
+            "exa" => Some(ProviderId::Exa),
+            "cosmic" | "cosmic ai" => Some(ProviderId::Cosmic),
+            "aerostack" => Some(ProviderId::Aerostack),
+            "parallel" | "parallel.ai" => Some(ProviderId::Parallel),
+            "fal" => Some(ProviderId::Fal),
+            "flora" => Some(ProviderId::Flora),
             _ => None,
+        }
+    }
+
+    /// Lowercase CLI aliases that `from_cli_name` also resolves to this provider,
+    /// excluding `cli_name` itself. Feeds the Settings provider search.
+    pub fn cli_aliases(&self) -> &'static [&'static str] {
+        match self {
+            ProviderId::DevPass => &[],
+            ProviderId::Manus => &[],
+            ProviderId::Xapi => &["x-api", "x api"],
+            ProviderId::Kilo => &[],
+            ProviderId::Devin => &[],
+            ProviderId::Warp => &["warp-ai", "warp-terminal"],
+            ProviderId::DeepInfra => &["deep-infra", "di"],
+            ProviderId::Fireworks => &["fireworks-ai", "fw"],
+            ProviderId::MuseAI => &["muse (muse.ai)"],
+            ProviderId::AzureOpenAI => &["azure-openai", "azure openai"],
+            ProviderId::Nous => &["nous-portal", "nous portal", "hermes"],
+            ProviderId::Venice => &[],
+            ProviderId::OpenCodeGo => &["opencode-go", "opencode go"],
+            ProviderId::Bifrost => &["bifrost-gateway", "bifrost gateway"],
+            ProviderId::Claude => &["anthropic"],
+            ProviderId::Tavily => &[],
+            ProviderId::LLMMan => &[],
+            ProviderId::IBMBob => &["ibm-bob", "ibm bob", "bob", "bobshell"],
+            ProviderId::Pi => &["pi-mono"],
+            ProviderId::Poe => &[],
+            ProviderId::Sakana => &["sakana-ai", "sakana ai"],
+            ProviderId::Linkup => &[],
+            ProviderId::Zed => &["zed-ai"],
+            ProviderId::WorkBuddy => &[],
+            ProviderId::JetBrains => &["jetbrains-ai", "jetbrains ai", "intellij"],
+            ProviderId::CodeBuddy => {
+                &["code-buddy", "codebuddy-cn", "codebuddycn", "腾讯codebuddy"]
+            }
+            ProviderId::NanoGPT => &["nano-gpt"],
+            ProviderId::Deepgram => &["dg"],
+            ProviderId::Wayfinder => &[],
+            ProviderId::Hyper => &["charm-hyper", "charm hyper"],
+            ProviderId::MiMo => &["xiaomi", "xiaomimimo", "xiaomi-mimo", "xiaomi mimo"],
+            ProviderId::Langdock => &[],
+            ProviderId::Infini => &["infini-ai"],
+            ProviderId::Kiro => &["aws"],
+            ProviderId::OpenRouter => &["or"],
+            ProviderId::Sub2Api => &["sub-2-api", "sub 2 api"],
+            ProviderId::Mistral => &["mistral-ai", "mistral ai"],
+            ProviderId::ZenMux => &["zen-mux"],
+            ProviderId::CommandCode => &["command-code", "command code"],
+            ProviderId::Factory => &["droid"],
+            ProviderId::XKiro => &["x-kiro"],
+            ProviderId::Flora => &[],
+            ProviderId::QwenCloud => &["qwencloud", "qwen", "qwen-token-plan", "qwen cloud"],
+            ProviderId::Doubao => &["ark", "volcengine"],
+            ProviderId::SailResearch => &["sail research"],
+            ProviderId::Raycast => &["raycast-ai"],
+            ProviderId::DeepSeek => &["deep-seek", "ds"],
+            ProviderId::Augment => &[],
+            ProviderId::Notion => &["notion-ai", "notionai", "notion ai"],
+            ProviderId::Xai => &["x.ai", "x-ai"],
+            ProviderId::AtlasCloud => &["atlas-cloud", "atlas cloud"],
+            ProviderId::Copilot => &["github"],
+            ProviderId::CrossModel => &["cross-model", "cross model", "crossmodel (removed)"],
+            ProviderId::LongCat => &["long-cat", "lc"],
+            ProviderId::Aixy => &["aixy-gateway", "aixy gateway"],
+            ProviderId::GitKraken => &["gitkraken-ai", "gitkraken ai"],
+            ProviderId::Windsurf => &["codeium"],
+            ProviderId::Vercel => &[
+                "vercel-ai-gateway",
+                "vercel ai gateway",
+                "ai-gateway",
+                "ai gateway",
+            ],
+            ProviderId::LithosAI => &[],
+            ProviderId::Sofya => &[],
+            ProviderId::TypeSafe => &["type-safe", "type safe"],
+            ProviderId::T3Chat => &["t3-chat", "t3 chat"],
+            ProviderId::OpenCode => &[],
+            ProviderId::ClinePass => &["cline-pass", "cline"],
+            ProviderId::TinyApi => &["tiny-api"],
+            ProviderId::MiniMax => &[],
+            ProviderId::Ollama => &[],
+            ProviderId::Grok => &["supergrok", "super-grok"],
+            ProviderId::HuggingFace => &["hugging-face", "hugging face", "hf"],
+            ProviderId::Meta => &[
+                "metaspark",
+                "meta-spark",
+                "muse-spark",
+                "musespark",
+                "muse spark",
+                "meta muse spark",
+            ],
+            ProviderId::ZoomMate => &["zoom-mate", "zoom mate"],
+            ProviderId::Abacus => &["abacus ai", "abacus-ai"],
+            ProviderId::Qoder => &[],
+            ProviderId::Kimi => &["moonshot"],
+            ProviderId::Replicate => &["r8"],
+            ProviderId::Perplexity => &["pplx"],
+            ProviderId::Helmcode => &["nan-builders", "nan builders"],
+            ProviderId::Cosmic => &["cosmic ai"],
+            ProviderId::Synthetic => &["synthetic.new"],
+            ProviderId::V0 => &["v0-dev", "v0.dev"],
+            ProviderId::AiAnd => &["ai&", "ai-and", "ai and"],
+            ProviderId::Cursor => &[],
+            ProviderId::CodeRabbit => &["code-rabbit", "code rabbit"],
+            ProviderId::Aerostack => &[],
+            ProviderId::ClawRouter => &["claw-router"],
+            ProviderId::Bedrock => &["aws-bedrock", "aws bedrock"],
+            ProviderId::Zai => &["z.ai"],
+            ProviderId::AlibabaTokenPlan => &[
+                "alibaba-token-plan",
+                "alibaba token plan",
+                "alibaba-token",
+                "bailian-token-plan",
+            ],
+            ProviderId::LiteLLM => &["lite-llm", "lite llm"],
+            ProviderId::Fal => &[],
+            ProviderId::Chutes => &["chutes-ai", "chutes ai"],
+            ProviderId::Codex => &["openai"],
+            ProviderId::Antigravity => &["agy"],
+            ProviderId::Alibaba => &["tongyi", "qianwen"],
+            ProviderId::ElevenLabs => &["eleven-labs", "11labs"],
+            ProviderId::Groq => &["groqcloud", "groq-cloud", "groq cloud"],
+            ProviderId::OpenAIApi => &["openai-api", "openai api", "openai-balance"],
+            ProviderId::LLMProxy => &["llm-proxy", "llm proxy"],
+            ProviderId::Codebuff => &["manicode"],
+            ProviderId::Exa => &[],
+            ProviderId::Parallel => &["parallel.ai"],
+            ProviderId::KimiK2 => &["kimi-k2", "kimi k2", "k2", "kimi k2 (removed)"],
+            ProviderId::Neuralwatt => &["neural-watt", "nw", "neural"],
+            ProviderId::Gemini => &["google"],
+            ProviderId::StepFun => &["step-fun", "step fun"],
+            ProviderId::Muse => &["muse-code", "muse code"],
+            ProviderId::Amp => &["sourcegraph"],
+            ProviderId::VertexAI => &["vertex", "vertex ai"],
         }
     }
 
@@ -882,6 +1145,11 @@ pub struct FetchContext {
     /// (LiteLLM model activity, Claude workspace spend). Scoped to the provider
     /// being fetched; false everywhere the setting is not consulted.
     pub optional_details_enabled: bool,
+
+    /// OpenAI API: also fetch the last hour of 1-minute usage for the Tokens/min chart
+    /// (upstream `OPENAI_LIVE_MINUTES`). The app sets it from settings (default on);
+    /// paths with no throughput consumer leave it off to save the request.
+    pub live_usage_enabled: bool,
 }
 
 impl Default for FetchContext {
@@ -904,6 +1172,7 @@ impl Default for FetchContext {
             browser_cookie_import: false,
             requires_optional_usage_completeness: false,
             optional_details_enabled: false,
+            live_usage_enabled: false,
         }
     }
 }
@@ -1032,6 +1301,14 @@ pub trait Provider: Send + Sync {
         None
     }
 
+    /// Lane the menu bar pace is scored on, whatever metric the menu bar
+    /// shows (upstream `menuBarPaceWindow`,
+    /// StatusItemController+Animation.swift). `None` scores the window the
+    /// tray icon draws.
+    fn menu_bar_pace_lane(&self) -> Option<super::IconLane> {
+        None
+    }
+
     /// Label for the primary lane in the menu bar metric picker when the
     /// lane is not a session window (upstream `menuBarLayoutPrimaryLabel`).
     /// `None` keeps the generic session label.
@@ -1050,6 +1327,18 @@ pub trait Provider: Send + Sync {
 
     /// Whether browser-cookie discovery/recovery is owned by the provider.
     fn owns_browser_cookie_resolution(&self) -> bool {
+        false
+    }
+
+    /// Whether the provider picks between its API-key and cookie lanes itself.
+    ///
+    /// When true, the shell keeps the usage source for Auto and API (OAuth)
+    /// under every cookie source instead of remapping it to Web or Cli. It
+    /// forwards a stored or token-account cookie header when the cookie source
+    /// is not `off`; `off` sets [`FetchContext::manual_cookie_missing`]. The
+    /// shell never reads a browser for this provider, which does that only on
+    /// its own cookie lane.
+    fn owns_credential_lane_routing(&self) -> bool {
         false
     }
 
@@ -1140,6 +1429,13 @@ pub fn cli_name_map() -> HashMap<&'static str, ProviderId> {
     map.insert("vercel ai gateway", ProviderId::Vercel);
     map.insert("ai-gateway", ProviderId::Vercel);
     map.insert("ai gateway", ProviderId::Vercel);
+    map.insert("synthetic.new", ProviderId::Synthetic);
+    map.insert("claw-router", ProviderId::ClawRouter);
+    map.insert("ibm-bob", ProviderId::IBMBob);
+    map.insert("ibm bob", ProviderId::IBMBob);
+    map.insert("bob", ProviderId::IBMBob);
+    map.insert("bobshell", ProviderId::IBMBob);
+    map.insert("muse (muse.ai)", ProviderId::MuseAI);
     map.insert("metaspark", ProviderId::Meta);
     map.insert("meta-spark", ProviderId::Meta);
     map.insert("muse-spark", ProviderId::Meta);
@@ -1197,6 +1493,7 @@ pub fn cli_name_map() -> HashMap<&'static str, ProviderId> {
     map.insert("llm-proxy", ProviderId::LLMProxy);
     map.insert("cross-model", ProviderId::CrossModel);
     map.insert("sakana-ai", ProviderId::Sakana);
+    map.insert("sofya", ProviderId::Sofya);
     map.insert("sub-2-api", ProviderId::Sub2Api);
     map.insert("notion-ai", ProviderId::Notion);
     map.insert("notionai", ProviderId::Notion);
@@ -1210,7 +1507,9 @@ pub fn cli_name_map() -> HashMap<&'static str, ProviderId> {
 ///
 /// Upstream 0.70.0 audited the palette (#4075, `docs/provider-palette.md`).
 /// The 16 accents it adopted are pinned in the tests below; changing one
-/// must not materially reduce contrast on white or `#222222`.
+/// must not materially reduce contrast on white or `#222222`. The Mac 0.70.0
+/// parity pass adopted 24 more Mac descriptor colors, also pinned below;
+/// Vercel is the one Mac color Windows does not take.
 pub fn brand_color(id: ProviderId) -> &'static str {
     match id {
         ProviderId::Codex => "#49A3B0",
@@ -1230,55 +1529,57 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::Kimi => "#FE603C",
         ProviderId::KimiK2 => "#4C00FF",
         ProviderId::Amp => "#F34E3F",
-        ProviderId::Warp => "#6366F1",
-        ProviderId::Ollama => "#8B95B0",
+        ProviderId::Warp => "#938BB4",
+        ProviderId::Ollama => "#888888",
         ProviderId::AzureOpenAI => "#0078D4",
-        ProviderId::T3Chat => "#8B5CF6",
-        ProviderId::OpenRouter => "#6B7280",
+        ProviderId::T3Chat => "#F56647",
+        ProviderId::OpenRouter => "#6467F2",
         ProviderId::JetBrains => "#FF3399",
         ProviderId::Alibaba => "#FF6A00",
         ProviderId::AlibabaTokenPlan => "#FF6A00",
         ProviderId::NanoGPT => "#687FA1",
         ProviderId::Infini => "#687FA1",
-        ProviderId::Perplexity => "#1FB8CD",
+        ProviderId::Perplexity => "#20B2AA",
         ProviderId::Abacus => "#814EE8",
         ProviderId::Mistral => "#FF5229",
         ProviderId::OpenCodeGo => "#3B82F6",
-        ProviderId::Kilo => "#5D87FF",
+        ProviderId::Kilo => "#F27027",
         ProviderId::Bedrock => "#01A88D",
         ProviderId::Codebuff => "#00FF95",
         ProviderId::CodeRabbit => "#FF5C35",
         ProviderId::DeepSeek => "#4D6BFE",
         ProviderId::DeepInfra => "#2A3275",
         ProviderId::AiAnd => "#E25C2B",
-        ProviderId::Windsurf => "#22C55E",
+        ProviderId::Windsurf => "#34E8BB",
         ProviderId::Manus => "#34322D",
         ProviderId::MiMo => "#FF6900",
-        ProviderId::Doubao => "#2563EB",
+        ProviderId::Doubao => "#3370FF",
         ProviderId::CommandCode => "#8C4EDD",
-        ProviderId::StepFun => "#999999",
+        ProviderId::StepFun => "#2196F2",
         ProviderId::Venice => "#3C8FDD",
-        ProviderId::OpenAIApi => "#10A37F",
-        ProviderId::Grok => "#111827",
+        ProviderId::OpenAIApi => "#0F826E",
+        ProviderId::Grok => "#10A37F",
         ProviderId::ElevenLabs => "#111827",
-        ProviderId::Deepgram => "#13EF93",
-        ProviderId::Groq => "#F55036",
+        ProviderId::Deepgram => "#6467F2",
+        ProviderId::Groq => "#F56844",
         ProviderId::HuggingFace => "#FFD21E",
-        ProviderId::Helmcode => "#4F46E5",
-        ProviderId::V0 => "#111827",
-        ProviderId::TypeSafe => "#2563EB",
-        ProviderId::LLMProxy => "#4F46E5",
-        ProviderId::Chutes => "#FF5C35",
-        ProviderId::LiteLLM => "#0EA5E9",
-        ProviderId::Poe => "#5D5FEF",
+        ProviderId::Helmcode => "#4934E1",
+        ProviderId::V0 => "#111111",
+        ProviderId::TinyApi => "#F97316",
+        ProviderId::TypeSafe => "#111111",
+        ProviderId::LLMProxy => "#24B47E",
+        ProviderId::Chutes => "#3184FF",
+        ProviderId::LiteLLM => "#4C89F0",
+        ProviderId::Poe => "#5D5CDE",
         ProviderId::Devin => "#317CFF",
-        ProviderId::Zed => "#084CCF",
+        ProviderId::Zed => "#084EFF",
         ProviderId::CrossModel => "#C084FC",
-        ProviderId::Qoder => "#2563EB",
+        ProviderId::Qoder => "#10B981",
         ProviderId::CodeBuddy => "#0052D9",
-        ProviderId::Sakana => "#0EA5E9",
+        ProviderId::Sakana => "#2975DB",
+        ProviderId::Sofya => "#B0B820",
         ProviderId::Sub2Api => "#14B8A6",
-        ProviderId::Wayfinder => "#14B8A6",
+        ProviderId::Wayfinder => "#10A37F",
         ProviderId::ZenMux => "#6C5CE7",
         ProviderId::ClinePass => "#5487C8",
         ProviderId::LongCat => "#29E154",
@@ -1287,6 +1588,7 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::QwenCloud => "#615CED",
         ProviderId::Notion => "#337EA9",
         ProviderId::Xai => "#8E8E93",
+        ProviderId::Xapi => "#71767B",
         ProviderId::Fireworks => "#F25B1C",
         ProviderId::Meta => "#0467DF",
         ProviderId::Muse => "#0668E1",
@@ -1301,8 +1603,26 @@ pub fn brand_color(id: ProviderId) -> &'static str {
         ProviderId::DevPass => "#2563EB",
         ProviderId::XKiro => "#52C99B",
         ProviderId::Raycast => "#FF6363",
-        // Upstream uses white; a mid neutral keeps contrast on light and dark surfaces.
+        // Mac uses white, which is invisible on the light bar track; a mid
+        // neutral keeps contrast on light and dark surfaces (user decision
+        // 2026-10-10, Mac-parity palette pass).
         ProviderId::Vercel => "#737373",
+        ProviderId::Synthetic => "#141414",
+        ProviderId::ClawRouter => "#596EF6",
+        ProviderId::IBMBob => "#0E61FA",
+        ProviderId::Langdock => "#5A4AE7",
+        ProviderId::Linkup => "#202020",
+        ProviderId::LithosAI => "#6B7280",
+        ProviderId::MuseAI => "#0668E1",
+        ProviderId::WorkBuddy => "#0DC8A6",
+        ProviderId::SailResearch => "#2C4681",
+        ProviderId::Tavily => "#0F766E",
+        ProviderId::Exa => "#0143D9",
+        ProviderId::Cosmic => "#6366F1",
+        ProviderId::Aerostack => "#6366F1",
+        ProviderId::Parallel => "#1D1C1A",
+        ProviderId::Fal => "#7C3AED",
+        ProviderId::Flora => "#111111",
     }
 }
 
@@ -1317,7 +1637,7 @@ mod tests {
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 89);
+        assert_eq!(all.len(), 108);
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Pi));
@@ -1363,6 +1683,7 @@ mod tests {
         assert!(all.contains(&ProviderId::Qoder));
         assert!(all.contains(&ProviderId::CodeBuddy));
         assert!(all.contains(&ProviderId::Sakana));
+        assert!(all.contains(&ProviderId::Sofya));
         assert!(all.contains(&ProviderId::Sub2Api));
         assert!(all.contains(&ProviderId::Wayfinder));
         assert!(all.contains(&ProviderId::ZenMux));
@@ -1373,6 +1694,7 @@ mod tests {
         assert!(all.contains(&ProviderId::QwenCloud));
         assert!(all.contains(&ProviderId::Notion));
         assert!(all.contains(&ProviderId::Xai));
+        assert!(all.contains(&ProviderId::Xapi));
         assert!(all.contains(&ProviderId::Meta));
         assert!(all.contains(&ProviderId::Replicate));
         assert!(all.contains(&ProviderId::Muse));
@@ -1387,6 +1709,22 @@ mod tests {
         assert!(all.contains(&ProviderId::XKiro));
         assert!(all.contains(&ProviderId::Raycast));
         assert!(all.contains(&ProviderId::Vercel));
+        assert!(all.contains(&ProviderId::Synthetic));
+        assert!(all.contains(&ProviderId::ClawRouter));
+        assert!(all.contains(&ProviderId::IBMBob));
+        assert!(all.contains(&ProviderId::Langdock));
+        assert!(all.contains(&ProviderId::Linkup));
+        assert!(all.contains(&ProviderId::LithosAI));
+        assert!(all.contains(&ProviderId::MuseAI));
+        assert!(all.contains(&ProviderId::WorkBuddy));
+        assert!(all.contains(&ProviderId::SailResearch));
+        assert!(all.contains(&ProviderId::TinyApi));
+        assert!(all.contains(&ProviderId::Tavily));
+        assert!(all.contains(&ProviderId::Exa));
+        assert!(all.contains(&ProviderId::Aerostack));
+        assert!(all.contains(&ProviderId::Parallel));
+        assert!(all.contains(&ProviderId::Fal));
+        assert!(all.contains(&ProviderId::Flora));
     }
 
     #[test]
@@ -1522,6 +1860,40 @@ mod tests {
     }
 
     #[test]
+    fn cli_aliases_resolve_back_to_their_provider_and_are_unique() {
+        let mut seen = std::collections::HashMap::new();
+        for id in ProviderId::all() {
+            for alias in id.cli_aliases() {
+                assert_ne!(*alias, id.cli_name(), "alias repeats cli_name for {id:?}");
+                assert_eq!(
+                    ProviderId::from_cli_name(alias),
+                    Some(*id),
+                    "alias {alias:?} does not resolve to {id:?}"
+                );
+                assert_eq!(
+                    alias.to_lowercase(),
+                    *alias,
+                    "alias {alias:?} must be lowercase"
+                );
+                assert!(
+                    seen.insert(*alias, *id).is_none(),
+                    "alias {alias:?} is claimed by more than one provider"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn cli_aliases_cover_the_documented_search_aliases() {
+        assert!(ProviderId::Codex.cli_aliases().contains(&"openai"));
+        assert!(ProviderId::Claude.cli_aliases().contains(&"anthropic"));
+        assert!(ProviderId::Factory.cli_aliases().contains(&"droid"));
+        assert!(ProviderId::Antigravity.cli_aliases().contains(&"agy"));
+        assert!(!ProviderId::Zai.cli_aliases().is_empty());
+        assert!(!ProviderId::Codex.cli_aliases().contains(&"codex"));
+    }
+
+    #[test]
     fn test_provider_id_cookie_domain() {
         // Cookie-based providers
         assert_eq!(ProviderId::Claude.cookie_domain(), Some("claude.ai"));
@@ -1537,6 +1909,7 @@ mod tests {
         assert_eq!(ProviderId::Kimi.cookie_domain(), Some("kimi.moonshot.cn"));
         assert_eq!(ProviderId::OpenCode.cookie_domain(), Some("opencode.ai"));
         assert_eq!(ProviderId::Venice.cookie_domain(), Some("venice.ai"));
+        assert_eq!(ProviderId::Groq.cookie_domain(), Some("groq.com"));
 
         // Token-based providers (no cookies)
         assert_eq!(ProviderId::Copilot.cookie_domain(), None);
@@ -1734,10 +2107,8 @@ mod tests {
     ];
 
     /// Audited providers whose accent upstream kept, where the Windows accent
-    /// already equals upstream's final value. Chutes, Deepgram, Doubao, Groq,
-    /// Kilo, LiteLLM, Perplexity, Qoder, Sakana, T3 Chat and Warp keep older
-    /// Windows accents that differ from upstream; aligning them is out of
-    /// scope for the 0.70.0 port.
+    /// already equals upstream's final value. The audited providers whose
+    /// older Windows accents differed are aligned in `MAC_PARITY_ACCENTS`.
     const RETAINED_ACCENTS: [(ProviderId, &str); 7] = [
         (ProviderId::AiAnd, "#E25C2B"),
         (ProviderId::Copilot, "#A855F7"),
@@ -1746,6 +2117,51 @@ mod tests {
         (ProviderId::Kimi, "#FE603C"),
         (ProviderId::Notion, "#337EA9"),
         (ProviderId::OpenCode, "#3B82F6"),
+    ];
+
+    /// Mac CodexBar 0.70.0 descriptor colors adopted for parity: (provider,
+    /// previous Windows accent, Mac color). Source: the `color:` of each
+    /// `CodexBarCore/Providers/<Name>/<Name>ProviderDescriptor.swift`.
+    const MAC_PARITY_ACCENTS: [(ProviderId, &str, &str); 24] = [
+        (ProviderId::Chutes, "#FF5C35", "#3184FF"),
+        (ProviderId::Deepgram, "#13EF93", "#6467F2"),
+        (ProviderId::Doubao, "#2563EB", "#3370FF"),
+        (ProviderId::Grok, "#111827", "#10A37F"),
+        (ProviderId::Groq, "#F55036", "#F56844"),
+        (ProviderId::Helmcode, "#4F46E5", "#4934E1"),
+        (ProviderId::Kilo, "#5D87FF", "#F27027"),
+        (ProviderId::LiteLLM, "#0EA5E9", "#4C89F0"),
+        (ProviderId::LLMProxy, "#4F46E5", "#24B47E"),
+        (ProviderId::Ollama, "#8B95B0", "#888888"),
+        (ProviderId::OpenAIApi, "#10A37F", "#0F826E"),
+        (ProviderId::OpenRouter, "#6B7280", "#6467F2"),
+        (ProviderId::Perplexity, "#1FB8CD", "#20B2AA"),
+        (ProviderId::Poe, "#5D5FEF", "#5D5CDE"),
+        (ProviderId::Qoder, "#2563EB", "#10B981"),
+        (ProviderId::Sakana, "#0EA5E9", "#2975DB"),
+        (ProviderId::StepFun, "#999999", "#2196F2"),
+        (ProviderId::T3Chat, "#8B5CF6", "#F56647"),
+        (ProviderId::TypeSafe, "#2563EB", "#111111"),
+        (ProviderId::V0, "#111827", "#111111"),
+        (ProviderId::Warp, "#6366F1", "#938BB4"),
+        (ProviderId::Wayfinder, "#14B8A6", "#10A37F"),
+        (ProviderId::Windsurf, "#22C55E", "#34E8BB"),
+        (ProviderId::Zed, "#084CCF", "#084EFF"),
+    ];
+
+    /// Mac-parity accents that fail the regression rule on one surface. They
+    /// are bar fills and icon tints, not text, and the Mac ships them as is;
+    /// the user chose exact Mac colors (2026-10-10). Each entry names the
+    /// only surface it is exempt on; every other check still applies.
+    const MAC_PARITY_CONTRAST_EXEMPTIONS: [(ProviderId, &str); 4] = [
+        // Mac green, 6.29 -> 2.66 on white.
+        (ProviderId::LLMProxy, "#FFFFFF"),
+        // Mac emerald, 5.17 -> 2.54 on white.
+        (ProviderId::Qoder, "#FFFFFF"),
+        // Mac near-black, 3.08 -> 1.19 on #222222.
+        (ProviderId::TypeSafe, "#222222"),
+        // Mac mint, 2.28 -> 1.57 on white.
+        (ProviderId::Windsurf, "#FFFFFF"),
     ];
 
     /// WCAG relative luminance of a `#RRGGBB` color, as upstream's
@@ -1791,6 +2207,33 @@ mod tests {
         }
         for (id, retained) in RETAINED_ACCENTS {
             assert_eq!(brand_color(id), retained, "{id:?}");
+        }
+    }
+
+    #[test]
+    fn mac_parity_accents_are_pinned() {
+        for (id, _, mac) in MAC_PARITY_ACCENTS {
+            assert_eq!(brand_color(id), mac, "{id:?}");
+        }
+        // Mac ships #FFFFFF, invisible on the light track (user decision 2026-10-10).
+        assert_eq!(brand_color(ProviderId::Vercel), "#737373");
+    }
+
+    #[test]
+    fn mac_parity_accents_do_not_materially_regress_contrast() {
+        // Same rule as the upstream audit below, applied to the Mac-parity
+        // pass. Only the listed provider/surface pairs are exempt.
+        for (id, previous, _) in MAC_PARITY_ACCENTS {
+            for background in ["#FFFFFF", "#222222"] {
+                let current = contrast_ratio(brand_color(id), background);
+                let before = contrast_ratio(previous, background);
+                let passes = current >= 3.0 || before - current < 0.5;
+                let exempt = MAC_PARITY_CONTRAST_EXEMPTIONS.contains(&(id, background));
+                assert!(
+                    passes != exempt,
+                    "{id:?} on {background}: {before:.2} -> {current:.2} (exempt: {exempt})"
+                );
+            }
         }
     }
 

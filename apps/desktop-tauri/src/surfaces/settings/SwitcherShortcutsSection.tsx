@@ -23,7 +23,7 @@ const ERROR_KEYS: Record<SwitcherShortcutErrorCode, LocaleKey> = {
   invalid: "SwitcherShortcutErrorInvalid",
 };
 
-/** Editor for the provider-switcher keys (Settings > Menu). */
+/** Editor for the provider-switcher keys, shown in SwitcherShortcutsDialog (Settings > General). */
 export default function SwitcherShortcutsSection({
   settings,
   set,
@@ -59,10 +59,9 @@ export default function SwitcherShortcutsSection({
   };
 
   return (
-    <section className="settings-section">
-      <h3 className="settings-section__title">{t("SwitcherShortcutsTitle")}</h3>
+    <div className="switcher-shortcuts">
       <p className="settings-section__caption">{t("SwitcherShortcutsHelper")}</p>
-      <div className="settings-section__group">
+      <div className="settings-group__box">
         {SWITCHER_ACTIONS.map((action) => {
           const value = mapping[action];
           return (
@@ -82,18 +81,20 @@ export default function SwitcherShortcutsSection({
         })}
       </div>
       {error && (
-        <p className="settings-section__error" role="alert">
+        <p className="settings-group__error" role="alert">
           {label(error.action)}: {t(ERROR_KEYS[error.code])}
         </p>
       )}
-      <button
-        type="button"
-        className="credential-btn"
-        disabled={saving}
-        onClick={reset}
-      >
-        {t("SwitcherShortcutReset")}
-      </button>
-    </section>
+      <div className="switcher-shortcuts__reset">
+        <button
+          type="button"
+          className="credential-btn"
+          disabled={saving}
+          onClick={reset}
+        >
+          {t("SwitcherShortcutReset")}
+        </button>
+      </div>
+    </div>
   );
 }

@@ -36,8 +36,8 @@ export function groupProviderDisplayDetails(
  * One transient provider detail line: "{title}: {value} [secondary]"
  * plus an optional clamped progress bar.
  *
- * Shared by the tray menu card (`MenuCardDetails`) and the settings provider
- * detail (`UsageSection`); each surface passes its own layout classes.
+ * Used by the settings provider detail (`UsageSection`); the tray card renders
+ * the same data as key-value rows in `card/DetailSections`.
  */
 export function ProviderDisplayRow({
   detail,

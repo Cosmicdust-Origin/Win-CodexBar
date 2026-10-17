@@ -62,7 +62,7 @@ mod tests {
     fn bridge_snapshot(id: ProviderId, usage: UsageSnapshot) -> ProviderUsageSnapshot {
         let result = ProviderFetchResult::new(usage, "web");
         let metadata = instantiate_provider(id).metadata().clone();
-        ProviderUsageSnapshot::from_fetch_result(id, &metadata, &result, None)
+        ProviderUsageSnapshot::from_fetch_result(id, &metadata, &result, None, None)
     }
 
     #[test]

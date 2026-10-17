@@ -6,8 +6,10 @@ use tauri::{Emitter, Manager, PhysicalPosition, WebviewUrl};
 use super::activation::{self, Activation};
 
 const SETTINGS_LABEL: &str = "settings";
-const SETTINGS_WIDTH: f64 = 720.0;
-const SETTINGS_HEIGHT: f64 = 580.0;
+use crate::surface::{
+    SETTINGS_WINDOW_HEIGHT, SETTINGS_WINDOW_MIN_HEIGHT, SETTINGS_WINDOW_MIN_WIDTH,
+    SETTINGS_WINDOW_WIDTH,
+};
 
 /// Open the detached Settings window, or focus it if already open.
 ///
@@ -32,7 +34,8 @@ pub fn open_or_focus(app: &tauri::AppHandle, tab: &str) -> Result<(), String> {
     // `activation::apply` below decides whether it takes focus.
     let win = tauri::WebviewWindowBuilder::new(app, SETTINGS_LABEL, url)
         .title("CodexBar Settings")
-        .inner_size(SETTINGS_WIDTH, SETTINGS_HEIGHT)
+        .inner_size(SETTINGS_WINDOW_WIDTH, SETTINGS_WINDOW_HEIGHT)
+        .min_inner_size(SETTINGS_WINDOW_MIN_WIDTH, SETTINGS_WINDOW_MIN_HEIGHT)
         .decorations(false)
         .shadow(false)
         .theme(Some(tauri::Theme::Dark))
@@ -50,8 +53,8 @@ pub fn open_or_focus(app: &tauri::AppHandle, tab: &str) -> Result<(), String> {
         let pos = monitor.position();
         let size = monitor.size();
         let scale = win.scale_factor().unwrap_or(1.0);
-        let win_w = (SETTINGS_WIDTH * scale) as i32;
-        let win_h = (SETTINGS_HEIGHT * scale) as i32;
+        let win_w = (SETTINGS_WINDOW_WIDTH * scale) as i32;
+        let win_h = (SETTINGS_WINDOW_HEIGHT * scale) as i32;
         let x = pos.x + (size.width as i32 - win_w) / 2;
         let y = pos.y + (size.height as i32 - win_h) / 2;
         let _ = win.set_position(PhysicalPosition::new(x, y));

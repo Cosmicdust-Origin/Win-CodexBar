@@ -7,7 +7,7 @@ use super::warning_identity::WarningIdentity;
 use super::*;
 use chrono::{Local, Utc};
 use codexbar::core::HookUsageWindow;
-use codexbar::notifications::WarningScope;
+use codexbar::notifications::{LimitResetObservation, LimitResetSample, WarningScope};
 use serde::Serialize;
 use std::sync::Arc;
 
@@ -30,6 +30,13 @@ impl RefreshScope {
     }
 
     fn refresh_account_lanes(self) -> bool {
+        matches!(self, Self::AllEnabled)
+    }
+
+    /// Upstream polls status pages from its full and per-provider refreshes
+    /// (`UsageStore.swift:842`). The 60-second auto-resume probe is
+    /// Windows-only, so it must not add status rounds of its own.
+    fn polls_status(self) -> bool {
         matches!(self, Self::AllEnabled)
     }
 }
@@ -262,6 +269,21 @@ pub(crate) fn build_fetch_context(
                 (SourceMode::Web, stored_cookie.clone(), false)
             }
             _ if active_token_env.is_some() => (SourceMode::OAuth, None, false),
+            // Providers that pick their own API-key or cookie lane (Command
+            // Code) keep Auto and API for every cookie source, so a configured
+            // key is used without touching a browser. `off` marks the cookie
+            // lane unavailable; `manual`/`auto` pass a stored header through.
+            _ if provider.owns_credential_lane_routing()
+                && matches!(usage_source, SourceMode::Auto | SourceMode::OAuth) =>
+            {
+                let cookie_off = cookie_source == "off";
+                let cookie_header = if cookie_off {
+                    None
+                } else {
+                    active_token_cookie.clone().or(stored_cookie)
+                };
+                (usage_source, cookie_header, cookie_off)
+            }
             // Opt-in web providers keep their default credential lane
             // unless the usage source is explicitly Web; a stored or
             // browser cookie must not turn Auto into Web.
@@ -289,10 +311,17 @@ pub(crate) fn build_fetch_context(
             "off" if provider_uses_oauth_without_cookies(id, usage_source) => {
                 (SourceMode::OAuth, None, false)
             }
-            "off"
-                if (has_kimi_code_api_key || has_opencodego_api_key)
-                    && usage_source == SourceMode::Auto =>
-            {
+            // OpenCode Go discovers browser sessions inside the provider; the
+            // missing-cookie flag tells it that Off forbids that discovery.
+            "off" if id == ProviderId::OpenCodeGo => {
+                let source_mode = if has_opencodego_api_key && usage_source == SourceMode::Auto {
+                    SourceMode::Auto
+                } else {
+                    SourceMode::Cli
+                };
+                (source_mode, None, true)
+            }
+            "off" if has_kimi_code_api_key && usage_source == SourceMode::Auto => {
                 (SourceMode::Auto, None, false)
             }
             // Droid/Factory: cookie-off must never scrape browser cookies. Map to
@@ -363,10 +392,14 @@ pub(crate) fn build_fetch_context(
         && !provider.cookie_source_scopes_session_only()
         && !cookies_only_enrich_usage
     {
-        if cookie_header
-            .as_deref()
-            .map(str::trim)
-            .is_none_or(|s| s.is_empty())
+        // Providers that own browser cookie resolution try each browser's
+        // session themselves; a pre-resolved first-browser header would pin
+        // them to that browser.
+        if !defer_provider_browser_cookie_lookup
+            && cookie_header
+                .as_deref()
+                .map(str::trim)
+                .is_none_or(|s| s.is_empty())
         {
             cookie_header = provider_cookie_domain(id, settings).and_then(|domain| {
                 codexbar::browser::cookies::get_cookie_header(domain)
@@ -451,6 +484,7 @@ pub(crate) fn build_fetch_context(
                 && token_account_kind == Some(codexbar::core::TokenAccountKind::ApiKey)),
         browser_cookie_import,
         optional_details_enabled: settings.optional_details_enabled(id),
+        live_usage_enabled: settings.live_usage_enabled(id),
         ..FetchContext::default()
     }
 }
@@ -634,6 +668,9 @@ async fn do_refresh_providers_with_policy(
             return Ok(ProviderRefreshOutcome::Skipped { reason });
         }
     };
+    if scope.polls_status() {
+        crate::status_poller::spawn_poll(app, &inputs.settings, &refresh_ids, force);
+    }
 
     // Ensure cache only contains currently enabled providers for this generation.
     if scope == RefreshScope::AllEnabled
@@ -745,12 +782,14 @@ fn spawn_provider_refreshes(
         );
         // Resolved here rather than inside the fetch: forecast history is keyed by
         // account, and the managed-account id is the only discriminator Codex exposes.
-        let token_account_id = inputs
+        let active_account = inputs
             .token_accounts
             .get(&id)
-            .and_then(ProviderAccountData::active_account)
-            .map(|account| account.id);
+            .and_then(ProviderAccountData::active_account);
+        let token_account_id = active_account.map(|account| account.id);
+        let token_account_label = active_account.and_then(|account| header_label(&account.label));
         let hooks_enabled = inputs.settings.hooks_enabled;
+        let pace_work_days = inputs.settings.weekly_progress_work_days;
 
         handles.push(tokio::spawn(async move {
             let Ok(_permit) = fetch_permits.acquire_owned().await else {
@@ -761,8 +800,12 @@ fn spawn_provider_refreshes(
                 id,
                 ctx,
                 generation,
-                token_account_id,
+                ActiveTokenAccount {
+                    id: token_account_id,
+                    label: token_account_label,
+                },
                 hooks_enabled,
+                pace_work_days,
             )
             .await;
         }));
@@ -797,16 +840,32 @@ fn spawn_provider_refreshes(
     handles
 }
 
+/// The active token account a refresh runs under: its id scopes forecast
+/// history; its label is header display only.
+struct ActiveTokenAccount {
+    id: Option<uuid::Uuid>,
+    label: Option<String>,
+}
+
+/// A token-account label fit for the card header, or `None` when blank.
+fn header_label(label: &str) -> Option<String> {
+    let label = label.trim();
+    (!label.is_empty()).then(|| label.to_string())
+}
+
 async fn refresh_provider(
     app: tauri::AppHandle,
     id: ProviderId,
     ctx: FetchContext,
     generation: u64,
-    token_account_id: Option<uuid::Uuid>,
+    token_account: ActiveTokenAccount,
     hooks_enabled: bool,
+    pace_work_days: Option<u8>,
 ) {
-    let (snapshot, account_identity, retention) =
-        fetch_provider_snapshot(id, ctx, token_account_id).await;
+    let (mut snapshot, account_identity, retention) =
+        fetch_provider_snapshot(id, ctx, token_account.id, pace_work_days).await;
+    snapshot.account_label = token_account.label;
+    let token_account_id = token_account.id;
     let fresh_snapshot = snapshot.error.is_none();
     // Captured before last-good preservation can swap in a cached snapshot.
     let fetch_attempt = FetchAttempt::of(&snapshot);
@@ -1074,6 +1133,7 @@ async fn fetch_provider_snapshot(
     id: ProviderId,
     ctx: FetchContext,
     token_account_id: Option<uuid::Uuid>,
+    pace_work_days: Option<u8>,
 ) -> (ProviderUsageSnapshot, Option<String>, RefreshRetention) {
     let provider = instantiate_provider(id);
     let metadata = provider.metadata().clone();
@@ -1091,6 +1151,7 @@ async fn fetch_provider_snapshot(
                         &metadata,
                         &result,
                         token_account_id,
+                        pace_work_days,
                     ),
                     account_identity,
                     RefreshRetention {
@@ -1196,7 +1257,7 @@ fn notify_usage_thresholds(
     cached: &[ProviderUsageSnapshot],
 ) {
     let cli_map = codexbar::core::cli_name_map();
-    if let Ok(mut guard) = state.lock() {
+    let persistence = if let Ok(mut guard) = state.lock() {
         for snapshot in cached {
             if snapshot.error.is_none()
                 && let Some(&provider) = cli_map.get(snapshot.provider_id.as_str())
@@ -1268,6 +1329,21 @@ fn notify_usage_thresholds(
                         weekly.used_percent,
                     );
                 }
+                let token_account_label = token_accounts
+                    .get(&provider)
+                    .and_then(ProviderAccountData::active_account)
+                    .map(|account| account.label.as_str());
+                guard.notification_manager.observe_limit_reset(
+                    limit_reset_sample(
+                        provider,
+                        snapshot,
+                        &warning_identity,
+                        token_account_label,
+                        &session_account,
+                        settings,
+                    ),
+                    settings,
+                );
                 notify_predictive_pace(
                     &mut guard.notification_manager,
                     provider,
@@ -1277,6 +1353,63 @@ fn notify_usage_thresholds(
                 );
             }
         }
+        guard
+            .notification_manager
+            .finish_limit_reset_batch(settings, chrono::Utc::now())
+    } else {
+        None
+    };
+    if let Some(persistence) = persistence {
+        persistence.apply();
+    }
+}
+
+/// Reset-detector input for one cached snapshot. Only real session lanes
+/// (1..=360 minutes) and the 7-day weekly lane are observed.
+pub(super) fn limit_reset_sample<'a>(
+    provider: ProviderId,
+    snapshot: &ProviderUsageSnapshot,
+    identity: &WarningIdentity,
+    token_account_label: Option<&str>,
+    session_transition_account: &'a str,
+    settings: &Settings,
+) -> LimitResetSample<'a> {
+    let label = token_account_label
+        .filter(|label| !label.trim().is_empty())
+        .or(snapshot.account_email.as_deref())
+        .filter(|label| !label.trim().is_empty())
+        .or(snapshot.account_organization.as_deref());
+    let account = identity.limit_reset_account(label, settings.hide_personal_info);
+    let observed_at = chrono::DateTime::parse_from_rfc3339(&snapshot.updated_at)
+        .ok()
+        .map(|date| date.with_timezone(&chrono::Utc));
+    let observe = |lane: &RateWindowSnapshot| {
+        Some(LimitResetObservation {
+            used_percent: lane.used_percent,
+            observed_at: observed_at?,
+            reset_boundary: lane
+                .resets_at
+                .as_deref()
+                .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+                .map(|date| date.with_timezone(&chrono::Utc)),
+        })
+    };
+    let session = Some(&snapshot.primary)
+        .filter(|lane| {
+            !lane.is_informational && lane.window_minutes.is_some_and(|m| (1..=360).contains(&m))
+        })
+        .and_then(observe);
+    let weekly = snapshot
+        .secondary
+        .as_ref()
+        .filter(|lane| !lane.is_informational && lane.window_minutes == Some(10080))
+        .and_then(observe);
+    LimitResetSample {
+        provider,
+        account,
+        session_transition_account,
+        session,
+        weekly,
     }
 }
 
@@ -1430,9 +1563,12 @@ fn notify_predictive_pace(
                 .map(|date| date.with_timezone(&chrono::Utc)),
             window.reset_description.clone(),
         );
-        let Some(pace) =
-            codexbar::core::UsagePace::weekly(&rate_window, observed_at, default_window_minutes)
-        else {
+        let Some(pace) = codexbar::core::UsagePace::weekly(
+            &rate_window,
+            observed_at,
+            default_window_minutes,
+            settings.weekly_progress_work_days,
+        ) else {
             continue;
         };
         manager.check_predictive_pace(
@@ -1513,6 +1649,17 @@ pub fn get_cached_providers(
         .into_iter()
         .map(|snapshot| ProviderUsagePresentationSnapshot::new(snapshot, &settings))
         .collect()
+}
+
+#[cfg(test)]
+mod refresh_scope_tests {
+    use super::RefreshScope;
+
+    #[test]
+    fn only_full_refreshes_poll_status_pages() {
+        assert!(RefreshScope::AllEnabled.polls_status());
+        assert!(!RefreshScope::AutoResume.polls_status());
+    }
 }
 
 #[cfg(test)]
@@ -1600,6 +1747,50 @@ mod predictive_warning_tests {
             }
         }
     }
+
+    /// Codex OAuth now publishes the auth.json email. Ambient Codex moves from
+    /// the unscoped key (process-local history only) to the lowercased email;
+    /// a managed token account still wins, and the header-only token-account
+    /// label never feeds any scoping key.
+    #[test]
+    fn codex_email_scopes_forecast_and_warnings_but_label_does_not() {
+        use crate::commands::bridge::forecast_account_key;
+
+        let token = uuid::Uuid::parse_str("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb").unwrap();
+        let mut usage = codexbar::core::UsageSnapshot::new(codexbar::core::RateWindow::new(1.0));
+        let mut snapshot = empty_snapshot();
+        snapshot.provider_id = "codex".to_string();
+
+        assert_eq!(forecast_account_key(&usage, None), None);
+        assert_eq!(quota_notification_account_identity(&snapshot, None), "");
+
+        snapshot.account_label = Some("Work account".to_string());
+        assert_eq!(quota_notification_account_identity(&snapshot, None), "");
+
+        usage.account_email = Some("Parity.User@Example.com".to_string());
+        snapshot.account_email = usage.account_email.clone();
+        assert_eq!(
+            forecast_account_key(&usage, None).as_deref(),
+            Some("parity.user@example.com")
+        );
+        assert_eq!(
+            quota_notification_account_identity(&snapshot, None),
+            "parity.user@example.com"
+        );
+        assert_eq!(
+            forecast_account_key(&usage, Some(token)).as_deref(),
+            Some("token-account:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+        );
+    }
+
+    #[test]
+    fn header_label_trims_and_drops_blank_labels() {
+        assert_eq!(
+            header_label("  parity-github "),
+            Some("parity-github".to_string())
+        );
+        assert_eq!(header_label("   "), None);
+    }
 }
 #[cfg(test)]
 mod reset_backfill_tests {
@@ -1618,7 +1809,10 @@ mod reset_backfill_tests {
             reserve_description: None,
             reserve_will_last_to_reset: false,
             reserve_eta_seconds: None,
+            pace: None,
             description_is_detail: false,
+            reset_regenerates: false,
+            hidden_on_card: false,
             monthly_limit_block: None,
         }
     }
@@ -1630,6 +1824,7 @@ mod reset_backfill_tests {
             primary_label: None,
             secondary: None,
             secondary_label: None,
+            secondary_label_key: None,
             model_specific: None,
             tertiary: None,
             tertiary_label: None,
@@ -1639,6 +1834,7 @@ mod reset_backfill_tests {
             cost: None,
             plan_name: None,
             account_email: None,
+            account_label: None,
             subscription: None,
             source_label: String::new(),
             has_successful_claude_cli_quota: false,
@@ -1646,11 +1842,13 @@ mod reset_backfill_tests {
             error: None,
             error_state: codexbar::core::ProviderStateKind::Ready,
             pace: None,
+            pace_authoritative: true,
             account_organization: None,
             tray_status_label: None,
             fetch_duration_ms: None,
             wayfinder_usage: None,
             open_ai_api_usage: None,
+            throughput: None,
             session_equivalent_forecast: None,
             quota_burndown: None,
         }

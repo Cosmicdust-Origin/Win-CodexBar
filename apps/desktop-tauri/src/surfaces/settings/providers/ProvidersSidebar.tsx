@@ -1,15 +1,19 @@
 import {
-  type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent,
+  Fragment,
   type DragEvent as ReactDragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  useLayoutEffect,
   useEffect,
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useLocale } from "../../../hooks/useLocale";
 import type { LocaleKey } from "../../../i18n/keys";
 import { ProviderIcon } from "../../../components/providers/ProviderIcon";
-import { getProviderIcon } from "../../../components/providers/providerIcons";
+import type { ServiceStatusIndicator } from "../../../types/bridge";
+import { SERVICE_STATUS_TO_KEY } from "../../../lib/serviceStatus";
 
 /** Last-fetch state mapped from a ProviderUsageSnapshot / settings pair. */
 export type ProviderSidebarStatus =
@@ -24,18 +28,23 @@ export interface ProviderSidebarRow {
   displayName: string;
   enabled: boolean;
   status: ProviderSidebarStatus;
-  /** Primary subtitle text, e.g. source hint or disabled reason. */
-  subtitlePrimary: string;
-  /** Optional secondary metric line (e.g. "Session 42%"). */
-  subtitleSecondary?: string;
+  /**
+   * Service status while "Check provider status" is on and the provider has
+   * a status page (`unknown` before the first poll). It replaces the
+   * fetch-status dot, as on macOS (`PreferencesSidebar.swift:197-203`).
+   */
+  service?: ServiceStatusIndicator;
 }
 
 interface Props {
+  /** Rows to show, already filtered by the search and in display order. */
   providers: ProviderSidebarRow[];
+  /** Selected provider, or null while an app pane is selected. */
   selectedId: string | null;
-  searchText: string;
-  onSearchTextChange: (value: string) => void;
+  /** False while sorted alphabetically or filtered: drag, Alt+Arrow and Move are off. */
+  canReorder: boolean;
   onSelect: (id: string) => void;
+  /** Full provider order after a move; only called while `canReorder`. */
   onReorder: (orderedIds: string[]) => void;
   onToggleEnabled: (id: string, enabled: boolean) => void;
   disabled?: boolean;
@@ -49,99 +58,63 @@ const STATUS_TO_KEY: Record<ProviderSidebarStatus, LocaleKey> = {
   loading: "ProviderStatusLoading",
 };
 
+interface MenuState {
+  id: string;
+  x: number;
+  y: number;
+}
+
 /**
- * Providers sidebar — parity port of egui `render_providers_sidebar`
- * (rust/src/native_ui/preferences.rs:3370).
- *
- * Responsibilities (Phase 6a only):
- *  - render rows with brand icon + status dot + two-line subtitle + toggle
- *  - drag-and-drop reorder (HTML5 native; emits `onReorder`)
- *  - button reorder for WebView2/automation paths where HTML5 drag can be brittle
- *  - keyboard reorder: Alt+ArrowUp / Alt+ArrowDown on the selected row
- *  - mount-in reveal animation keyed on row id
+ * Provider rows of the Settings sidebar (macOS `SettingsSidebarProviderRow`):
+ * a 16px icon, the name and a fetch-status dot on enabled rows; disabled rows
+ * are dimmed. Enable/Disable, Move Up and Move Down live in the row context
+ * menu (right-click, Shift+F10 or the Menu key). Reorder also works by HTML5
+ * drag and Alt+ArrowUp / Alt+ArrowDown, only while `canReorder`.
  */
 export function ProvidersSidebar({
   providers,
   selectedId,
-  searchText,
-  onSearchTextChange,
+  canReorder,
   onSelect,
   onReorder,
   onToggleEnabled,
   disabled,
 }: Props) {
   const { t } = useLocale();
-
-  // Optimistic local order so drag-drop feels instant while the backend
-  // round-trips `reorder_providers`.
-  const [localOrder, setLocalOrder] = useState<string[]>(() =>
-    providers.map((p) => p.id),
-  );
-  useEffect(() => {
-    setLocalOrder(providers.map((p) => p.id));
-  }, [providers]);
-
-  const byId = new Map(providers.map((p) => [p.id, p]));
-  const ordered = localOrder
-    .map((id) => byId.get(id))
-    .filter((p): p is ProviderSidebarRow => Boolean(p));
-
-  // Track previously-mounted ids to trigger a reveal animation for new rows.
-  const seenRef = useRef<Set<string> | null>(null);
-  if (seenRef.current === null) {
-    seenRef.current = new Set(ordered.map((p) => p.id));
-  }
-  const [justMounted, setJustMounted] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    const seen = seenRef.current;
-    if (!seen) return;
-    const newly = new Set<string>();
-    for (const p of ordered) {
-      if (!seen.has(p.id)) {
-        newly.add(p.id);
-        seen.add(p.id);
-      }
-    }
-    if (newly.size) {
-      setJustMounted(newly);
-      const h = window.setTimeout(() => setJustMounted(new Set()), 260);
-      return () => window.clearTimeout(h);
-    }
-    return undefined;
-  }, [ordered]);
-
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  const rowRefs = useRef(new Map<string, HTMLLIElement>());
+  const reorderable = canReorder && !disabled;
+  const ids = providers.map((p) => p.id);
 
-  const commitReorder = (nextIds: string[]) => {
-    setLocalOrder(nextIds);
-    onReorder(nextIds);
-  };
+  const focusRow = (id: string) => rowRefs.current.get(id)?.focus();
 
   const moveId = (id: string, delta: number) => {
-    const idx = localOrder.indexOf(id);
-    if (idx < 0) return;
+    if (!reorderable) return;
+    const idx = ids.indexOf(id);
     const target = idx + delta;
-    if (target < 0 || target >= localOrder.length) return;
-    const next = [...localOrder];
+    if (idx < 0 || target < 0 || target >= ids.length) return;
+    const next = [...ids];
     next.splice(idx, 1);
     next.splice(target, 0, id);
-    commitReorder(next);
+    onReorder(next);
   };
 
   const handleDragStart = (id: string) => (e: ReactDragEvent<HTMLLIElement>) => {
-    if (disabled) return;
+    if (!reorderable) return;
     setDragId(id);
     e.dataTransfer.effectAllowed = "move";
     try {
       e.dataTransfer.setData("text/plain", id);
     } catch {
-      /* Firefox sometimes throws; ignore. */
+      /* Some engines throw on setData during dragstart; the id is kept in state. */
     }
   };
 
   const handleDragOver = (overId: string) => (e: ReactDragEvent<HTMLLIElement>) => {
-    if (!dragId || dragId === overId) return;
+    // No drop target once reordering stops mid-drag (sort, search or a save).
+    if (!reorderable || !dragId || dragId === overId) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     if (dropTargetId !== overId) setDropTargetId(overId);
@@ -150,15 +123,15 @@ export function ProvidersSidebar({
   const handleDrop = (overId: string) => (e: ReactDragEvent<HTMLLIElement>) => {
     if (!dragId || dragId === overId) return;
     e.preventDefault();
-    const from = localOrder.indexOf(dragId);
-    const to = localOrder.indexOf(overId);
-    if (from < 0 || to < 0) return;
-    const next = [...localOrder];
-    next.splice(from, 1);
-    next.splice(to, 0, dragId);
-    commitReorder(next);
+    const from = ids.indexOf(dragId);
+    const to = ids.indexOf(overId);
     setDragId(null);
     setDropTargetId(null);
+    if (from < 0 || to < 0 || !reorderable) return;
+    const next = [...ids];
+    next.splice(from, 1);
+    next.splice(to, 0, dragId);
+    onReorder(next);
   };
 
   const handleDragEnd = () => {
@@ -166,178 +139,267 @@ export function ProvidersSidebar({
     setDropTargetId(null);
   };
 
-  const handleKey = (row: ProviderSidebarRow) => (e: ReactKeyboardEvent<HTMLLIElement>) => {
-    if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+  const openMenuAtRow = (id: string) => {
+    const rect = rowRefs.current.get(id)?.getBoundingClientRect();
+    setMenu({ id, x: (rect?.left ?? 0) + 24, y: rect?.bottom ?? 0 });
+  };
+
+  const handleKey = (row: ProviderSidebarRow, index: number) => (
+    e: ReactKeyboardEvent<HTMLLIElement>,
+  ) => {
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
       e.preventDefault();
-      moveId(row.id, e.key === "ArrowUp" ? -1 : 1);
+      const delta = e.key === "ArrowUp" ? -1 : 1;
+      if (e.altKey) {
+        moveId(row.id, delta);
+        return;
+      }
+      const next = providers[index + delta];
+      if (next) {
+        onSelect(next.id);
+        focusRow(next.id);
+      }
       return;
     }
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       onSelect(row.id);
+      return;
+    }
+    if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+      e.preventDefault();
+      openMenuAtRow(row.id);
     }
   };
 
-  const sidebarRef = useRef<HTMLUListElement>(null);
-
-  // Explicit wheel handler — WebView2 on Windows can swallow wheel events
-  // when parent containers have overflow:hidden/clip. This ensures the
-  // sidebar always scrolls in response to wheel input.
-  const handleWheel = (e: React.WheelEvent<HTMLUListElement>) => {
-    const el = sidebarRef.current;
-    if (!el) return;
-    el.scrollTop += e.deltaY;
-    e.stopPropagation();
+  const handleContextMenu = (id: string) => (e: ReactMouseEvent<HTMLLIElement>) => {
+    e.preventDefault();
+    setMenu({ id, x: e.clientX, y: e.clientY });
   };
 
+  const menuRow = menu ? providers.find((p) => p.id === menu.id) ?? null : null;
+  const menuIndex = menuRow ? ids.indexOf(menuRow.id) : -1;
+  const focusId = selectedId && ids.includes(selectedId) ? selectedId : ids[0];
+
   return (
-    <div className="providers-sidebar-shell">
-      <div className="providers-sidebar-search">
-        <input
-          className="providers-sidebar-search__input"
-          type="search"
-          value={searchText}
-          onChange={(e) => onSearchTextChange(e.target.value)}
-          placeholder={t("ProviderSidebarSearch")}
-          aria-label={t("ProviderSidebarSearch")}
-          spellCheck={false}
-        />
-        {searchText.trim() && (
-          <button
-            type="button"
-            className="providers-sidebar-search__clear"
-            onClick={() => onSearchTextChange("")}
-            aria-label={t("ProviderSidebarClearSearch")}
-            title={t("ProviderSidebarClearSearch")}
-          >
-            ×
-          </button>
-        )}
-      </div>
+    <>
       <ul
-        ref={sidebarRef}
         className="providers-sidebar"
         role="listbox"
         aria-label={t("ProvidersAriaLabel")}
         aria-orientation="vertical"
-        onWheel={handleWheel}
       >
-        {ordered.length === 0 && (
-          <li className="providers-sidebar__empty">
+        {providers.length === 0 && (
+          <li className="providers-sidebar__empty" role="presentation">
             {t("ProviderSidebarNoMatches")}
           </li>
         )}
-        {ordered.map((p, index) => {
+        {providers.map((p, index) => {
           const isSelected = p.id === selectedId;
-          const isDrop = dropTargetId === p.id;
-          const isDragging = dragId === p.id;
-          const reveal = justMounted.has(p.id);
-          const brand = getProviderIcon(p.id).brandColor;
-          const canMoveUp = index > 0 && !disabled;
-          const canMoveDown = index < ordered.length - 1 && !disabled;
+          const statusLabel = p.service
+            ? t("ProviderServiceStatusHelp").replace("{}", t(SERVICE_STATUS_TO_KEY[p.service]))
+            : t(STATUS_TO_KEY[p.status]);
           const cls = [
             "providers-sidebar__row",
             isSelected && "providers-sidebar__row--selected",
             !p.enabled && "providers-sidebar__row--disabled",
-            isDragging && "providers-sidebar__row--dragging",
-            isDrop && "providers-sidebar__row--drop",
-            reveal && "providers-sidebar__row--reveal",
+            dragId === p.id && "providers-sidebar__row--dragging",
+            dropTargetId === p.id && "providers-sidebar__row--drop",
           ]
             .filter(Boolean)
             .join(" ");
 
-          const rowStyle: CSSProperties = {
-            ["--provider-brand" as string]: brand,
-          };
-
           return (
             <li
               key={p.id}
+              ref={(node) => {
+                if (node) rowRefs.current.set(p.id, node);
+                else rowRefs.current.delete(p.id);
+              }}
               className={cls}
               role="option"
-              tabIndex={isSelected ? 0 : -1}
+              tabIndex={p.id === focusId ? 0 : -1}
               aria-selected={isSelected}
-              draggable={!disabled}
-              style={rowStyle}
+              aria-label={`${p.displayName} — ${statusLabel}`}
+              data-provider-id={p.id}
+              draggable={reorderable}
               onClick={() => onSelect(p.id)}
-              onKeyDown={handleKey(p)}
+              onKeyDown={handleKey(p, index)}
+              onContextMenu={handleContextMenu(p.id)}
               onDragStart={handleDragStart(p.id)}
               onDragOver={handleDragOver(p.id)}
               onDrop={handleDrop(p.id)}
               onDragEnd={handleDragEnd}
             >
-              <span
-                className={`providers-sidebar__status providers-sidebar__status--${p.status}`}
-                title={t(STATUS_TO_KEY[p.status])}
-                aria-label={t(STATUS_TO_KEY[p.status])}
-              />
-              <ProviderIcon providerId={p.id} size={24} />
-              <div className="providers-sidebar__text">
-                <span className="providers-sidebar__name" title={p.displayName}>
-                  {p.displayName}
-                </span>
-                <span className="providers-sidebar__subtitle">
-                  <span
-                    className="providers-sidebar__subtitle-primary"
-                    title={p.subtitlePrimary}
-                  >
-                    {p.subtitlePrimary}
-                  </span>
-                  {p.subtitleSecondary && (
-                    <span className="providers-sidebar__subtitle-secondary">
-                      {p.subtitleSecondary}
-                    </span>
-                  )}
-                </span>
-              </div>
-              <span
-                className="providers-sidebar__handle"
-                aria-hidden="true"
-                title={t("ProviderSidebarReorderHint")}
-              >
-                ⋮⋮
+              <ProviderIcon providerId={p.id} size={16} />
+              <span className="providers-sidebar__name" title={p.displayName}>
+                {p.displayName}
               </span>
-              <span className="providers-sidebar__reorder-controls">
-                <button
-                  type="button"
-                  className="providers-sidebar__reorder-button"
-                  disabled={!canMoveUp}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    moveId(p.id, -1);
-                  }}
-                  aria-label={`${t("ProviderSidebarMoveUp")} ${p.displayName}`}
-                  title={`${t("ProviderSidebarMoveUp")} ${p.displayName}`}
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  className="providers-sidebar__reorder-button"
-                  disabled={!canMoveDown}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    moveId(p.id, 1);
-                  }}
-                  aria-label={`${t("ProviderSidebarMoveDown")} ${p.displayName}`}
-                  title={`${t("ProviderSidebarMoveDown")} ${p.displayName}`}
-                >
-                  ↓
-                </button>
-              </span>
-              <input
-                type="checkbox"
-                className="providers-sidebar__checkbox"
-                checked={p.enabled}
-                disabled={disabled}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => onToggleEnabled(p.id, e.target.checked)}
-                aria-label={`${p.displayName} ${t("ProviderEnabled")}`}
-              />
+              {p.enabled && p.service && (
+                <span
+                  className={`providers-sidebar__service providers-sidebar__service--${p.service}`}
+                  title={statusLabel}
+                  aria-hidden="true"
+                />
+              )}
+              {p.enabled && !p.service && (
+                <span
+                  className={`providers-sidebar__status providers-sidebar__status--${p.status}`}
+                  title={statusLabel}
+                  aria-hidden="true"
+                />
+              )}
             </li>
           );
-          })}
+        })}
       </ul>
-    </div>
+      {menu && menuRow && (
+        <ProviderRowMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={(refocus) => {
+            setMenu(null);
+            if (refocus) focusRow(menu.id);
+          }}
+          items={[
+            {
+              label: t(menuRow.enabled ? "ProviderContextDisable" : "ProviderContextEnable"),
+              disabled: Boolean(disabled),
+              run: () => onToggleEnabled(menuRow.id, !menuRow.enabled),
+            },
+            {
+              label: t("ProviderSidebarMoveUp"),
+              disabled: !reorderable || menuIndex <= 0,
+              run: () => moveId(menuRow.id, -1),
+            },
+            {
+              label: t("ProviderSidebarMoveDown"),
+              disabled: !reorderable || menuIndex >= ids.length - 1,
+              run: () => moveId(menuRow.id, 1),
+            },
+          ]}
+        />
+      )}
+    </>
+  );
+}
+
+export interface MenuItem {
+  label: string;
+  disabled: boolean;
+  run: () => void;
+  /** Set for a checkbox item; its state shows as a check mark. */
+  checked?: boolean;
+  /** Native-style tooltip for the item. */
+  title?: string;
+  /** Draws a divider above the item. */
+  separatorBefore?: boolean;
+}
+
+const MENU_EDGE = 4;
+
+/** A small floating menu at a point, kept inside the window. */
+export function ProviderRowMenu({
+  x,
+  y,
+  items,
+  onClose,
+}: {
+  x: number;
+  y: number;
+  items: MenuItem[];
+  /** `refocus`: return focus to the row (keyboard close or after a command). */
+  onClose: (refocus: boolean) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ left: x, top: y });
+  const onCloseRef = useRef(onClose);
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const left = Math.max(MENU_EDGE, Math.min(x, window.innerWidth - rect.width - MENU_EDGE));
+    const top = Math.max(MENU_EDGE, Math.min(y, window.innerHeight - rect.height - MENU_EDGE));
+    setPos({ left, top });
+    el.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+  }, [x, y]);
+
+  useEffect(() => {
+    const onPointer = (e: MouseEvent) => {
+      if (ref.current?.contains(e.target as Node)) return;
+      // A `data-menu-toggle` button closes its own menu on click, not here.
+      if ((e.target as Element | null)?.closest?.("[data-menu-toggle]")) return;
+      onCloseRef.current(false);
+    };
+    const onDismiss = () => onCloseRef.current(false);
+    document.addEventListener("mousedown", onPointer, true);
+    window.addEventListener("blur", onDismiss);
+    window.addEventListener("resize", onDismiss);
+    return () => {
+      document.removeEventListener("mousedown", onPointer, true);
+      window.removeEventListener("blur", onDismiss);
+      window.removeEventListener("resize", onDismiss);
+    };
+  }, []);
+
+  const handleKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Escape" || e.key === "Tab") {
+      e.preventDefault();
+      onClose(true);
+      return;
+    }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const buttons = Array.from(
+        ref.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [],
+      );
+      if (buttons.length === 0) return;
+      const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      const step = e.key === "ArrowDown" ? 1 : -1;
+      buttons[(at + step + buttons.length) % buttons.length].focus();
+    }
+  };
+
+  return createPortal(
+    <div
+      ref={ref}
+      className="providers-sidebar-menu"
+      role="menu"
+      style={{ left: pos.left, top: pos.top }}
+      onKeyDown={handleKey}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {items.map((item) => (
+        <Fragment key={item.label}>
+          {item.separatorBefore && (
+            <div className="providers-sidebar-menu__separator" role="separator" />
+          )}
+          <button
+            type="button"
+            role={item.checked === undefined ? "menuitem" : "menuitemcheckbox"}
+            aria-checked={item.checked}
+            className="providers-sidebar-menu__item"
+            title={item.title}
+            disabled={item.disabled}
+            onClick={() => {
+              item.run();
+              onClose(true);
+            }}
+          >
+            {item.checked !== undefined && (
+              <span className="providers-sidebar-menu__check" aria-hidden="true">
+                {item.checked ? "✓" : ""}
+              </span>
+            )}
+            {item.label}
+          </button>
+        </Fragment>
+      ))}
+    </div>,
+    document.body,
   );
 }

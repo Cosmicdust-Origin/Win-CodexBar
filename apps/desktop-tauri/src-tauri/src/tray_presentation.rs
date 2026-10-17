@@ -1,11 +1,16 @@
 //! Pure tray presentation policy shared by the native tray surfaces.
 
 use crate::commands::{ProviderUsageSnapshot, RateWindowSnapshot};
+use chrono::{DateTime, Utc};
+use codexbar::core::{IconLane, ProviderId, UsagePace};
 use codexbar::settings::{Language, MetricPreference, Settings, TrayIconMode};
 use codexbar::tray::{
-    TrayPaceColor, render_bar_icon_rgba_with_pace, render_percent_icon_rgba_with_pace,
-    render_stacked_bar_icon_rgba,
+    TrayPaceColor, render_bar_icon_rgba_tinted, render_percent_icon_rgba_tinted,
+    render_stacked_bar_icon_rgba_tinted, render_stacked_bars_icon_rgba_tinted,
 };
+
+/// Opt-in provider accent for a tray meter (`menu_bar_color_by_provider`).
+type ProviderRgb = (u8, u8, u8);
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum TrayIconPlan {
@@ -13,15 +18,26 @@ enum TrayIconPlan {
         primary_percent: f64,
         secondary_percent: Option<f64>,
         has_error: bool,
+        provider_tint: Option<ProviderRgb>,
+    },
+    /// The same session and weekly windows as `Bars`, drawn as equal rows.
+    StackedBars {
+        primary_percent: f64,
+        secondary_percent: Option<f64>,
+        has_error: bool,
+        provider_tint: Option<ProviderRgb>,
     },
     Percent {
         percent: f64,
         has_error: bool,
+        provider_tint: Option<ProviderRgb>,
     },
     Stacked {
         top_percent: f64,
         bottom_percent: f64,
         has_error: bool,
+        top_tint: Option<ProviderRgb>,
+        bottom_tint: Option<ProviderRgb>,
     },
 }
 
@@ -57,16 +73,27 @@ impl<'a> TrayPresentationPlan<'a> {
         snapshots: &'a [ProviderUsageSnapshot],
         rates_cache: Option<&'a crate::commands::CurrencyRateCache>,
     ) -> Self {
+        Self::resolve_at(settings, snapshots, rates_cache, Utc::now())
+    }
+
+    /// [`Self::resolve`] with the pace tint scored at `now`.
+    pub(crate) fn resolve_at(
+        settings: &'a Settings,
+        snapshots: &'a [ProviderUsageSnapshot],
+        rates_cache: Option<&'a crate::commands::CurrencyRateCache>,
+        now: DateTime<Utc>,
+    ) -> Self {
         let ordered = ordered_snapshot_refs(settings, snapshots);
         let healthy = ordered
             .into_iter()
             .filter(|snapshot| snapshot.error.is_none())
             .collect::<Vec<_>>();
         let has_error = healthy.is_empty() && !snapshots.is_empty();
-        let prefer_highest =
-            settings.menu_bar_shows_highest_usage || settings.menu_bar_display_mode == "minimal";
+        // The retired Display mode "minimal" is folded into this flag once on load.
+        let prefer_highest = settings.menu_bar_shows_highest_usage;
         let selected = pick_tray_provider(&healthy, prefer_highest);
-        let icon_pace = tray_pace_color(settings, selected);
+        let icon_pace = tray_pace_color(settings, selected, now);
+        let single_tint = provider_tint(settings, selected);
 
         let (icon, status_rows) = match settings.tray_icon_mode {
             TrayIconMode::Stacked => {
@@ -76,6 +103,8 @@ impl<'a> TrayPresentationPlan<'a> {
                             top_percent: selected_tray_percents(top, settings).0,
                             bottom_percent: selected_tray_percents(bottom, settings).0,
                             has_error,
+                            top_tint: provider_tint(settings, Some(top)),
+                            bottom_tint: provider_tint(settings, Some(bottom)),
                         },
                         vec![
                             TrayStatusRow {
@@ -102,7 +131,11 @@ impl<'a> TrayPresentationPlan<'a> {
                         .collect();
                     (
                         resolve_single_provider_icon_plan(
-                            settings, percents.0, percents.1, has_error,
+                            settings,
+                            percents.0,
+                            percents.1,
+                            has_error,
+                            single_tint,
                         ),
                         rows,
                     )
@@ -121,7 +154,13 @@ impl<'a> TrayPresentationPlan<'a> {
                     })
                     .collect();
                 (
-                    resolve_single_provider_icon_plan(settings, percents.0, percents.1, has_error),
+                    resolve_single_provider_icon_plan(
+                        settings,
+                        percents.0,
+                        percents.1,
+                        has_error,
+                        single_tint,
+                    ),
                     rows,
                 )
             }
@@ -137,7 +176,13 @@ impl<'a> TrayPresentationPlan<'a> {
                     .into_iter()
                     .collect();
                 (
-                    resolve_single_provider_icon_plan(settings, percents.0, percents.1, has_error),
+                    resolve_single_provider_icon_plan(
+                        settings,
+                        percents.0,
+                        percents.1,
+                        has_error,
+                        single_tint,
+                    ),
                     rows,
                 )
             }
@@ -145,7 +190,9 @@ impl<'a> TrayPresentationPlan<'a> {
 
         let icon_pace = match icon {
             TrayIconPlan::Stacked { .. } => None,
-            TrayIconPlan::Bars { .. } | TrayIconPlan::Percent { .. } => icon_pace,
+            TrayIconPlan::Bars { .. }
+            | TrayIconPlan::StackedBars { .. }
+            | TrayIconPlan::Percent { .. } => icon_pace,
         };
 
         Self {
@@ -163,20 +210,44 @@ impl<'a> TrayPresentationPlan<'a> {
                 primary_percent,
                 secondary_percent,
                 has_error,
-            } => render_bar_icon_rgba_with_pace(
+                provider_tint,
+            } => render_bar_icon_rgba_tinted(
                 primary_percent,
                 secondary_percent,
                 has_error,
                 self.icon_pace,
+                provider_tint,
             ),
-            TrayIconPlan::Percent { percent, has_error } => {
-                render_percent_icon_rgba_with_pace(percent, has_error, self.icon_pace)
-            }
+            TrayIconPlan::Percent {
+                percent,
+                has_error,
+                provider_tint,
+            } => render_percent_icon_rgba_tinted(percent, has_error, self.icon_pace, provider_tint),
+            TrayIconPlan::StackedBars {
+                primary_percent,
+                secondary_percent,
+                has_error,
+                provider_tint,
+            } => render_stacked_bars_icon_rgba_tinted(
+                primary_percent,
+                secondary_percent,
+                has_error,
+                self.icon_pace,
+                provider_tint,
+            ),
             TrayIconPlan::Stacked {
                 top_percent,
                 bottom_percent,
                 has_error,
-            } => render_stacked_bar_icon_rgba(top_percent, bottom_percent, has_error),
+                top_tint,
+                bottom_tint,
+            } => render_stacked_bar_icon_rgba_tinted(
+                top_percent,
+                bottom_percent,
+                has_error,
+                top_tint,
+                bottom_tint,
+            ),
         }
     }
 
@@ -201,35 +272,126 @@ fn resolve_single_provider_icon_plan(
     primary_percent: f64,
     secondary_percent: Option<f64>,
     has_error: bool,
+    provider_tint: Option<ProviderRgb>,
 ) -> TrayIconPlan {
-    if settings.menu_bar_shows_percent {
-        TrayIconPlan::Percent {
+    use codexbar::settings::MenuBarIconStyle;
+    match settings.menu_bar_icon_style {
+        MenuBarIconStyle::Percent => TrayIconPlan::Percent {
             percent: primary_percent,
             has_error,
-        }
-    } else {
-        TrayIconPlan::Bars {
+            provider_tint,
+        },
+        MenuBarIconStyle::StackedBars => TrayIconPlan::StackedBars {
             primary_percent,
             secondary_percent,
             has_error,
-        }
+            provider_tint,
+        },
+        MenuBarIconStyle::Bars => TrayIconPlan::Bars {
+            primary_percent,
+            secondary_percent,
+            has_error,
+            provider_tint,
+        },
     }
+}
+
+/// Accent tint for the meter of `snapshot` (upstream "Color by provider").
+///
+/// Opt-in through `menu_bar_color_by_provider`. Uses the effective accent, so
+/// a per-provider override applies too. A malformed override yields no tint.
+/// Legibility against the tray canvas is checked by the renderer.
+fn provider_tint(
+    settings: &Settings,
+    snapshot: Option<&ProviderUsageSnapshot>,
+) -> Option<ProviderRgb> {
+    if !settings.menu_bar_color_by_provider {
+        return None;
+    }
+    let id = ProviderId::from_cli_name(&snapshot?.provider_id)?;
+    parse_hex_rgb(&settings.effective_accent_color(id))
+}
+
+/// Parse `#RRGGBB` (the leading `#` is optional and case is ignored).
+fn parse_hex_rgb(value: &str) -> Option<ProviderRgb> {
+    let hex = value.trim().strip_prefix('#').unwrap_or(value.trim());
+    if hex.len() != 6 || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let channel = |range: std::ops::Range<usize>| u8::from_str_radix(&hex[range], 16).ok();
+    Some((channel(0..2)?, channel(2..4)?, channel(4..6)?))
 }
 
 /// Pace tint for the provider that drives a single-provider tray icon.
 ///
 /// Opt-in through `menu_bar_color_pace`; on-track and unknown stages keep the
-/// normal usage-level colour.
+/// normal usage-level colour. The pace comes from the menu bar pace window
+/// (upstream `menuBarPaceWindow`, StatusItemController+Animation.swift
+/// :1207-1225): the lane the provider declares, or else the window the icon
+/// draws for the selected metric.
 fn tray_pace_color(
     settings: &Settings,
     selected: Option<&ProviderUsageSnapshot>,
+    now: DateTime<Utc>,
 ) -> Option<TrayPaceColor> {
     if !settings.menu_bar_color_pace {
         return None;
     }
-    selected
-        .and_then(|snapshot| snapshot.pace.as_ref())
-        .and_then(|pace| TrayPaceColor::from_stage(&pace.stage))
+    let snapshot = selected?;
+    let window = menu_bar_pace_window(snapshot, settings)?;
+    let pace = menu_bar_pace(snapshot, &window, settings.weekly_progress_work_days, now)?;
+    TrayPaceColor::from_stage(crate::commands::pace::stage_str(pace.stage))
+}
+
+/// Window the menu bar pace is scored on. A provider-declared lane wins over
+/// the selected metric; a missing declared lane gives no pace.
+fn menu_bar_pace_window(
+    snapshot: &ProviderUsageSnapshot,
+    settings: &Settings,
+) -> Option<RateWindowSnapshot> {
+    let declared = ProviderId::from_cli_name(&snapshot.provider_id)
+        .and_then(|id| codexbar::core::instantiate_provider(id).menu_bar_pace_lane());
+    match declared {
+        Some(IconLane::Primary) => Some(snapshot.primary.clone()),
+        Some(IconLane::Secondary) => snapshot.secondary.clone(),
+        None => Some(crate::usage_metric::selected_usage_icon_windows(snapshot, settings).0),
+    }
+}
+
+/// Generic branch of upstream `UsageStore.weeklyPace`
+/// (UsageStore+HistoricalPace.swift:8-64): the fetch must allow pace and the
+/// window must have quota left and its own length (no 7-day fallback). A
+/// monthly sentinel resolves to the real calendar cycle first
+/// (`paceWindowForElapsedEligibility`, :118-124), and a pace expecting less
+/// than 3% use is dropped.
+fn menu_bar_pace(
+    snapshot: &ProviderUsageSnapshot,
+    window: &RateWindowSnapshot,
+    work_days: Option<u8>,
+    now: DateTime<Utc>,
+) -> Option<UsagePace> {
+    const MINIMUM_EXPECTED_PERCENT: f64 = 3.0;
+    if !snapshot.pace_authoritative || window.is_informational {
+        return None;
+    }
+    window.window_minutes?;
+    let rate_window = window.to_rate_window();
+    if rate_window.remaining_percent() <= 0.0 {
+        return None;
+    }
+    let pace_window = match ProviderId::from_cli_name(&snapshot.provider_id) {
+        Some(id) => id
+            .pace_capability()
+            .resolved_reset_window_for_pace(&rate_window),
+        None => rate_window,
+    };
+    let pace = UsagePace::weekly(
+        &pace_window,
+        Some(now),
+        crate::commands::pace::WEEKLY_FALLBACK_MINUTES,
+        work_days,
+    )?;
+    (pace.expected_used_percent >= MINIMUM_EXPECTED_PERCENT).then_some(pace)
 }
 
 fn fallback_percents(

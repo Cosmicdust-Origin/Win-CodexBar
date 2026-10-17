@@ -3,8 +3,7 @@ import { GeminiCliCreds } from "./credentials/GeminiCliCreds";
 import { VertexAiCreds } from "./credentials/VertexAiCreds";
 import { JetBrainsCreds } from "./credentials/JetBrainsCreds";
 import { KiroCreds } from "./credentials/KiroCreds";
-import { ClaudeCreds } from "./credentials/ClaudeCreds";
-import { OpenAiExtras } from "./credentials/OpenAiExtras";
+import { hasWorkspaceExtra, OpenAiExtras } from "./credentials/OpenAiExtras";
 import { OpenRouterManagementCreds } from "./credentials/OpenRouterManagementCreds";
 
 interface Props {
@@ -15,8 +14,7 @@ interface Props {
 /**
  * Dispatch the appropriate Phase-6d credential component based on the
  * current provider. Providers without a bespoke credentials UI render
- * nothing. Mirrors the `provider_id == ProviderId::*` chain in
- * `rust/src/native_ui/preferences.rs::render_provider_detail_panel`.
+ * nothing. Claude and Codex switches live in the Options group instead.
  */
 export function CredentialsDispatcher({ providerId, t }: Props) {
   switch (providerId) {
@@ -28,25 +26,11 @@ export function CredentialsDispatcher({ providerId, t }: Props) {
       return <JetBrainsCreds t={t} />;
     case "kiro":
       return <KiroCreds t={t} />;
-    case "claude":
-      return <ClaudeCreds t={t} />;
-    case "codex":
-      return <OpenAiExtras providerId={providerId} t={t} />;
-    case "openaiapi":
-      return <OpenAiExtras providerId={providerId} t={t} />;
-    case "litellm":
-    case "llmman":
-    case "devin":
-    case "opencodego":
-    case "zed":
-    case "sub2api":
-    case "llmproxy":
-    case "xai":
-    case "gitkraken":
-      return <OpenAiExtras providerId={providerId} t={t} />;
     case "openrouter":
       return <OpenRouterManagementCreds t={t} />;
     default:
-      return null;
+      return hasWorkspaceExtra(providerId) ? (
+        <OpenAiExtras providerId={providerId} t={t} />
+      ) : null;
   }
 }

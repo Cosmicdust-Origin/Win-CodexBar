@@ -8,7 +8,8 @@ vi.mock("../../../../../lib/tauri", () => ({
   getProviderChartData: vi.fn(),
   getSettingsSnapshot: vi.fn().mockResolvedValue({ enableAnimations: false }),
 }));
-vi.mock("../../../../../lib/providerCharts", () => ({
+vi.mock("../../../../../lib/providerCharts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../../../lib/providerCharts")>()),
   providerSupportsChartData: () => true,
 }));
 
@@ -131,6 +132,20 @@ describe("ChartsSection OpenAI API daily usage (upstream 0.66.0)", () => {
     expect(screen.queryByText("DetailChartCost")).toBeNull();
   });
 
+  it("draws the per-day chart for the Groq console history", () => {
+    mockChart.mockResolvedValue(chartData({ providerId: "groq" }));
+    render(
+      <ChartsSection
+        providerId="groq"
+        accountEmail={null}
+        openAiApiUsage={openAiUsage}
+        t={(key) => key}
+      />,
+    );
+    expect(screen.getByText("OpenAIChartTitle", { selector: ".provider-detail-chart__title" })).toBeTruthy();
+    expect(screen.getByRole("listbox")).toBeTruthy();
+  });
+
   it("renders nothing for openaiapi without usage or with an empty window", () => {
     mockChart.mockResolvedValue(chartData({ providerId: "openaiapi" }));
     const { container, rerender } = render(
@@ -163,5 +178,47 @@ describe("ChartsSection OpenAI API daily usage (upstream 0.66.0)", () => {
     });
     expect(screen.queryByText("OpenAIChartTitle")).toBeNull();
     expect(screen.queryByRole("listbox")).toBeNull();
+  });
+});
+
+describe("ChartsSection quota window history (moved from the tray card)", () => {
+  const quotaWindowHistory = {
+    providerId: "claude",
+    accountScope: null,
+    historyCoverageEstablished: true,
+    windows: [
+      {
+        offset: 0,
+        start: "2026-09-14T12:00:00Z",
+        end: "2026-09-21T12:00:00Z",
+        totalTokens: 1234,
+        totalCostUsd: 1.25,
+        tokensAreComplete: true,
+        costIsComplete: true,
+        entryCount: 2,
+        boundariesAreEstimated: false,
+      },
+    ],
+  };
+
+  it("lists recent quota windows under the chart tabs", async () => {
+    mockChart.mockResolvedValue(chartData({ providerId: "claude", quotaWindowHistory }));
+    render(<ChartsSection providerId="claude" accountEmail={null} t={(key) => key} />);
+    expect(await screen.findByText("1,234")).toBeInTheDocument();
+    expect(screen.getByRole("tablist")).toBeInTheDocument();
+  });
+
+  it("shows the history alone when there is no chart series", async () => {
+    mockChart.mockResolvedValue(
+      chartData({
+        providerId: "claude",
+        costHistory: [],
+        tokensHistory: [],
+        quotaWindowHistory,
+      }),
+    );
+    render(<ChartsSection providerId="claude" accountEmail={null} t={(key) => key} />);
+    expect(await screen.findByText("$1.25")).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
   });
 });

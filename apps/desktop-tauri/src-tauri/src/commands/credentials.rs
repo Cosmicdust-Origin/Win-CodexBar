@@ -40,6 +40,10 @@ pub struct AppInfoBridge {
     pub name: String,
     pub version: String,
     pub build_number: String,
+    /// UTC date this binary was built (YYYY-MM-DD). `None` when the build
+    /// script output was reused from a target dir shared with another branch.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub build_date: Option<String>,
     pub update_channel: String,
     pub tagline: String,
 }

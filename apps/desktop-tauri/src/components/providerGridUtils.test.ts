@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ProviderUsageSnapshot } from "../types/bridge";
 
-import { prioritizeProviders } from "./providerGridUtils";
+import { prioritizeProviders, switcherWeeklyPercent } from "./providerGridUtils";
 
 function provider(id: string): ProviderUsageSnapshot {
   return {
@@ -104,5 +104,39 @@ describe("prioritizeProviders", () => {
     expect(prioritized.length).toBe(unprioritized.length);
     // same members, different order
     expect(new Set(ids(prioritized))).toEqual(new Set(ids(unprioritized)));
+  });
+});
+
+function lane(usedPercent: number, windowMinutes: number | null): ProviderUsageSnapshot["primary"] {
+  return { ...provider("x").primary, usedPercent, remainingPercent: 100 - usedPercent, windowMinutes };
+}
+
+describe("switcherWeeklyPercent", () => {
+  it("shows the 7-day lane, not the session lane", () => {
+    const codex = { ...provider("codex"), primary: lane(42, 300), secondary: lane(63, 10080) };
+    expect(switcherWeeklyPercent(codex, true)).toBe(63);
+    expect(switcherWeeklyPercent(codex, false)).toBe(37);
+  });
+
+  it("picks the most used 7-day lane when both core lanes are weekly", () => {
+    const both = { ...provider("p"), primary: lane(20, 10080), secondary: lane(70, 10080) };
+    expect(switcherWeeklyPercent(both, true)).toBe(70);
+  });
+
+  it("ignores weekly tertiary and extra lanes", () => {
+    const scoped = {
+      ...provider("claude"),
+      primary: lane(10, 300),
+      secondary: lane(30, 10080),
+      tertiary: lane(95, 10080),
+      extraRateWindows: [{ id: "scoped", title: "Scoped", window: lane(99, 10080) }],
+    };
+    expect(switcherWeeklyPercent(scoped, true)).toBe(30);
+  });
+
+  it("falls back to the primary lane without a 7-day lane", () => {
+    const monthly = { ...provider("p"), primary: lane(25, 43200), secondary: lane(80, 300) };
+    expect(switcherWeeklyPercent(monthly, true)).toBe(25);
+    expect(switcherWeeklyPercent({ ...provider("p"), primary: lane(140, null) }, true)).toBe(100);
   });
 });

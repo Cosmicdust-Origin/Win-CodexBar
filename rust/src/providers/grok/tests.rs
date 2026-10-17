@@ -277,6 +277,7 @@ fn billing_snapshot_uses_full_weekly_cycle_for_pace() {
         &result.usage.primary,
         Some(now),
         crate::core::WEEKLY_WINDOW_MINUTES,
+        None,
     );
     assert!(pace.is_some(), "weekly window + reset must yield pace");
 }
